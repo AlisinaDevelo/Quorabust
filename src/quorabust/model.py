@@ -56,6 +56,7 @@ def train_duplicate_classifier(
             y_tr,
             eval_set=[(X_ev, y_ev)],
             verbose=False,
+            early_stopping_rounds=20,
         )
     else:
         clf.fit(X_tr, y_tr)
