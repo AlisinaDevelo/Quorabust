@@ -43,6 +43,8 @@ def train_duplicate_classifier(
         "tree_method": "hist",
         "verbosity": 0,
     }
+    if eval_df is not None:
+        params.setdefault("early_stopping_rounds", 20)
     if xgb_params:
         params.update(xgb_params)
 
@@ -56,7 +58,6 @@ def train_duplicate_classifier(
             y_tr,
             eval_set=[(X_ev, y_ev)],
             verbose=False,
-            early_stopping_rounds=20,
         )
     else:
         clf.fit(X_tr, y_tr)
