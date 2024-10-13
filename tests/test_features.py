@@ -31,8 +31,8 @@ def test_pair_feature_builder_shape_and_monotonic_similarity():
 def test_fit_from_frame():
     df = pd.DataFrame(
         {
-            "question1": ["a b", "c d"],
-            "question2": ["a c", "e f"],
+            "question1": ["hello world", "foo bar"],
+            "question2": ["hello there", "baz qux"],
         }
     )
     b = PairFeatureBuilder(max_features=64)

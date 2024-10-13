@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 import unicodedata
 
-
 _WS = re.compile(r"\s+")
 _NON_WORD = re.compile(r"[^\w\s]", re.UNICODE)
 

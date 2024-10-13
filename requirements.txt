@@ -1,7 +1,5 @@
-numpy
-pandas
-scikit-learn
-xgboost
-matplotlib
-seaborn
-jupyter
+# Runtime deps; use `pip install -e ".[dev]"` for tests and lint.
+numpy>=1.24
+pandas>=2.0
+scikit-learn>=1.3
+xgboost>=2.0

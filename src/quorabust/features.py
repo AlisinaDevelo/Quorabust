@@ -31,6 +31,7 @@ class PairFeatureBuilder:
             max_features=max_features,
             ngram_range=ngram_range,
             min_df=1,
+            stop_words=None,
         )
         self._fitted = False
 
