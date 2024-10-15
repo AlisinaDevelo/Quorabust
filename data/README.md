@@ -1,6 +1,6 @@
-# Data Directory
+# Data directory
 
-This directory contains all datasets used in the Quorabust project.
+Datasets for Quorabust. See [docs/NOTES.md](../docs/NOTES.md) for download links and column expectations.
 
 ## Subdirectories
 
