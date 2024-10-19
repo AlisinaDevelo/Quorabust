@@ -25,4 +25,9 @@ setup(
     author_email="alisinakarimi.2003@gmail.com",
     description="Text features and models for Quora-style duplicate question detection.",
     url="https://github.com/AliSinaDevelo/Quorabust",
+    entry_points={
+        "console_scripts": [
+            "quorabust-train=quorabust.cli:main",
+        ],
+    },
 )
