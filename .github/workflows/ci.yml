@@ -24,3 +24,5 @@ jobs:
         run: ruff check src tests
       - name: Pytest
         run: pytest -q --cov=quorabust --cov-report=term-missing
+      - name: CLI
+        run: quorabust-train --help
