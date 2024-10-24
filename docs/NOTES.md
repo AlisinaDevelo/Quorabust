@@ -12,8 +12,12 @@ The public [Quora Question Pairs](https://www.kaggle.com/c/quora-question-pairs)
 
 - **TF–IDF** uses `stop_words=None` so short or stopword-heavy questions still produce a vocabulary (important for tests and for “what is …” style duplicates).
 - **Early stopping** is enabled when you pass `eval_df` to `train_duplicate_classifier`; `early_stopping_rounds` defaults to 20 and can be overridden via `xgb_params`.
-- **Artifacts**: serialize `(PairFeatureBuilder, XGBClassifier)` together if you save models; the vectorizer vocabulary must match training.
+- **Artifacts**: use `save_classifier` / `load_classifier` from `quorabust.persist` (or `from quorabust import …`) so the `PairFeatureBuilder` (TF–IDF state) and `XGBClassifier` stay in sync.
+
+## Training CLI
+
+`quorabust-train` reads a CSV with `question1`, `question2`, and `is_duplicate`, shuffles, optionally holds out the first fraction for early stopping, fits the pipeline, prints log loss, and writes a pickle. See `quorabust.cli` or run `quorabust-train --help`.
 
 ## Notebooks
 
-The `notebooks/` folder is reserved for ad-hoc EDA and experiments. Templates were removed in favor of a small, tested library; recreate notebooks as needed for your workflow.
+See [notebooks/10_workflow.ipynb](../notebooks/10_workflow.ipynb) for a short end-to-end checklist; add your own EDA notebooks alongside it.

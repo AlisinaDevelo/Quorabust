@@ -16,11 +16,16 @@ Optional extras: `pip install -e ".[viz,notebooks]"` for Matplotlib, Seaborn, an
 
 ```python
 import pandas as pd
-from quorabust import clean_text, train_duplicate_classifier, predict_proba_duplicate
+from quorabust import (
+    clean_text,
+    load_classifier,
+    predict_proba_duplicate,
+    train_duplicate_classifier,
+)
 
-df = pd.read_csv("data/raw/quora_train.csv")  # place Kaggle Quora data here
-df = df.rename(columns=lambda c: c.strip())
-builder, clf = train_duplicate_classifier(df.head(5000))  # example subset
+df = pd.read_csv("data/raw/train.csv")  # Kaggle Quora Question Pairs
+df.columns = [c.strip() for c in df.columns]
+builder, clf = train_duplicate_classifier(df.head(5000))
 
 proba = predict_proba_duplicate(
     builder,
@@ -31,11 +36,31 @@ proba = predict_proba_duplicate(
 print(proba[:, 1])  # P(duplicate)
 ```
 
+### Train from the terminal
+
+With `data/raw/train.csv` in place:
+
+```bash
+quorabust-train --csv data/raw/train.csv --out models/quorabust.pkl
+python -m quorabust --csv data/raw/train.csv --out models/quorabust.pkl   # equivalent
+```
+
+Options: `--max-rows N`, `--eval-fraction 0.1` (default), `--eval-fraction 0` to train on all rows without a holdout, `--seed`.
+
+### Load a saved model
+
+```python
+from quorabust import load_classifier, predict_proba_duplicate
+
+builder, clf, meta = load_classifier("models/quorabust.pkl")
+print(meta)  # n_train, eval_log_loss, paths, etc.
+```
+
 ## Project layout
 
 | Path | Purpose |
 |------|---------|
-| `src/quorabust/` | Package: `preprocess`, `features`, `model` |
+| `src/quorabust/` | Package: `preprocess`, `features`, `model`, `persist`, `cli` |
 | `tests/` | Pytest suite |
 | `data/raw/` | Original CSVs (not committed; see `data/README.md`) |
 | `data/processed/` | Cleaned splits |
