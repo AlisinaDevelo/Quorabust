@@ -1,0 +1,1 @@
+Quorabust bundles no vendored third-party source. Runtime dependencies are listed in pyproject.toml / requirements.txt and are subject to their respective licenses (see pip metadata).
