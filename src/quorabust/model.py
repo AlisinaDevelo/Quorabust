@@ -4,7 +4,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import log_loss
+from sklearn.metrics import accuracy_score, log_loss, roc_auc_score
 from xgboost import XGBClassifier
 
 from quorabust.features import PairFeatureBuilder
@@ -88,3 +88,25 @@ def eval_log_loss(
     y = df[label_col].astype(int).to_numpy()
     proba = clf.predict_proba(X)[:, 1]
     return float(log_loss(y, proba))
+
+
+def eval_classification_metrics(
+    builder: PairFeatureBuilder,
+    clf: XGBClassifier,
+    df: pd.DataFrame,
+    label_col: str = "is_duplicate",
+    col_q1: str = "question1",
+    col_q2: str = "question2",
+) -> dict[str, float]:
+    """Accuracy, log loss, and ROC-AUC when both classes are present."""
+    X = builder.transform_frame(df, col_q1=col_q1, col_q2=col_q2)
+    y = df[label_col].astype(int).to_numpy()
+    proba = clf.predict_proba(X)[:, 1]
+    y_hat = (proba >= 0.5).astype(int)
+    out: dict[str, float] = {
+        "accuracy": float(accuracy_score(y, y_hat)),
+        "log_loss": float(log_loss(y, proba)),
+    }
+    if len(np.unique(y)) > 1:
+        out["roc_auc"] = float(roc_auc_score(y, proba))
+    return out
