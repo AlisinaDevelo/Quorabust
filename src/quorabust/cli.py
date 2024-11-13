@@ -2,13 +2,22 @@ from __future__ import annotations
 
 import argparse
 import sys
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
-from quorabust.model import eval_log_loss, train_duplicate_classifier
+from quorabust.lineage import git_revision, sha256_file
+from quorabust.model import eval_classification_metrics, train_duplicate_classifier
 from quorabust.persist import save_classifier
+
+
+def _package_version() -> str:
+    try:
+        return version("Quorabust")
+    except PackageNotFoundError:
+        return "0.0.0"
 
 
 def _load_quora_csv(path: Path) -> pd.DataFrame:
@@ -78,16 +87,20 @@ def main(argv: list[str] | None = None) -> int:
         "n_train": len(train_df),
         "n_eval": len(eval_df) if eval_df is not None else 0,
         "csv": str(args.csv.resolve()),
+        "csv_sha256": sha256_file(args.csv),
         "seed": args.seed,
+        "quorabust_version": _package_version(),
+        "git_revision": git_revision(),
     }
-    if eval_df is not None:
-        ll = eval_log_loss(builder, clf, eval_df)
-        meta["eval_log_loss"] = ll
-        print(f"eval log_loss: {ll:.4f} (n_eval={len(eval_df)})")
-    else:
-        ll = eval_log_loss(builder, clf, train_df)
-        meta["train_log_loss"] = ll
-        print(f"log_loss (no holdout): {ll:.4f}")
+    eval_target = eval_df if eval_df is not None else train_df
+    m = eval_classification_metrics(builder, clf, eval_target)
+    for k, v in m.items():
+        meta[f"eval_{k}"] = v
+    print(
+        "metrics: "
+        + ", ".join(f"{k}={v:.4f}" for k, v in sorted(m.items())),
+        f"(n={len(eval_target)})",
+    )
 
     save_classifier(args.out, builder, clf, meta=meta)
     print(f"wrote {args.out.resolve()}")
