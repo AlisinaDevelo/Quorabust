@@ -1,4 +1,3 @@
-import numpy as np
 import pandas as pd
 
 from quorabust.model import eval_classification_metrics, train_duplicate_classifier
