@@ -25,6 +25,6 @@ jobs:
       - name: Mypy
         run: mypy src/quorabust
       - name: Pytest
-        run: pytest -q --cov=quorabust --cov-report=term-missing
+        run: pytest -q --cov=quorabust --cov-report=term-missing --cov-fail-under=70
       - name: CLI
         run: quorabust-train --help
