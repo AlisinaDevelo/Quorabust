@@ -71,10 +71,16 @@ print(meta)  # n_train, eval_log_loss, paths, etc.
 
 ```bash
 ruff check src tests
-pytest -q --cov=quorabust
+mypy src/quorabust
+pytest -q --cov=quorabust --cov-fail-under=70
+pre-commit run --all-files   # optional
 ```
 
-Design notes and data pointers: [docs/NOTES.md](docs/NOTES.md).
+Design notes: [docs/NOTES.md](docs/NOTES.md). Contributing: [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Enterprise / operations
+
+Governance (security policy, Dependabot, audits), containers, and release expectations are summarized in [docs/ENTERPRISE.md](docs/ENTERPRISE.md). Saved model pickles include `meta` (CSV checksum, git revision, package version, metrics); only load trusted artifacts.
 
 ## License
 
