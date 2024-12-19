@@ -21,3 +21,7 @@ The public [Quora Question Pairs](https://www.kaggle.com/c/quora-question-pairs)
 ## Notebooks
 
 See [notebooks/10_workflow.ipynb](../notebooks/10_workflow.ipynb) for a short end-to-end checklist; add your own EDA notebooks alongside it.
+
+## Operations
+
+For audits, Docker, and release hygiene see [ENTERPRISE.md](ENTERPRISE.md).
