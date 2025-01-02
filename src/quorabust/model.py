@@ -16,19 +16,21 @@ def train_duplicate_classifier(
     col_q1: str = "question1",
     col_q2: str = "question2",
     *,
+    feature_builder: Any | None = None,
     eval_df: pd.DataFrame | None = None,
     random_state: int = 42,
     xgb_params: dict[str, Any] | None = None,
-) -> tuple[PairFeatureBuilder, XGBClassifier]:
+) -> tuple[Any, XGBClassifier]:
     """
-    Fit TF–IDF vocabulary on training questions, build pair features, train XGBoost.
+    Fit feature builder on training questions, build pair features, train XGBoost.
+    Pass ``feature_builder`` for non-TF–IDF backends (e.g. embeddings).
     If eval_df is provided, uses early stopping on logloss.
     """
     for col in (col_q1, col_q2, label_col):
         if col not in train_df.columns:
             raise KeyError(f"Missing column: {col}")
 
-    builder = PairFeatureBuilder()
+    builder: Any = feature_builder if feature_builder is not None else PairFeatureBuilder()
     builder.fit_from_frame(train_df, col_q1=col_q1, col_q2=col_q2)
     X_tr = builder.transform_frame(train_df, col_q1=col_q1, col_q2=col_q2)
     y_tr = train_df[label_col].astype(int).to_numpy()
@@ -66,7 +68,7 @@ def train_duplicate_classifier(
 
 
 def predict_proba_duplicate(
-    builder: PairFeatureBuilder,
+    builder: Any,
     clf: XGBClassifier,
     q1: list[str],
     q2: list[str],
@@ -77,7 +79,7 @@ def predict_proba_duplicate(
 
 
 def eval_log_loss(
-    builder: PairFeatureBuilder,
+    builder: Any,
     clf: XGBClassifier,
     df: pd.DataFrame,
     label_col: str = "is_duplicate",
@@ -91,7 +93,7 @@ def eval_log_loss(
 
 
 def eval_classification_metrics(
-    builder: PairFeatureBuilder,
+    builder: Any,
     clf: XGBClassifier,
     df: pd.DataFrame,
     label_col: str = "is_duplicate",
