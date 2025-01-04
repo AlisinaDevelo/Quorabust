@@ -33,6 +33,19 @@ dev = [
     "mypy>=1.8",
     "pip-audit>=2.6",
     "pre-commit>=3.6",
+    "httpx>=0.27",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "prometheus-client>=0.20",
+]
+serve = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "prometheus-client>=0.20",
+]
+nlp = [
+    "sentence-transformers>=3.0",
+    "torch>=2.1",
 ]
 
 [project.urls]
@@ -40,6 +53,7 @@ Homepage = "https://github.com/AliSinaDevelo/Quorabust"
 
 [project.scripts]
 quorabust-train = "quorabust.cli:main"
+quorabust-serve = "quorabust.serve:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -74,5 +88,9 @@ module = [
     "xgboost",
     "pandas.*",
     "numpy.*",
+    "fastapi.*",
+    "uvicorn.*",
+    "prometheus_client.*",
+    "sentence_transformers.*",
 ]
 ignore_missing_imports = true

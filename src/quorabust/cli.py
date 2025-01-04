@@ -8,9 +8,11 @@ from typing import Any
 
 import pandas as pd
 
+from quorabust.drift import feature_means_from_matrix
 from quorabust.lineage import git_revision, sha256_file
 from quorabust.model import eval_classification_metrics, train_duplicate_classifier
 from quorabust.persist import save_classifier
+from quorabust.registry import append_model_record
 
 
 def _package_version() -> str:
@@ -54,6 +56,23 @@ def main(argv: list[str] | None = None) -> int:
         help="Holdout fraction for early stopping and log loss (use 0 for no holdout)",
     )
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument(
+        "--feature-backend",
+        choices=["tfidf", "embedding"],
+        default="tfidf",
+        help="tfidf (default) or sentence-transformer embeddings (requires nlp extra)",
+    )
+    p.add_argument(
+        "--embedding-model",
+        default="sentence-transformers/all-MiniLM-L6-v2",
+        help="When --feature-backend=embedding, SentenceTransformer model id",
+    )
+    p.add_argument(
+        "--registry-dir",
+        type=Path,
+        default=None,
+        help="If set, append a JSONL record under this directory after training",
+    )
     args = p.parse_args(argv)
 
     if not args.csv.is_file():
@@ -77,11 +96,23 @@ def main(argv: list[str] | None = None) -> int:
         eval_df = df.iloc[:n_eval].copy()
         train_df = df.iloc[n_eval:].copy()
 
+    feature_builder: Any | None = None
+    if args.feature_backend == "embedding":
+        from quorabust.embedding_features import PairEmbeddingBuilder
+
+        feature_builder = PairEmbeddingBuilder(model_name=args.embedding_model)
+
     builder, clf = train_duplicate_classifier(
         train_df,
         eval_df=eval_df,
         random_state=args.seed,
+        feature_builder=feature_builder,
     )
+
+    if args.feature_backend == "embedding":
+        feat_names = ["cos", "l2", "mad", "len_ratio", "len_sum"]
+    else:
+        feat_names = ["cos", "jaccard", "len_ratio", "abs_len_diff", "len_sum"]
 
     meta: dict[str, Any] = {
         "n_train": len(train_df),
@@ -91,6 +122,8 @@ def main(argv: list[str] | None = None) -> int:
         "seed": args.seed,
         "quorabust_version": _package_version(),
         "git_revision": git_revision(),
+        "feature_backend": args.feature_backend,
+        "feature_schema": feat_names,
     }
     eval_target = eval_df if eval_df is not None else train_df
     m = eval_classification_metrics(builder, clf, eval_target)
@@ -102,7 +135,21 @@ def main(argv: list[str] | None = None) -> int:
         f"(n={len(eval_target)})",
     )
 
+    X_ref = builder.transform_frame(train_df)
+    meta["reference_feature_means"] = feature_means_from_matrix(feat_names, X_ref)
+
     save_classifier(args.out, builder, clf, meta=meta)
+    if args.registry_dir is not None:
+        append_model_record(
+            args.registry_dir,
+            {
+                "artifact": str(args.out.resolve()),
+                "feature_backend": args.feature_backend,
+                "git_revision": meta.get("git_revision"),
+                "quorabust_version": meta.get("quorabust_version"),
+                "eval_metrics": {k: meta[k] for k in meta if k.startswith("eval_")},
+            },
+        )
     print(f"wrote {args.out.resolve()}")
     return 0
 

@@ -6,12 +6,10 @@ from typing import Any
 
 from xgboost import XGBClassifier
 
-from quorabust.features import PairFeatureBuilder
-
 
 def save_classifier(
     path: str | Path,
-    builder: PairFeatureBuilder,
+    builder: Any,
     clf: XGBClassifier,
     meta: dict[str, Any] | None = None,
 ) -> None:
@@ -23,7 +21,7 @@ def save_classifier(
         pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-def load_classifier(path: str | Path) -> tuple[PairFeatureBuilder, XGBClassifier, dict[str, Any]]:
+def load_classifier(path: str | Path) -> tuple[Any, XGBClassifier, dict[str, Any]]:
     with Path(path).open("rb") as f:
         data = pickle.load(f)
     return data["builder"], data["clf"], data.get("meta", {})
