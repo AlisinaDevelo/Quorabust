@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0
+
+### Added
+- Chunked CSV reader (`dataio`), JSONL model registry, drift mean-shift helpers.
+- Optional **embedding** backend (`PairEmbeddingBuilder`, `[nlp]` extra) and `quorabust-train --feature-backend`.
+- **FastAPI** serving (`quorabust-serve`): health/ready, predict, Prometheus `/metrics`, A/B header routing.
+- Training `meta`: `feature_schema`, `reference_feature_means`; optional `--registry-dir`.
+- Docs: [docs/SCALING.md](docs/SCALING.md); CI runs `quorabust-serve --help`.
+
 ## 0.2.0
 
 ### Added

@@ -10,7 +10,7 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 ```
 
-Optional extras: `pip install -e ".[viz,notebooks]"` for Matplotlib, Seaborn, and Jupyter.
+Optional extras: `pip install -e ".[viz,notebooks]"` for Matplotlib, Seaborn, and Jupyter; `".[nlp]"` for sentence-transformer features; `".[serve]"` matches the API stack (also included in `dev`).
 
 ## Usage
 
@@ -45,7 +45,7 @@ quorabust-train --csv data/raw/train.csv --out models/quorabust.pkl
 python -m quorabust --csv data/raw/train.csv --out models/quorabust.pkl   # equivalent
 ```
 
-Options: `--max-rows N`, `--eval-fraction 0.1` (default), `--eval-fraction 0` to train on all rows without a holdout, `--seed`.
+Options: `--max-rows N`, `--eval-fraction 0.1` (default), `--eval-fraction 0` to train on all rows without a holdout, `--seed`, `--feature-backend {tfidf,embedding}`, `--embedding-model …`, `--registry-dir` (JSONL registry).
 
 ### Load a saved model
 
@@ -53,14 +53,24 @@ Options: `--max-rows N`, `--eval-fraction 0.1` (default), `--eval-fraction 0` to
 from quorabust import load_classifier, predict_proba_duplicate
 
 builder, clf, meta = load_classifier("models/quorabust.pkl")
-print(meta)  # n_train, eval_log_loss, paths, etc.
+print(meta)  # n_train, metrics, csv_sha256, reference_feature_means, …
 ```
+
+### HTTP API (monitoring + A/B)
+
+```bash
+export QUORABUST_MODEL_PATH=models/quorabust.pkl
+quorabust-serve --host 0.0.0.0 --port 8000
+# optional second artifact: export QUORABUST_MODEL_B=models/other.pkl
+```
+
+`GET /metrics` exposes Prometheus text; `POST /predict` accepts `{"question1":[...],"question2":[...]}` and optional header `X-Quorabust-Variant: b`.
 
 ## Project layout
 
 | Path | Purpose |
 |------|---------|
-| `src/quorabust/` | Package: `preprocess`, `features`, `model`, `persist`, `cli` |
+| `src/quorabust/` | Package: `preprocess`, `features`, `embedding_features`, `model`, `persist`, `cli`, `serve`, `dataio`, `registry`, `drift` |
 | `tests/` | Pytest suite |
 | `data/raw/` | Original CSVs (not committed; see `data/README.md`) |
 | `data/processed/` | Cleaned splits |
@@ -80,7 +90,7 @@ Design notes: [docs/NOTES.md](docs/NOTES.md). Contributing: [CONTRIBUTING.md](CO
 
 ## Enterprise / operations
 
-Governance (security policy, Dependabot, audits), containers, and release expectations are summarized in [docs/ENTERPRISE.md](docs/ENTERPRISE.md). Saved model pickles include `meta` (CSV checksum, git revision, package version, metrics); only load trusted artifacts.
+Governance (security policy, Dependabot, audits), containers, serving, and release expectations are summarized in [docs/ENTERPRISE.md](docs/ENTERPRISE.md) and [docs/SCALING.md](docs/SCALING.md). Saved model pickles include `meta` (CSV checksum, git revision, package version, feature means for drift, metrics); only load trusted artifacts.
 
 ## License
 

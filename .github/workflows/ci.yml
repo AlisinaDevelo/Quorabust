@@ -28,3 +28,5 @@ jobs:
         run: pytest -q --cov=quorabust --cov-report=term-missing --cov-fail-under=70
       - name: CLI
         run: quorabust-train --help
+      - name: Serve CLI
+        run: quorabust-serve --help

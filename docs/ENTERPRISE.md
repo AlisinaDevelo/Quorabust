@@ -14,7 +14,21 @@
 
 ## Lineage and artifacts
 
-Training writes `csv_sha256`, `git_revision`, `quorabust_version`, and metric fields into the pickle `meta` dict. Treat `.pkl` files as **trusted** (pickle); load only from controlled storage.
+Training writes `csv_sha256`, `git_revision`, `quorabust_version`, `feature_schema`, `reference_feature_means` (for drift checks), and metric fields into the pickle `meta` dict. Treat `.pkl` files as **trusted** (pickle); load only from controlled storage.
+
+## Serving and SLOs
+
+- **`quorabust-serve`**: FastAPI with `/health`, `/ready`, `/predict`, `/metrics` (Prometheus). Configure **`QUORABUST_MODEL_PATH`** and optional **`QUORABUST_MODEL_B`** for A/B; clients may send **`X-Quorabust-Variant: b`**.
+- Wire ingress timeouts and autoscaling to your **latency** SLO using the histogram in `/metrics`.
+
+## Scale and NLP
+
+See [SCALING.md](SCALING.md) for chunked CSV I/O, optional **embedding** training (`pip install ".[nlp]"`, `quorabust-train --feature-backend embedding`), and pointers to distributed XGBoost.
+
+## Registry and drift (lightweight)
+
+- **`quorabust.registry`**: append JSONL rows with `--registry-dir` after training; swap for MLflow when you need a UI.
+- **`quorabust.drift`**: compare live batch feature means to `meta["reference_feature_means"]`.
 
 ## Releases
 

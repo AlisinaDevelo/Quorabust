@@ -4,6 +4,7 @@ import os
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,13 @@ from pydantic import BaseModel, Field
 
 from quorabust.model import predict_proba_duplicate
 from quorabust.persist import load_classifier
+
+
+def _dist_version() -> str:
+    try:
+        return version("Quorabust")
+    except PackageNotFoundError:
+        return "0.0.0"
 
 
 class PredictBody(BaseModel):
@@ -61,7 +69,7 @@ def create_app(
                 state["b"] = load_classifier(pb)
         yield
 
-    app = FastAPI(title="Quorabust", lifespan=lifespan)
+    app = FastAPI(title=f"Quorabust {_dist_version()}", lifespan=lifespan)
 
     @app.get("/health")
     def health() -> dict[str, str]:
