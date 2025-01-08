@@ -11,7 +11,7 @@ from typing import Any
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import PlainTextResponse
 from prometheus_client import CollectorRegistry, Counter, Histogram, generate_latest
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from quorabust.model import predict_proba_duplicate
 from quorabust.persist import load_classifier
@@ -25,13 +25,56 @@ def _dist_version() -> str:
 
 
 class PredictBody(BaseModel):
-    question1: list[str] = Field(..., min_length=1)
-    question2: list[str] = Field(..., min_length=1)
+    """Batch of question pairs; ``question1[i]`` is paired with ``question2[i]``."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "question1": [
+                        "How do I learn Python?",
+                        "Best pizza in NYC?",
+                    ],
+                    "question2": [
+                        "What is the best way to learn Python?",
+                        "Where is good pizza in New York?",
+                    ],
+                }
+            ]
+        }
+    )
+
+    question1: list[str] = Field(
+        ...,
+        min_length=1,
+        description="First question in each pair (same length as question2).",
+    )
+    question2: list[str] = Field(
+        ...,
+        min_length=1,
+        description="Second question in each pair (same length as question1).",
+    )
 
 
 class PredictOut(BaseModel):
-    proba_duplicate: list[float]
-    variant: str
+    """Per-row duplicate probabilities and which model variant served the request."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "proba_duplicate": [0.82, 0.31],
+                    "variant": "a",
+                }
+            ]
+        }
+    )
+
+    proba_duplicate: list[float] = Field(
+        ...,
+        description="P(duplicate) for each pair, same order as the request lists.",
+    )
+    variant: str = Field(..., description="Scoring variant (a or b) after A/B fallback rules.")
 
 
 def create_app(
@@ -69,19 +112,29 @@ def create_app(
                 state["b"] = load_classifier(pb)
         yield
 
-    app = FastAPI(title=f"Quorabust {_dist_version()}", lifespan=lifespan)
+    app = FastAPI(
+        title=f"Quorabust {_dist_version()}",
+        lifespan=lifespan,
+        openapi_tags=[
+            {"name": "scoring", "description": "Duplicate probability for question pairs."},
+            {
+                "name": "operations",
+                "description": "Liveness, readiness, and Prometheus metrics.",
+            },
+        ],
+    )
 
-    @app.get("/health")
+    @app.get("/health", tags=["operations"])
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
-    @app.get("/ready")
+    @app.get("/ready", tags=["operations"])
     def ready() -> dict[str, str]:
         if "a" not in state:
             raise HTTPException(status_code=503, detail="model a not loaded")
         return {"status": "ready"}
 
-    @app.get("/metrics")
+    @app.get("/metrics", tags=["operations"])
     def metrics() -> PlainTextResponse:
         data = generate_latest(registry)
         return PlainTextResponse(
@@ -89,10 +142,27 @@ def create_app(
             media_type="text/plain; version=0.0.4",
         )
 
-    @app.post("/predict", response_model=PredictOut)
+    @app.post(
+        "/predict",
+        response_model=PredictOut,
+        tags=["scoring"],
+        summary="Predict duplicate probability",
+        description=(
+            "Scores one or more question pairs. Optional header "
+            "`X-Quorabust-Variant: b` selects the B artifact when configured."
+        ),
+        responses={
+            400: {"description": "question1 and question2 length mismatch"},
+            503: {"description": "Model not loaded or variant unavailable"},
+        },
+    )
     def predict(
         body: PredictBody,
-        x_quorabust_variant: str | None = Header(default=None, alias="X-Quorabust-Variant"),
+        x_quorabust_variant: str | None = Header(
+            default=None,
+            alias="X-Quorabust-Variant",
+            description="A/B variant: `a` (default) or `b` if a second model is loaded.",
+        ),
     ) -> PredictOut:
         v = (x_quorabust_variant or "a").lower().strip()
         if v == "b" and "b" not in state:
