@@ -44,6 +44,20 @@ def test_ready_without_model_file():
         assert client.get("/ready").status_code == 503
 
 
+def test_openapi_includes_predict_examples(tmp_path):
+    p = tmp_path / "m.pkl"
+    _tiny_pkl(p)
+    app = create_app(model_path_a=str(p))
+    with TestClient(app) as client:
+        spec = client.get("/openapi.json").json()
+    post = spec["paths"]["/predict"]["post"]
+    assert post.get("summary")
+    assert "scoring" in post.get("tags", [])
+    body = spec["components"]["schemas"]["PredictBody"]
+    examples = body.get("examples") or []
+    assert examples and "question1" in examples[0]
+
+
 def test_serve_ab_variant_header(tmp_path):
     pa = tmp_path / "a.pkl"
     pb = tmp_path / "b.pkl"
