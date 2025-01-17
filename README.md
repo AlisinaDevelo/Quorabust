@@ -64,7 +64,7 @@ quorabust-serve --host 0.0.0.0 --port 8000
 # optional second artifact: export QUORABUST_MODEL_B=models/other.pkl
 ```
 
-`GET /metrics` exposes Prometheus text; `POST /predict` accepts `{"question1":[...],"question2":[...]}` and optional header `X-Quorabust-Variant: b`.
+`GET /metrics` exposes Prometheus text; `POST /predict` accepts `{"question1":[...],"question2":[...]}` and optional header `X-Quorabust-Variant: b`. Interactive docs: **`/docs`**. Load testing: [docs/LOAD_TESTING.md](docs/LOAD_TESTING.md).
 
 ## Project layout
 
