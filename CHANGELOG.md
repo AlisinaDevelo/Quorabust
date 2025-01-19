@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+### Added
+- OpenAPI examples, descriptions, and tags for scoring vs operations endpoints.
+- `loadtests/k6_predict.js` and [docs/LOAD_TESTING.md](docs/LOAD_TESTING.md) for SLO-oriented load checks.
+
 ## 0.3.0
 
 ### Added
