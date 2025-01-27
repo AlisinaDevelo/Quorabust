@@ -19,7 +19,7 @@ Training writes `csv_sha256`, `git_revision`, `quorabust_version`, `feature_sche
 ## Serving and SLOs
 
 - **`quorabust-serve`**: FastAPI with `/health`, `/ready`, `/predict`, `/metrics` (Prometheus). Configure **`QUORABUST_MODEL_PATH`** and optional **`QUORABUST_MODEL_B`** for A/B; clients may send **`X-Quorabust-Variant: b`**.
-- Wire ingress timeouts and autoscaling to your **latency** SLO using the histogram in `/metrics`. See [LOAD_TESTING.md](LOAD_TESTING.md) for k6 and threshold examples.
+- Wire ingress timeouts and autoscaling to your **latency** SLO using the histogram in `/metrics`. See [LOAD_TESTING.md](LOAD_TESTING.md) for k6 and [GRAFANA.md](GRAFANA.md) for a starter dashboard JSON.
 
 ## Scale and NLP
 

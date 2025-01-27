@@ -24,4 +24,4 @@ See [notebooks/10_workflow.ipynb](../notebooks/10_workflow.ipynb) for a short en
 
 ## Operations
 
-For audits, Docker, release hygiene, serving, and registry/drift see [ENTERPRISE.md](ENTERPRISE.md). For scale, embeddings, and distributed-training pointers see [SCALING.md](SCALING.md).
+For audits, Docker, release hygiene, serving, and registry/drift see [ENTERPRISE.md](ENTERPRISE.md). For scale, embeddings, and distributed-training pointers see [SCALING.md](SCALING.md). For Grafana, see [GRAFANA.md](GRAFANA.md).

@@ -16,4 +16,4 @@ quorabust-serve --port 8000 &
 k6 run -e BASE_URL=http://127.0.0.1:8000 loadtests/k6_predict.js
 ```
 
-Edit **`loadtests/k6_predict.js`** `thresholds` to match your SLO (e.g. stricter `p(95)` latency or lower error rate). Pair k6 results with **`GET /metrics`** (Prometheus histogram `quorabust_predict_latency_seconds`) in Grafana or similar.
+Edit **`loadtests/k6_predict.js`** `thresholds` to match your SLO (e.g. stricter `p(95)` latency or lower error rate). Pair k6 results with **`GET /metrics`** and the importable Grafana dashboard in [GRAFANA.md](GRAFANA.md).
