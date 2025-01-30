@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.2
+
+### Added
+- Importable Grafana dashboard `grafana/dashboards/quorabust-serving.json` and [docs/GRAFANA.md](docs/GRAFANA.md).
+
 ## 0.3.1
 
 ### Added
