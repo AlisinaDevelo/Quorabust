@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "Quorabust"
-version = "0.3.1"
+version = "0.3.2"
 description = "Text features and models for Quora-style duplicate question detection."
 readme = "README.md"
 requires-python = ">=3.10"
