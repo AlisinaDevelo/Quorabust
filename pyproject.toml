@@ -28,7 +28,7 @@ notebooks = [
 ]
 dev = [
     "pytest>=7.4",
-    "pytest-cov>=4.1",
+    "pytest-cov>=7.1.0",
     "ruff>=0.1",
     "mypy>=1.20.0",
     "pip-audit>=2.6",
