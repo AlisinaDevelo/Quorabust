@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- `quorabust-report` for generating Markdown model cards from saved artifacts and
+  optional labeled holdout CSVs.
+
 ## 0.3.2
 
 ### Added

@@ -54,6 +54,7 @@ Homepage = "https://github.com/AliSinaDevelo/Quorabust"
 [project.scripts]
 quorabust-train = "quorabust.cli:main"
 quorabust-serve = "quorabust.serve:main"
+quorabust-report = "quorabust.report:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
