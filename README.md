@@ -1,6 +1,20 @@
 # Quorabust
 
-Library for **Quora-style duplicate question detection**: text cleaning, pairwise TF–IDF and lexical features, and an **XGBoost** classifier on top.
+Production-minded **Quora-style duplicate question detection**: reproducible training,
+artifact metadata, FastAPI serving, Prometheus metrics, drift helpers, A/B model routing,
+load tests, and Markdown model-card reporting.
+
+Quorabust is intentionally small enough to inspect quickly while still showing the
+operational shape of an ML-backed backend service.
+
+## What it demonstrates
+
+- Pairwise text features with TF-IDF or optional sentence-transformer embeddings
+- XGBoost training with optional holdout evaluation and early stopping
+- Saved artifacts that include lineage, feature schema, dataset checksum, and metrics
+- FastAPI inference with health/readiness checks, OpenAPI docs, Prometheus metrics, and A/B routing
+- Drift helper utilities, JSONL model registry, k6 load test, and Grafana dashboard starter
+- `quorabust-report` model-card generation for artifact review and benchmark summaries
 
 ## Setup
 
@@ -46,6 +60,20 @@ python -m quorabust --csv data/raw/train.csv --out models/quorabust.pkl   # equi
 ```
 
 Options: `--max-rows N`, `--eval-fraction 0.1` (default), `--eval-fraction 0` to train on all rows without a holdout, `--seed`, `--feature-backend {tfidf,embedding}`, `--embedding-model …`, `--registry-dir` (JSONL registry).
+
+### Generate a model card
+
+```bash
+quorabust-report \
+  --model models/quorabust.pkl \
+  --eval-csv data/processed/holdout.csv \
+  --out reports/quorabust-model-card.md
+```
+
+The report includes artifact metadata, persisted training/eval metrics, optional holdout
+metrics, and a threshold confusion matrix. Use a real held-out CSV for comparable model
+claims; the command accepts the same `question1`, `question2`, `is_duplicate` column
+contract as training.
 
 ### Load a saved model
 
