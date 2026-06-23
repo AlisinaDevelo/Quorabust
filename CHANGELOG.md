@@ -7,6 +7,10 @@
   optional labeled holdout CSVs.
 - `GET /models` serving endpoint for safe loaded-model metadata.
 
+### Fixed
+- Capped NumPy below 2.5 so Mypy can parse dependency stubs with the configured
+  Python target.
+
 ## 0.3.2
 
 ### Added
