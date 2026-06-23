@@ -15,7 +15,19 @@ def _tiny_pkl(path):
         }
     )
     b, clf = train_duplicate_classifier(df, xgb_params={"n_estimators": 12, "max_depth": 3})
-    save_classifier(path, b, clf, meta={"id": "a"})
+    save_classifier(
+        path,
+        b,
+        clf,
+        meta={
+            "id": "a",
+            "csv": "/private/path/train.csv",
+            "feature_backend": "tfidf",
+            "feature_schema": ["cos", "jaccard", "len_ratio", "abs_len_diff", "len_sum"],
+            "n_train": len(df),
+            "eval_accuracy": 0.8,
+        },
+    )
 
 
 def test_serve_health_ready_predict(tmp_path):
@@ -56,6 +68,26 @@ def test_openapi_includes_predict_examples(tmp_path):
     body = spec["components"]["schemas"]["PredictBody"]
     examples = body.get("examples") or []
     assert examples and "question1" in examples[0]
+
+
+def test_models_returns_safe_public_metadata(tmp_path):
+    p = tmp_path / "m.pkl"
+    _tiny_pkl(p)
+    app = create_app(model_path_a=str(p))
+    with TestClient(app) as client:
+        r = client.get("/models")
+    assert r.status_code == 200
+    model = r.json()["variants"]["a"]
+    assert model["feature_backend"] == "tfidf"
+    assert model["eval_metrics"]["accuracy"] == 0.8
+    assert "csv" not in model
+    assert "id" not in model
+
+
+def test_models_without_loaded_artifacts_is_unavailable():
+    app = create_app(model_path_a="/nonexistent/quorabust_missing.pkl")
+    with TestClient(app) as client:
+        assert client.get("/models").status_code == 503
 
 
 def test_serve_ab_variant_header(tmp_path):

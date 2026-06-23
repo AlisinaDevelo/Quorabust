@@ -93,6 +93,8 @@ quorabust-serve --host 0.0.0.0 --port 8000
 ```
 
 `GET /metrics` exposes Prometheus text; `POST /predict` accepts `{"question1":[...],"question2":[...]}` and optional header `X-Quorabust-Variant: b`. Interactive docs: **`/docs`**. Load testing: [docs/LOAD_TESTING.md](docs/LOAD_TESTING.md). Grafana: [docs/GRAFANA.md](docs/GRAFANA.md).
+`GET /models` returns allowlisted metadata for loaded variants without leaking local
+artifact paths or training CSV paths.
 
 ## Project layout
 

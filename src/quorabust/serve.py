@@ -77,6 +77,31 @@ class PredictOut(BaseModel):
     variant: str = Field(..., description="Scoring variant (a or b) after A/B fallback rules.")
 
 
+_PUBLIC_META_KEYS = {
+    "feature_backend",
+    "feature_schema",
+    "n_train",
+    "n_eval",
+    "seed",
+    "quorabust_version",
+    "git_revision",
+    "csv_sha256",
+    "reference_feature_means",
+}
+
+
+def _public_model_meta(meta: dict[str, Any]) -> dict[str, Any]:
+    public = {k: meta[k] for k in _PUBLIC_META_KEYS if k in meta}
+    eval_metrics = {
+        k.removeprefix("eval_"): v
+        for k, v in sorted(meta.items())
+        if k.startswith("eval_") and isinstance(v, int | float)
+    }
+    if eval_metrics:
+        public["eval_metrics"] = eval_metrics
+    return public
+
+
 def create_app(
     model_path_a: str | None = None,
     model_path_b: str | None = None,
@@ -133,6 +158,25 @@ def create_app(
         if "a" not in state:
             raise HTTPException(status_code=503, detail="model a not loaded")
         return {"status": "ready"}
+
+    @app.get(
+        "/models",
+        tags=["operations"],
+        summary="List loaded model metadata",
+        description=(
+            "Returns allowlisted metadata for loaded variants. Local artifact paths and "
+            "training CSV paths are intentionally omitted."
+        ),
+        responses={503: {"description": "No models loaded"}},
+    )
+    def models() -> dict[str, dict[str, dict[str, Any]]]:
+        if not state:
+            raise HTTPException(status_code=503, detail="no models loaded")
+        variants = {
+            name: _public_model_meta(meta)
+            for name, (_, _, meta) in state.items()
+        }
+        return {"variants": variants}
 
     @app.get("/metrics", tags=["operations"])
     def metrics() -> PlainTextResponse:

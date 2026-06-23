@@ -5,6 +5,7 @@
 ### Added
 - `quorabust-report` for generating Markdown model cards from saved artifacts and
   optional labeled holdout CSVs.
+- `GET /models` serving endpoint for safe loaded-model metadata.
 
 ## 0.3.2
 
