@@ -16,6 +16,12 @@
 
 Training writes `csv_sha256`, `git_revision`, `quorabust_version`, `feature_schema`, `reference_feature_means` (for drift checks), and metric fields into the pickle `meta` dict. Treat `.pkl` files as **trusted** (pickle); load only from controlled storage.
 
+Use `quorabust-train --metadata-out models/quorabust.meta.json` to write the same
+lineage and metric metadata as JSON. Reviewers and release tooling can inspect that
+sidecar without loading executable pickle content. The sidecar is not a replacement for
+the model artifact; it is a safer inspection path. For untrusted artifact distribution,
+prefer a non-pickle format such as `skops` or ONNX in a future release.
+
 ## Serving and SLOs
 
 - **`quorabust-serve`**: FastAPI with `/health`, `/ready`, `/predict`, `/metrics` (Prometheus). Configure **`QUORABUST_MODEL_PATH`** and optional **`QUORABUST_MODEL_B`** for A/B; clients may send **`X-Quorabust-Variant: b`**.

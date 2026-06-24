@@ -1,8 +1,10 @@
+import json
+
 import numpy as np
 import pandas as pd
 
 from quorabust.model import predict_proba_duplicate, train_duplicate_classifier
-from quorabust.persist import load_classifier, save_classifier
+from quorabust.persist import load_classifier, save_classifier, save_metadata_sidecar
 
 
 def _df():
@@ -29,3 +31,13 @@ def test_save_load_roundtrip(tmp_path):
     p1 = predict_proba_duplicate(builder, clf, q1, q2)
     p2 = predict_proba_duplicate(b2, c2, q1, q2)
     assert np.allclose(p1, p2)
+
+
+def test_save_metadata_sidecar_writes_json(tmp_path):
+    path = tmp_path / "model.meta.json"
+    written = save_metadata_sidecar(path, {"run": "test", "eval_accuracy": 0.9})
+    assert written == path
+    assert json.loads(path.read_text(encoding="utf-8")) == {
+        "run": "test",
+        "eval_accuracy": 0.9,
+    }

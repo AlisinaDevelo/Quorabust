@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import pickle
 from pathlib import Path
 from typing import Any
@@ -25,3 +26,14 @@ def load_classifier(path: str | Path) -> tuple[Any, XGBClassifier, dict[str, Any
     with Path(path).open("rb") as f:
         data = pickle.load(f)
     return data["builder"], data["clf"], data.get("meta", {})
+
+
+def save_metadata_sidecar(
+    path: str | Path,
+    meta: dict[str, Any],
+) -> Path:
+    """Write artifact metadata as JSON so reviewers do not need to load a pickle."""
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(meta, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return p

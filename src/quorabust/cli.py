@@ -11,7 +11,7 @@ import pandas as pd
 from quorabust.drift import feature_means_from_matrix
 from quorabust.lineage import git_revision, sha256_file
 from quorabust.model import eval_classification_metrics, train_duplicate_classifier
-from quorabust.persist import save_classifier
+from quorabust.persist import save_classifier, save_metadata_sidecar
 from quorabust.registry import append_model_record
 
 
@@ -72,6 +72,12 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         default=None,
         help="If set, append a JSONL record under this directory after training",
+    )
+    p.add_argument(
+        "--metadata-out",
+        type=Path,
+        default=None,
+        help="If set, write artifact metadata JSON here without requiring pickle loading",
     )
     args = p.parse_args(argv)
 
@@ -139,6 +145,8 @@ def main(argv: list[str] | None = None) -> int:
     meta["reference_feature_means"] = feature_means_from_matrix(feat_names, X_ref)
 
     save_classifier(args.out, builder, clf, meta=meta)
+    if args.metadata_out is not None:
+        save_metadata_sidecar(args.metadata_out, meta)
     if args.registry_dir is not None:
         append_model_record(
             args.registry_dir,

@@ -13,6 +13,7 @@ run in CI without the Kaggle dataset.
 quorabust-train \
   --csv examples/smoke_pairs.csv \
   --out /tmp/quorabust-smoke.pkl \
+  --metadata-out /tmp/quorabust-smoke.meta.json \
   --eval-fraction 0 \
   --seed 7
 
@@ -47,6 +48,7 @@ training:
 quorabust-train \
   --csv data/raw/train.csv \
   --out models/quorabust.pkl \
+  --metadata-out models/quorabust.meta.json \
   --eval-fraction 0.1 \
   --seed 42
 

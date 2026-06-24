@@ -59,7 +59,7 @@ quorabust-train --csv data/raw/train.csv --out models/quorabust.pkl
 python -m quorabust --csv data/raw/train.csv --out models/quorabust.pkl   # equivalent
 ```
 
-Options: `--max-rows N`, `--eval-fraction 0.1` (default), `--eval-fraction 0` to train on all rows without a holdout, `--seed`, `--feature-backend {tfidf,embedding}`, `--embedding-model …`, `--registry-dir` (JSONL registry).
+Options: `--max-rows N`, `--eval-fraction 0.1` (default), `--eval-fraction 0` to train on all rows without a holdout, `--seed`, `--feature-backend {tfidf,embedding}`, `--embedding-model …`, `--registry-dir` (JSONL registry), `--metadata-out` (JSON sidecar for reviewing artifact lineage without loading the pickle).
 
 ### Generate a model card
 
@@ -123,7 +123,7 @@ Design notes: [docs/NOTES.md](docs/NOTES.md). Contributing: [CONTRIBUTING.md](CO
 
 ## Enterprise / operations
 
-Governance (security policy, Dependabot, audits), containers, serving, and release expectations are summarized in [docs/ENTERPRISE.md](docs/ENTERPRISE.md) and [docs/SCALING.md](docs/SCALING.md). Saved model pickles include `meta` (CSV checksum, git revision, package version, feature means for drift, metrics); only load trusted artifacts.
+Governance (security policy, Dependabot, audits), containers, serving, and release expectations are summarized in [docs/ENTERPRISE.md](docs/ENTERPRISE.md) and [docs/SCALING.md](docs/SCALING.md). Saved model pickles include `meta` (CSV checksum, git revision, package version, feature means for drift, metrics); only load trusted artifacts. Use `quorabust-train --metadata-out ...` when you only need lineage and metrics.
 
 ## License
 

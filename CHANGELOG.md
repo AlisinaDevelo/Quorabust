@@ -10,6 +10,7 @@
 - JSON output for `quorabust-report --format json`.
 - Precision, recall, F1, and configurable threshold sweeps in model reports.
 - `POST /predict?explain=true` feature-value explanations for scored pairs.
+- `quorabust-train --metadata-out` for JSON metadata sidecars.
 
 ### Fixed
 - Capped NumPy below 2.5 so Mypy can parse dependency stubs with the configured
