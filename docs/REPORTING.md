@@ -58,3 +58,10 @@ threshold.
 
 Use `--format json` when you want CI or release tooling to compare metrics without
 scraping Markdown.
+
+## Sample model card
+
+A checked-in example produced from fully synthetic data lives at
+[SAMPLE_MODEL_CARD.md](SAMPLE_MODEL_CARD.md). It shows the exact shape of a generated
+card without depending on the Kaggle dataset; its metrics describe the toy data only.
+The commands to regenerate it are in that file's Reproduce section.
