@@ -71,9 +71,10 @@ quorabust-report \
 ```
 
 The report includes artifact metadata, persisted training/eval metrics, optional holdout
-metrics, and a threshold confusion matrix. Use `--format json` for machine-readable CI or
-release artifacts. Use a real held-out CSV for comparable model claims; the command
-accepts the same `question1`, `question2`, `is_duplicate` column contract as training.
+metrics, a confusion matrix, and a precision/recall/F1 threshold sweep. Use
+`--format json` for machine-readable CI or release artifacts. Use a real held-out CSV for
+comparable model claims; the command accepts the same `question1`, `question2`,
+`is_duplicate` column contract as training.
 See [docs/REPORTING.md](docs/REPORTING.md) for the CI smoke workflow and
 real-evaluation checklist.
 

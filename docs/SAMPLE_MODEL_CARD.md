@@ -29,7 +29,7 @@ Scores pairs of short natural-language questions and returns the probability tha
 | n_eval | 0 |
 | seed | 7 |
 | quorabust_version | 0.3.2 |
-| git_revision | 669dd7dffb715e2d5d84c7ec3ce8315219115057 |
+| git_revision | bb7c63ccdf8b22f8ed963dd312013eb2bd6f6719 |
 | csv_sha256 | 0a7b4ad6c6bb12fd038d5d7673eaced0646a8914c52dbdf502d2476b29ad6132 |
 
 ## Persisted Evaluation
@@ -47,6 +47,9 @@ Scores pairs of short natural-language questions and returns the probability tha
 | n | 32 |
 | threshold | 0.5000 |
 | accuracy | 0.9375 |
+| precision | 0.9444 |
+| recall | 0.9444 |
+| f1 | 0.9444 |
 | log_loss | 0.1958 |
 | roc_auc | 0.9841 |
 | positive_rate | 0.5625 |
@@ -58,6 +61,14 @@ Scores pairs of short natural-language questions and returns the probability tha
 | --- | --- | --- |
 | actual 0 | 13 | 1 |
 | actual 1 | 1 | 17 |
+
+## Threshold Sweep
+
+| threshold | precision | recall | f1 | accuracy | predicted_positive_rate |
+| --- | --- | --- | --- | --- | --- |
+| 0.3000 | 0.8182 | 1.0000 | 0.9000 | 0.8750 | 0.6875 |
+| 0.5000 | 0.9444 | 0.9444 | 0.9444 | 0.9375 | 0.5625 |
+| 0.7000 | 1.0000 | 0.8333 | 0.9091 | 0.9062 | 0.4688 |
 
 ## Serving Contract
 
@@ -72,8 +83,7 @@ Performance depends on the training data distribution and threshold. Re-run this
 ```bash
 pip install -e ".[dev]"
 quorabust-train  --csv examples/smoke_pairs.csv --out /tmp/quorabust-smoke.pkl --eval-fraction 0 --seed 7
-quorabust-report --model /tmp/quorabust-smoke.pkl --artifact-label quorabust-smoke.pkl --eval-csv examples/smoke_pairs.csv --out docs/SAMPLE_MODEL_CARD.md
+quorabust-report --model /tmp/quorabust-smoke.pkl --artifact-label quorabust-smoke.pkl --eval-csv examples/smoke_pairs.csv --thresholds 0.3,0.5,0.7 --out docs/SAMPLE_MODEL_CARD.md
 ```
 
 For a real model card, run the same `train`/`report` commands against the Kaggle Quora Question Pairs CSV instead of the smoke fixture.
-

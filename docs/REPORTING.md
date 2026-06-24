@@ -20,6 +20,7 @@ quorabust-report \
   --model /tmp/quorabust-smoke.pkl \
   --artifact-label quorabust-smoke.pkl \
   --eval-csv examples/smoke_pairs.csv \
+  --thresholds 0.3,0.5,0.7 \
   --out /tmp/quorabust-smoke-model-card.md
 
 quorabust-report \
@@ -32,6 +33,10 @@ quorabust-report \
 
 The smoke dataset proves the command path works. It is not a benchmark and should not be
 used for public model-quality claims.
+
+Reports include precision, recall, F1, accuracy, and predicted-positive rate at the
+selected threshold plus a threshold sweep. Use `--thresholds` to compare operating
+points before choosing one.
 
 ## Real Evaluation
 
@@ -49,6 +54,7 @@ quorabust-report \
   --model models/quorabust.pkl \
   --artifact-label quorabust-tfidf-v1.pkl \
   --eval-csv data/processed/holdout.csv \
+  --thresholds 0.2,0.3,0.4,0.5,0.6,0.7,0.8 \
   --out reports/quorabust-tfidf-v1.md
 ```
 

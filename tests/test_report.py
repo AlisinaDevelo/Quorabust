@@ -4,7 +4,13 @@ import pandas as pd
 
 from quorabust.model import train_duplicate_classifier
 from quorabust.persist import save_classifier
-from quorabust.report import build_report_payload, evaluate_holdout, main, render_model_card
+from quorabust.report import (
+    build_report_payload,
+    evaluate_holdout,
+    main,
+    render_model_card,
+    threshold_sweep,
+)
 
 
 def _df():
@@ -57,16 +63,34 @@ def test_build_report_payload_is_machine_readable():
             "n": 10,
             "threshold": 0.5,
             "accuracy": 0.8,
+            "precision": 0.8,
+            "recall": 0.8,
+            "f1": 0.8,
             "tn": 4,
             "fp": 1,
             "fn": 1,
             "tp": 4,
         },
+        sweep_metrics=[
+            {
+                "threshold": 0.5,
+                "accuracy": 0.8,
+                "precision": 0.8,
+                "recall": 0.8,
+                "f1": 0.8,
+                "tn": 4,
+                "fp": 1,
+                "fn": 1,
+                "tp": 4,
+                "predicted_positive_rate": 0.5,
+            }
+        ],
     )
     assert payload["artifact"] == "model.pkl"
     assert payload["training_metadata"] == {"feature_backend": "tfidf"}
     assert payload["persisted_evaluation"]["accuracy"] == 0.75
     assert payload["confusion_matrix"]["actual_1"]["predicted_1"] == 4
+    assert payload["threshold_sweep"][0]["f1"] == 0.8
     assert "csv" not in payload["training_metadata"]
 
 
@@ -76,6 +100,17 @@ def test_evaluate_holdout_returns_confusion_counts(tmp_path):
     assert metrics["n"] == 30
     assert metrics["tn"] + metrics["fp"] + metrics["fn"] + metrics["tp"] == 30
     assert 0.0 <= metrics["accuracy"] <= 1.0
+    assert 0.0 <= metrics["precision"] <= 1.0
+    assert 0.0 <= metrics["recall"] <= 1.0
+    assert 0.0 <= metrics["f1"] <= 1.0
+
+
+def test_threshold_sweep_returns_tradeoff_rows(tmp_path):
+    _, builder, clf = _artifact(tmp_path)
+    rows = threshold_sweep(builder, clf, _df(), thresholds=[0.3, 0.5, 0.7])
+    assert [row["threshold"] for row in rows] == [0.3, 0.5, 0.7]
+    assert all(0.0 <= row["precision"] <= 1.0 for row in rows)
+    assert all(0.0 <= row["recall"] <= 1.0 for row in rows)
 
 
 def test_report_cli_writes_model_card(tmp_path):
@@ -104,6 +139,7 @@ def test_report_cli_writes_model_card(tmp_path):
     assert "| artifact | smoke-model.pkl |" in card
     assert "## Holdout Evaluation" in card
     assert "## Confusion Matrix" in card
+    assert "## Threshold Sweep" in card
 
 
 def test_report_cli_writes_json_payload(tmp_path):
@@ -134,8 +170,14 @@ def test_report_cli_writes_json_payload(tmp_path):
     assert payload["artifact"] == "smoke-model.pkl"
     assert payload["holdout_evaluation"]["n"] == 30
     assert payload["confusion_matrix"]["labels"] == ["not_duplicate", "duplicate"]
+    assert len(payload["threshold_sweep"]) == 3
 
 
 def test_report_cli_rejects_bad_threshold(tmp_path):
     model, _, _ = _artifact(tmp_path)
     assert main(["--model", str(model), "--threshold", "1.5"]) == 1
+
+
+def test_report_cli_rejects_bad_threshold_grid(tmp_path):
+    model, _, _ = _artifact(tmp_path)
+    assert main(["--model", str(model), "--thresholds", "0.2,nope"]) == 1
