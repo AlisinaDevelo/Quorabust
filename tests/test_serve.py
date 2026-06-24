@@ -45,6 +45,7 @@ def test_serve_health_ready_predict(tmp_path):
         body = r.json()
         assert "proba_duplicate" in body
         assert body["variant"] == "a"
+        assert body["features"] is None
         m = client.get("/metrics")
         assert m.status_code == 200
         assert b"quorabust_predictions_total" in m.content
@@ -82,6 +83,26 @@ def test_models_returns_safe_public_metadata(tmp_path):
     assert model["eval_metrics"]["accuracy"] == 0.8
     assert "csv" not in model
     assert "id" not in model
+
+
+def test_predict_can_return_feature_explanations(tmp_path):
+    p = tmp_path / "m.pkl"
+    _tiny_pkl(p)
+    app = create_app(model_path_a=str(p))
+    with TestClient(app) as client:
+        r = client.post(
+            "/predict?explain=true",
+            json={"question1": ["hello"], "question2": ["hello there"]},
+        )
+    assert r.status_code == 200
+    features = r.json()["features"]
+    assert features and set(features[0]) == {
+        "cos",
+        "jaccard",
+        "len_ratio",
+        "abs_len_diff",
+        "len_sum",
+    }
 
 
 def test_models_without_loaded_artifacts_is_unavailable():

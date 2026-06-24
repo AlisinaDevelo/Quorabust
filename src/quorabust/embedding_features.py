@@ -25,6 +25,9 @@ class PairEmbeddingBuilder:
     def fit(self, corpus: list[str] | None = None) -> PairEmbeddingBuilder:
         return self
 
+    def feature_names(self) -> list[str]:
+        return ["cos", "l2", "mad", "len_ratio", "len_sum"]
+
     def fit_from_frame(
         self,
         df: pd.DataFrame,

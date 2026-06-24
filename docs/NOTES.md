@@ -13,6 +13,9 @@ The public [Quora Question Pairs](https://www.kaggle.com/c/quora-question-pairs)
 - **TF–IDF** uses `stop_words=None` so short or stopword-heavy questions still produce a vocabulary (important for tests and for “what is …” style duplicates).
 - **Early stopping** is enabled when you pass `eval_df` to `train_duplicate_classifier`; `early_stopping_rounds` defaults to 20 and can be overridden via `xgb_params`.
 - **Artifacts**: use `save_classifier` / `load_classifier` from `quorabust.persist` (or `from quorabust import …`) so the `PairFeatureBuilder` (TF–IDF state) and `XGBClassifier` stay in sync.
+- **Explanations**: `POST /predict?explain=true` returns model input feature values
+  (for example cosine, Jaccard, and length stats). These are inspectable features, not
+  causal natural-language explanations.
 
 ## Training CLI
 

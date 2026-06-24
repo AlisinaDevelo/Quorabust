@@ -43,6 +43,9 @@ class PairFeatureBuilder:
         self._fitted = True
         return self
 
+    def feature_names(self) -> list[str]:
+        return ["cos", "jaccard", "len_ratio", "abs_len_diff", "len_sum"]
+
     def fit_from_frame(
         self,
         df: pd.DataFrame,

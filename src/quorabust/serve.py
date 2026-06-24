@@ -13,6 +13,7 @@ from fastapi.responses import PlainTextResponse
 from prometheus_client import CollectorRegistry, Counter, Histogram, generate_latest
 from pydantic import BaseModel, ConfigDict, Field
 
+from quorabust.explain import explain_pair_features
 from quorabust.model import predict_proba_duplicate
 from quorabust.persist import load_classifier
 
@@ -65,6 +66,15 @@ class PredictOut(BaseModel):
                 {
                     "proba_duplicate": [0.82, 0.31],
                     "variant": "a",
+                    "features": [
+                        {
+                            "cos": 0.73,
+                            "jaccard": 0.42,
+                            "len_ratio": 0.8,
+                            "abs_len_diff": 1.0,
+                            "len_sum": 9.0,
+                        }
+                    ],
                 }
             ]
         }
@@ -75,6 +85,13 @@ class PredictOut(BaseModel):
         description="P(duplicate) for each pair, same order as the request lists.",
     )
     variant: str = Field(..., description="Scoring variant (a or b) after A/B fallback rules.")
+    features: list[dict[str, float]] | None = Field(
+        default=None,
+        description=(
+            "Optional per-pair model input feature values when `explain=true`. "
+            "These are feature values, not causal explanations."
+        ),
+    )
 
 
 _PUBLIC_META_KEYS = {
@@ -193,7 +210,8 @@ def create_app(
         summary="Predict duplicate probability",
         description=(
             "Scores one or more question pairs. Optional header "
-            "`X-Quorabust-Variant: b` selects the B artifact when configured."
+            "`X-Quorabust-Variant: b` selects the B artifact when configured. "
+            "Set query parameter `explain=true` to return input feature values."
         ),
         responses={
             400: {"description": "question1 and question2 length mismatch"},
@@ -202,6 +220,7 @@ def create_app(
     )
     def predict(
         body: PredictBody,
+        explain: bool = False,
         x_quorabust_variant: str | None = Header(
             default=None,
             alias="X-Quorabust-Variant",
@@ -222,7 +241,16 @@ def create_app(
         finally:
             latency.labels(v).observe(time.perf_counter() - t0)
         predictions.labels(v).inc()
-        return PredictOut(proba_duplicate=[float(x) for x in proba], variant=v)
+        features = None
+        if explain:
+            schema = _meta.get("feature_schema")
+            features = explain_pair_features(
+                bld,
+                body.question1,
+                body.question2,
+                feature_schema=schema if isinstance(schema, list) else None,
+            )
+        return PredictOut(proba_duplicate=[float(x) for x in proba], variant=v, features=features)
 
     return app
 

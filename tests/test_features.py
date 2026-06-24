@@ -26,6 +26,7 @@ def test_pair_feature_builder_shape_and_monotonic_similarity():
     X = b.transform_pairs(q1, q2)
     assert X.shape == (2, 5)
     assert X[0, 0] >= X[1, 0]
+    assert b.feature_names() == ["cos", "jaccard", "len_ratio", "abs_len_diff", "len_sum"]
 
 
 def test_fit_from_frame():
