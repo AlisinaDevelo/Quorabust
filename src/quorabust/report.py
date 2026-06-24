@@ -15,6 +15,16 @@ from quorabust.model import predict_proba_duplicate
 from quorabust.persist import load_classifier
 
 _REQUIRED_COLUMNS = {"question1", "question2", "is_duplicate"}
+_METADATA_KEYS = [
+    "feature_backend",
+    "feature_schema",
+    "n_train",
+    "n_eval",
+    "seed",
+    "quorabust_version",
+    "git_revision",
+    "csv_sha256",
+]
 
 
 def _package_version() -> str:
@@ -51,6 +61,18 @@ def _markdown_table(headers: list[str], rows: list[list[Any]]) -> str:
     for row in rows:
         out.append("| " + " | ".join(_format_value(v) for v in row) + " |")
     return "\n".join(out)
+
+
+def _metadata_from_meta(meta: dict[str, Any]) -> dict[str, Any]:
+    return {k: meta[k] for k in _METADATA_KEYS if k in meta}
+
+
+def _persisted_metrics_from_meta(meta: dict[str, Any]) -> dict[str, float]:
+    return {
+        k.removeprefix("eval_"): float(v)
+        for k, v in sorted(meta.items())
+        if k.startswith("eval_") and isinstance(v, int | float)
+    }
 
 
 def evaluate_holdout(
@@ -100,22 +122,8 @@ def render_model_card(
         ["generated_by", f"Quorabust {_package_version()}"],
     ]
 
-    metadata_keys = [
-        "feature_backend",
-        "feature_schema",
-        "n_train",
-        "n_eval",
-        "seed",
-        "quorabust_version",
-        "git_revision",
-        "csv_sha256",
-    ]
-    metadata_rows = [[k, meta[k]] for k in metadata_keys if k in meta]
-    persisted_metric_rows = [
-        [k.removeprefix("eval_"), meta[k]]
-        for k in sorted(meta)
-        if k.startswith("eval_") and isinstance(meta[k], int | float)
-    ]
+    metadata_rows = [[k, v] for k, v in _metadata_from_meta(meta).items()]
+    persisted_metric_rows = [[k, v] for k, v in _persisted_metrics_from_meta(meta).items()]
 
     parts = [
         "# Quorabust Model Card",
@@ -200,9 +208,56 @@ def render_model_card(
     return "\n".join(parts)
 
 
+def build_report_payload(
+    *,
+    artifact: str,
+    meta: dict[str, Any],
+    holdout_metrics: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Build a machine-readable report payload for CI and model comparisons."""
+    payload: dict[str, Any] = {
+        "artifact": artifact,
+        "generated_by": f"Quorabust {_package_version()}",
+        "intended_use": (
+            "Scores pairs of short natural-language questions and returns the probability "
+            "that the pair is semantically duplicate."
+        ),
+        "training_metadata": _metadata_from_meta(meta),
+        "persisted_evaluation": _persisted_metrics_from_meta(meta),
+        "serving_contract": {
+            "predict": "POST /predict",
+            "metrics": "GET /metrics",
+            "input": {"question1": "list[str]", "question2": "list[str]"},
+            "output": {"proba_duplicate": "list[float]"},
+        },
+        "caveats": [
+            "Performance depends on the training data distribution and threshold.",
+            "Re-run on a current holdout set before comparing artifacts.",
+        ],
+    }
+    if holdout_metrics is not None:
+        payload["holdout_evaluation"] = {
+            k: v
+            for k, v in holdout_metrics.items()
+            if k not in {"tn", "fp", "fn", "tp"}
+        }
+        payload["confusion_matrix"] = {
+            "labels": ["not_duplicate", "duplicate"],
+            "actual_0": {
+                "predicted_0": holdout_metrics["tn"],
+                "predicted_1": holdout_metrics["fp"],
+            },
+            "actual_1": {
+                "predicted_0": holdout_metrics["fn"],
+                "predicted_1": holdout_metrics["tp"],
+            },
+        }
+    return payload
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Generate a Markdown model card for a Quorabust artifact.",
+        description="Generate a model report for a Quorabust artifact.",
     )
     parser.add_argument("--model", type=Path, required=True, help="Saved .pkl artifact")
     parser.add_argument(
@@ -222,7 +277,13 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Public artifact label to print instead of the local model path",
     )
-    parser.add_argument("--out", type=Path, default=None, help="Write Markdown here")
+    parser.add_argument(
+        "--format",
+        choices=["markdown", "json"],
+        default="markdown",
+        help="Report format to print or write",
+    )
+    parser.add_argument("--out", type=Path, default=None, help="Write report here")
     args = parser.parse_args(argv)
 
     if not args.model.is_file():
@@ -249,16 +310,28 @@ def main(argv: list[str] | None = None) -> int:
             print(str(exc), file=sys.stderr)
             return 1
 
-    card = render_model_card(
-        artifact=args.artifact_label or str(args.model.resolve()),
-        meta=meta,
-        holdout_metrics=holdout_metrics,
-    )
+    artifact = args.artifact_label or str(args.model.resolve())
+    if args.format == "json":
+        report = json.dumps(
+            build_report_payload(
+                artifact=artifact,
+                meta=meta,
+                holdout_metrics=holdout_metrics,
+            ),
+            indent=2,
+            sort_keys=True,
+        )
+    else:
+        report = render_model_card(
+            artifact=artifact,
+            meta=meta,
+            holdout_metrics=holdout_metrics,
+        )
     if args.out is None:
-        print(card)
+        print(report)
     else:
         args.out.parent.mkdir(parents=True, exist_ok=True)
-        args.out.write_text(card, encoding="utf-8")
+        args.out.write_text(report + "\n", encoding="utf-8")
         print(f"wrote {args.out.resolve()}")
     return 0
 

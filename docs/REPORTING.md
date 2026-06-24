@@ -21,6 +21,13 @@ quorabust-report \
   --artifact-label quorabust-smoke.pkl \
   --eval-csv examples/smoke_pairs.csv \
   --out /tmp/quorabust-smoke-model-card.md
+
+quorabust-report \
+  --model /tmp/quorabust-smoke.pkl \
+  --artifact-label quorabust-smoke.pkl \
+  --eval-csv examples/smoke_pairs.csv \
+  --format json \
+  --out /tmp/quorabust-smoke-model-card.json
 ```
 
 The smoke dataset proves the command path works. It is not a benchmark and should not be
@@ -48,3 +55,6 @@ quorabust-report \
 Record the dataset source, split method, command, commit SHA, and date next to any
 published result. Do not compare artifacts unless they use the same holdout split and
 threshold.
+
+Use `--format json` when you want CI or release tooling to compare metrics without
+scraping Markdown.

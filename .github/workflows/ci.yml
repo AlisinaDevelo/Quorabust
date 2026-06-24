@@ -44,4 +44,11 @@ jobs:
             --artifact-label quorabust-smoke.pkl \
             --eval-csv examples/smoke_pairs.csv \
             --out /tmp/quorabust-smoke-model-card.md
+          quorabust-report \
+            --model /tmp/quorabust-smoke.pkl \
+            --artifact-label quorabust-smoke.pkl \
+            --eval-csv examples/smoke_pairs.csv \
+            --format json \
+            --out /tmp/quorabust-smoke-model-card.json
           test -s /tmp/quorabust-smoke-model-card.md
+          test -s /tmp/quorabust-smoke-model-card.json

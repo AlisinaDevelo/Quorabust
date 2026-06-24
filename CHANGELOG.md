@@ -7,6 +7,7 @@
   optional labeled holdout CSVs.
 - `GET /models` serving endpoint for safe loaded-model metadata.
 - `examples/smoke_pairs.csv` and CI coverage for the train-to-report workflow.
+- JSON output for `quorabust-report --format json`.
 
 ### Fixed
 - Capped NumPy below 2.5 so Mypy can parse dependency stubs with the configured
