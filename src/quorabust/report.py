@@ -217,6 +217,11 @@ def main(argv: list[str] | None = None) -> int:
         default=0.5,
         help="Decision threshold for the optional confusion matrix",
     )
+    parser.add_argument(
+        "--artifact-label",
+        default=None,
+        help="Public artifact label to print instead of the local model path",
+    )
     parser.add_argument("--out", type=Path, default=None, help="Write Markdown here")
     args = parser.parse_args(argv)
 
@@ -245,7 +250,7 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
     card = render_model_card(
-        artifact=str(args.model.resolve()),
+        artifact=args.artifact_label or str(args.model.resolve()),
         meta=meta,
         holdout_metrics=holdout_metrics,
     )

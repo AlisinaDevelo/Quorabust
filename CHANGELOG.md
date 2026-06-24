@@ -6,6 +6,7 @@
 - `quorabust-report` for generating Markdown model cards from saved artifacts and
   optional labeled holdout CSVs.
 - `GET /models` serving endpoint for safe loaded-model metadata.
+- `examples/smoke_pairs.csv` and CI coverage for the train-to-report workflow.
 
 ### Fixed
 - Capped NumPy below 2.5 so Mypy can parse dependency stubs with the configured

@@ -61,9 +61,24 @@ def test_report_cli_writes_model_card(tmp_path):
     _df().to_csv(eval_csv, index=False)
     out = tmp_path / "MODEL_CARD.md"
 
-    assert main(["--model", str(model), "--eval-csv", str(eval_csv), "--out", str(out)]) == 0
+    assert (
+        main(
+            [
+                "--model",
+                str(model),
+                "--artifact-label",
+                "smoke-model.pkl",
+                "--eval-csv",
+                str(eval_csv),
+                "--out",
+                str(out),
+            ]
+        )
+        == 0
+    )
 
     card = out.read_text(encoding="utf-8")
+    assert "| artifact | smoke-model.pkl |" in card
     assert "## Holdout Evaluation" in card
     assert "## Confusion Matrix" in card
 

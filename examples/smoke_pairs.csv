@@ -1,0 +1,33 @@
+question1,question2,is_duplicate
+how do i learn python fast,what is the best way to learn python,1
+best way to study golang,how can i learn go programming,1
+what is docker used for,why do developers use docker,1
+how to deploy fastapi,steps to deploy a fastapi app,1
+what is prometheus monitoring,how does prometheus collect metrics,1
+how to improve postgres queries,ways to make postgres queries faster,1
+what is a websocket,how do websockets work,1
+how to write unit tests,what is the best way to test code,1
+what is terraform,why use terraform for infrastructure,1
+how to debug latency,how can i find slow requests,1
+what is xgboost,how does xgboost classification work,1
+how to clean text data,ways to preprocess text for ml,1
+what is the capital of france,how do i install redis,0
+best pizza in rome,how does kubernetes schedule pods,0
+how to learn python,what is the weather tomorrow,0
+postgres index tuning,best guitar strings for beginners,0
+what is a websocket,how do i bake sourdough bread,0
+fastapi deployment guide,what are symptoms of flu,0
+terraform state file,how to train for a marathon,0
+prometheus metrics,where can i buy train tickets,0
+docker compose network,what is the tallest mountain,0
+unit testing in python,how to grow tomatoes indoors,0
+machine learning model card,what is the price of gold,0
+text preprocessing pipeline,how to learn chess openings,0
+how do i cache api responses,ways to cache http api results,1
+what is rate limiting,how does api rate limiting work,1
+how to rotate logs,steps for application log rotation,1
+what is a health check,why services expose health endpoints,1
+how to tune xgboost,which xgboost parameters matter,1
+what is model drift,how do ml models drift over time,1
+redis cache invalidation,how to repair a bicycle chain,0
+openapi schema docs,what causes ocean tides,0
