@@ -7,6 +7,9 @@ load tests, and Markdown model-card reporting.
 Quorabust is intentionally small enough to inspect quickly while still showing the
 operational shape of an ML-backed backend service.
 
+📐 **Architecture & diagrams:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — component
+overview, training pipeline, train-vs-serve sequence, and the artifact/registry contract.
+
 ## What it demonstrates
 
 - Pairwise text features with TF-IDF or optional sentence-transformer embeddings
