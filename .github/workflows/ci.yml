@@ -32,6 +32,8 @@ jobs:
         run: quorabust-serve --help
       - name: Report CLI
         run: quorabust-report --help
+      - name: Report validator CLI
+        run: quorabust-validate-report --help
       - name: Smoke model report
         run: |
           quorabust-train \
@@ -50,5 +52,9 @@ jobs:
             --eval-csv examples/smoke_pairs.csv \
             --format json \
             --out /tmp/quorabust-smoke-model-card.json
+          quorabust-validate-report \
+            --report /tmp/quorabust-smoke-model-card.json \
+            --require-holdout \
+            --require-calibration
           test -s /tmp/quorabust-smoke-model-card.md
           test -s /tmp/quorabust-smoke-model-card.json

@@ -77,6 +77,22 @@ threshold.
 Use `--format json` when you want CI or release tooling to compare metrics without
 scraping Markdown.
 
+Use `quorabust-validate-report` as a release gate for machine-readable reports:
+
+```bash
+quorabust-report \
+  --model models/quorabust.pkl \
+  --artifact-label quorabust-tfidf-v1.pkl \
+  --eval-csv data/processed/holdout.csv \
+  --format json \
+  --out reports/quorabust-tfidf-v1.json
+
+quorabust-validate-report \
+  --report reports/quorabust-tfidf-v1.json \
+  --require-holdout \
+  --require-calibration
+```
+
 When `quorabust-train` has a holdout split, it stores a selected `decision_threshold` in
 artifact metadata. The threshold is chosen from `--thresholds` by maximizing
 `--threshold-metric` (default `f1`). Serving uses that artifact threshold unless the

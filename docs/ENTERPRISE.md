@@ -42,6 +42,8 @@ See [SCALING.md](SCALING.md) for chunked CSV I/O, optional **embedding** trainin
 
 - **`quorabust.registry`**: append JSONL rows with `--registry-dir` after training; swap for MLflow when you need a UI.
 - **`quorabust.drift`**: compare live batch feature means to `meta["reference_feature_means"]`.
+- **`quorabust-validate-report`**: validate JSON model-card reports in CI/release jobs;
+  use `--require-holdout --require-calibration` before promoting a benchmarked artifact.
 
 ## Releases
 
