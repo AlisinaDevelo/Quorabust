@@ -13,6 +13,7 @@
 - `quorabust-train --metadata-out` for JSON metadata sidecars.
 - Thresholded `/predict` decisions with artifact/env defaults and per-request override.
 - Enterprise product-positioning guide for semantic matching use cases and production gaps.
+- Calibration summary and probability-bin diagnostics in `quorabust-report`.
 
 ### Fixed
 - Capped NumPy below 2.5 so Mypy can parse dependency stubs with the configured

@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import (
     accuracy_score,
+    brier_score_loss,
     confusion_matrix,
     f1_score,
     log_loss,
@@ -118,6 +119,54 @@ def _metrics_at_threshold(y: np.ndarray, proba: np.ndarray, threshold: float) ->
     }
 
 
+def calibration_summary(
+    y: np.ndarray,
+    proba: np.ndarray,
+    *,
+    n_bins: int = 10,
+) -> dict[str, Any]:
+    """Summarize whether predicted probabilities match observed positive rates."""
+    if n_bins < 1:
+        raise ValueError("n_bins must be at least 1")
+
+    bins: list[dict[str, Any]] = []
+    total = len(y)
+    expected_calibration_error = 0.0
+    for idx in range(n_bins):
+        lower = idx / n_bins
+        upper = (idx + 1) / n_bins
+        if idx == n_bins - 1:
+            mask = (proba >= lower) & (proba <= upper)
+        else:
+            mask = (proba >= lower) & (proba < upper)
+        count = int(np.sum(mask))
+        if count == 0:
+            continue
+        mean_predicted = float(np.mean(proba[mask]))
+        observed_rate = float(np.mean(y[mask]))
+        absolute_error = abs(mean_predicted - observed_rate)
+        expected_calibration_error += (count / total) * absolute_error
+        bins.append(
+            {
+                "lower": float(lower),
+                "upper": float(upper),
+                "count": count,
+                "mean_predicted_probability": mean_predicted,
+                "observed_positive_rate": observed_rate,
+                "absolute_error": float(absolute_error),
+            }
+        )
+
+    return {
+        "n_bins": int(n_bins),
+        "brier_score": float(brier_score_loss(y, proba)),
+        "expected_calibration_error": float(expected_calibration_error),
+        "mean_predicted_probability": float(np.mean(proba)),
+        "mean_observed_rate": float(np.mean(y)),
+        "bins": bins,
+    }
+
+
 def _holdout_proba(
     builder: Any,
     clf: Any,
@@ -139,6 +188,7 @@ def evaluate_holdout(
     df: pd.DataFrame,
     *,
     threshold: float = 0.5,
+    calibration_bins: int = 10,
 ) -> dict[str, Any]:
     """Evaluate a loaded artifact against a labeled Quora-style dataframe."""
     y, proba = _holdout_proba(builder, clf, df)
@@ -147,6 +197,7 @@ def evaluate_holdout(
         "n": int(len(df)),
         "log_loss": float(log_loss(y, proba, labels=[0, 1])),
         "positive_rate": float(np.mean(y)),
+        "calibration": calibration_summary(y, proba, n_bins=calibration_bins),
         **threshold_metrics,
     }
     if len(np.unique(y)) > 1:
@@ -215,6 +266,7 @@ def render_model_card(
     ]
 
     if holdout_metrics is not None:
+        calibration = holdout_metrics.get("calibration")
         metric_keys = [
             "n",
             "threshold",
@@ -244,6 +296,45 @@ def render_model_card(
                 _markdown_table(["", "predicted 0", "predicted 1"], confusion_rows),
             ]
         )
+        if isinstance(calibration, dict):
+            calibration_rows = [
+                ["n_bins", calibration["n_bins"]],
+                ["brier_score", calibration["brier_score"]],
+                ["expected_calibration_error", calibration["expected_calibration_error"]],
+                ["mean_predicted_probability", calibration["mean_predicted_probability"]],
+                ["mean_observed_rate", calibration["mean_observed_rate"]],
+            ]
+            bin_rows = [
+                [
+                    f"{row['lower']:.2f}-{row['upper']:.2f}",
+                    row["count"],
+                    row["mean_predicted_probability"],
+                    row["observed_positive_rate"],
+                    row["absolute_error"],
+                ]
+                for row in calibration.get("bins", [])
+            ]
+            parts.extend(
+                [
+                    "",
+                    "## Calibration Summary",
+                    "",
+                    _markdown_table(["metric", "value"], calibration_rows),
+                    "",
+                    "## Calibration Bins",
+                    "",
+                    _markdown_table(
+                        [
+                            "probability_bin",
+                            "count",
+                            "mean_predicted_probability",
+                            "observed_positive_rate",
+                            "absolute_error",
+                        ],
+                        bin_rows,
+                    ),
+                ]
+            )
         if sweep_metrics:
             sweep_rows = [
                 [
@@ -282,8 +373,9 @@ def render_model_card(
             "",
             (
                 "`POST /predict` accepts `question1` and `question2` arrays of equal length "
-                "and returns `proba_duplicate` in the same order. `GET /metrics` exposes "
-                "Prometheus counters and latency histograms."
+                "and returns `proba_duplicate`, `is_duplicate`, and `decision_threshold` "
+                "in the same order. `GET /metrics` exposes Prometheus counters and "
+                "latency histograms."
             ),
             "",
             "## Caveats",
@@ -319,7 +411,11 @@ def build_report_payload(
             "predict": "POST /predict",
             "metrics": "GET /metrics",
             "input": {"question1": "list[str]", "question2": "list[str]"},
-            "output": {"proba_duplicate": "list[float]"},
+            "output": {
+                "proba_duplicate": "list[float]",
+                "is_duplicate": "list[bool]",
+                "decision_threshold": "float",
+            },
         },
         "caveats": [
             "Performance depends on the training data distribution and threshold.",
@@ -330,8 +426,11 @@ def build_report_payload(
         payload["holdout_evaluation"] = {
             k: v
             for k, v in holdout_metrics.items()
-            if k not in {"tn", "fp", "fn", "tp"}
+            if k not in {"tn", "fp", "fn", "tp", "calibration"}
         }
+        calibration = holdout_metrics.get("calibration")
+        if calibration is not None:
+            payload["calibration"] = calibration
         payload["confusion_matrix"] = {
             "labels": ["not_duplicate", "duplicate"],
             "actual_0": {
@@ -371,6 +470,12 @@ def main(argv: list[str] | None = None) -> int:
         help="Comma-separated thresholds for the optional holdout sweep",
     )
     parser.add_argument(
+        "--calibration-bins",
+        type=int,
+        default=10,
+        help="Number of probability bins for the optional calibration report",
+    )
+    parser.add_argument(
         "--artifact-label",
         default=None,
         help="Public artifact label to print instead of the local model path",
@@ -389,6 +494,9 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     if not 0.0 < args.threshold < 1.0:
         print("--threshold must be between 0 and 1", file=sys.stderr)
+        return 1
+    if args.calibration_bins < 1:
+        print("--calibration-bins must be at least 1", file=sys.stderr)
         return 1
     try:
         thresholds = _parse_thresholds(args.thresholds)
@@ -410,6 +518,7 @@ def main(argv: list[str] | None = None) -> int:
                 clf,
                 eval_df,
                 threshold=args.threshold,
+                calibration_bins=args.calibration_bins,
             )
             sweep_metrics = threshold_sweep(
                 builder,

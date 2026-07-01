@@ -78,7 +78,8 @@ quorabust-report \
 ```
 
 The report includes artifact metadata, persisted training/eval metrics, optional holdout
-metrics, a confusion matrix, and a precision/recall/F1 threshold sweep. Use
+metrics, a confusion matrix, a precision/recall/F1 threshold sweep, and probability
+calibration diagnostics. Use `--calibration-bins` to tune the calibration table and
 `--format json` for machine-readable CI or release artifacts. Use a real held-out CSV for
 comparable model claims; the command accepts the same `question1`, `question2`,
 `is_duplicate` column contract as training.

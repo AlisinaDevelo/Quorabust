@@ -6,6 +6,7 @@ from quorabust.model import train_duplicate_classifier
 from quorabust.persist import save_classifier
 from quorabust.report import (
     build_report_payload,
+    calibration_summary,
     evaluate_holdout,
     main,
     render_model_card,
@@ -70,6 +71,23 @@ def test_build_report_payload_is_machine_readable():
             "fp": 1,
             "fn": 1,
             "tp": 4,
+            "calibration": {
+                "n_bins": 2,
+                "brier_score": 0.12,
+                "expected_calibration_error": 0.05,
+                "mean_predicted_probability": 0.48,
+                "mean_observed_rate": 0.5,
+                "bins": [
+                    {
+                        "lower": 0.0,
+                        "upper": 0.5,
+                        "count": 5,
+                        "mean_predicted_probability": 0.2,
+                        "observed_positive_rate": 0.2,
+                        "absolute_error": 0.0,
+                    }
+                ],
+            },
         },
         sweep_metrics=[
             {
@@ -90,6 +108,7 @@ def test_build_report_payload_is_machine_readable():
     assert payload["training_metadata"] == {"feature_backend": "tfidf"}
     assert payload["persisted_evaluation"]["accuracy"] == 0.75
     assert payload["confusion_matrix"]["actual_1"]["predicted_1"] == 4
+    assert payload["calibration"]["expected_calibration_error"] == 0.05
     assert payload["threshold_sweep"][0]["f1"] == 0.8
     assert "csv" not in payload["training_metadata"]
 
@@ -103,6 +122,19 @@ def test_evaluate_holdout_returns_confusion_counts(tmp_path):
     assert 0.0 <= metrics["precision"] <= 1.0
     assert 0.0 <= metrics["recall"] <= 1.0
     assert 0.0 <= metrics["f1"] <= 1.0
+    assert 0.0 <= metrics["calibration"]["brier_score"] <= 1.0
+    assert "expected_calibration_error" in metrics["calibration"]
+
+
+def test_calibration_summary_returns_bins():
+    summary = calibration_summary(
+        y=pd.Series([0, 0, 1, 1]).to_numpy(),
+        proba=pd.Series([0.1, 0.3, 0.7, 0.9]).to_numpy(),
+        n_bins=2,
+    )
+    assert summary["n_bins"] == 2
+    assert len(summary["bins"]) == 2
+    assert 0.0 <= summary["expected_calibration_error"] <= 1.0
 
 
 def test_threshold_sweep_returns_tradeoff_rows(tmp_path):
@@ -139,6 +171,8 @@ def test_report_cli_writes_model_card(tmp_path):
     assert "| artifact | smoke-model.pkl |" in card
     assert "## Holdout Evaluation" in card
     assert "## Confusion Matrix" in card
+    assert "## Calibration Summary" in card
+    assert "## Calibration Bins" in card
     assert "## Threshold Sweep" in card
 
 
@@ -169,6 +203,7 @@ def test_report_cli_writes_json_payload(tmp_path):
     payload = json.loads(out.read_text(encoding="utf-8"))
     assert payload["artifact"] == "smoke-model.pkl"
     assert payload["holdout_evaluation"]["n"] == 30
+    assert "calibration" in payload
     assert payload["confusion_matrix"]["labels"] == ["not_duplicate", "duplicate"]
     assert len(payload["threshold_sweep"]) == 3
 

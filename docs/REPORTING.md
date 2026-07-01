@@ -2,7 +2,8 @@
 
 Use `quorabust-report` to turn a saved artifact into a Markdown model card. The report
 is meant for artifact review: it shows lineage, feature schema, persisted metrics, and
-optional holdout metrics with a threshold confusion matrix.
+optional holdout metrics with a threshold confusion matrix, threshold sweep, and
+probability calibration summary.
 
 ## Smoke Workflow
 
@@ -22,6 +23,7 @@ quorabust-report \
   --artifact-label quorabust-smoke.pkl \
   --eval-csv examples/smoke_pairs.csv \
   --thresholds 0.3,0.5,0.7 \
+  --calibration-bins 5 \
   --out /tmp/quorabust-smoke-model-card.md
 
 quorabust-report \
@@ -38,6 +40,11 @@ used for public model-quality claims.
 Reports include precision, recall, F1, accuracy, and predicted-positive rate at the
 selected threshold plus a threshold sweep. Use `--thresholds` to compare operating
 points before choosing one.
+
+Reports also include calibration diagnostics: Brier score, expected calibration error,
+mean predicted probability, mean observed rate, and probability-bin rows. Use
+`--calibration-bins` to control how many bins are printed. Calibration helps decide
+whether probabilities are fit for thresholding or only useful for ranking.
 
 ## Real Evaluation
 
@@ -57,6 +64,7 @@ quorabust-report \
   --artifact-label quorabust-tfidf-v1.pkl \
   --eval-csv data/processed/holdout.csv \
   --thresholds 0.2,0.3,0.4,0.5,0.6,0.7,0.8 \
+  --calibration-bins 10 \
   --out reports/quorabust-tfidf-v1.md
 ```
 
