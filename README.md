@@ -10,6 +10,8 @@ operational shape of an ML-backed backend service.
 
 📐 **Architecture & diagrams:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — component
 overview, training pipeline, train-vs-serve sequence, and the artifact/registry contract.
+**Enterprise positioning:** [docs/PRODUCT.md](docs/PRODUCT.md) — product surface,
+buyer-facing use cases, method strategy, and production gaps.
 
 ## What it demonstrates
 
@@ -124,7 +126,8 @@ pytest -q --cov=quorabust --cov-fail-under=70
 pre-commit run --all-files   # optional
 ```
 
-Design notes: [docs/NOTES.md](docs/NOTES.md). Contributing: [CONTRIBUTING.md](CONTRIBUTING.md).
+Design notes: [docs/NOTES.md](docs/NOTES.md). Enterprise positioning:
+[docs/PRODUCT.md](docs/PRODUCT.md). Contributing: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Enterprise / operations
 
