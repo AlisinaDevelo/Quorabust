@@ -30,6 +30,27 @@ def _tiny_pkl(path):
     )
 
 
+def _tiny_pkl_with_threshold(path, threshold: float) -> None:
+    df = pd.DataFrame(
+        {
+            "question1": ["hello world", "foo bar", "what is python"],
+            "question2": ["hello there", "baz qux", "python language"],
+            "is_duplicate": [1, 0, 1],
+        }
+    )
+    b, clf = train_duplicate_classifier(df, xgb_params={"n_estimators": 12, "max_depth": 3})
+    save_classifier(
+        path,
+        b,
+        clf,
+        meta={
+            "feature_backend": "tfidf",
+            "feature_schema": ["cos", "jaccard", "len_ratio", "abs_len_diff", "len_sum"],
+            "decision_threshold": threshold,
+        },
+    )
+
+
 def test_serve_health_ready_predict(tmp_path):
     p = tmp_path / "m.pkl"
     _tiny_pkl(p)
@@ -44,6 +65,9 @@ def test_serve_health_ready_predict(tmp_path):
         assert r.status_code == 200
         body = r.json()
         assert "proba_duplicate" in body
+        assert "is_duplicate" in body
+        assert body["decision_threshold"] == 0.5
+        assert len(body["is_duplicate"]) == len(body["proba_duplicate"])
         assert body["variant"] == "a"
         assert body["features"] is None
         m = client.get("/metrics")
@@ -103,6 +127,44 @@ def test_predict_can_return_feature_explanations(tmp_path):
         "abs_len_diff",
         "len_sum",
     }
+
+
+def test_predict_uses_artifact_decision_threshold(tmp_path):
+    p = tmp_path / "m.pkl"
+    _tiny_pkl_with_threshold(p, 0.91)
+    app = create_app(model_path_a=str(p))
+    with TestClient(app) as client:
+        r = client.post(
+            "/predict",
+            json={"question1": ["hello"], "question2": ["hello there"]},
+        )
+    assert r.status_code == 200
+    assert r.json()["decision_threshold"] == 0.91
+
+
+def test_predict_threshold_query_overrides_artifact_threshold(tmp_path):
+    p = tmp_path / "m.pkl"
+    _tiny_pkl_with_threshold(p, 0.91)
+    app = create_app(model_path_a=str(p))
+    with TestClient(app) as client:
+        r = client.post(
+            "/predict?threshold=0.2",
+            json={"question1": ["hello"], "question2": ["hello there"]},
+        )
+    assert r.status_code == 200
+    assert r.json()["decision_threshold"] == 0.2
+
+
+def test_predict_rejects_invalid_threshold(tmp_path):
+    p = tmp_path / "m.pkl"
+    _tiny_pkl(p)
+    app = create_app(model_path_a=str(p))
+    with TestClient(app) as client:
+        r = client.post(
+            "/predict?threshold=1.2",
+            json={"question1": ["hello"], "question2": ["hello there"]},
+        )
+    assert r.status_code == 422
 
 
 def test_models_without_loaded_artifacts_is_unavailable():

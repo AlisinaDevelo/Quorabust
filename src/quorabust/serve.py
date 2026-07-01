@@ -8,7 +8,7 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 from prometheus_client import CollectorRegistry, Counter, Histogram, generate_latest
 from pydantic import BaseModel, ConfigDict, Field
@@ -17,12 +17,34 @@ from quorabust.explain import explain_pair_features
 from quorabust.model import predict_proba_duplicate
 from quorabust.persist import load_classifier
 
+DEFAULT_DECISION_THRESHOLD = 0.5
+
 
 def _dist_version() -> str:
     try:
         return version("Quorabust")
     except PackageNotFoundError:
         return "0.0.0"
+
+
+def _env_decision_threshold() -> float:
+    raw = os.environ.get("QUORABUST_DECISION_THRESHOLD")
+    if raw is None:
+        return DEFAULT_DECISION_THRESHOLD
+    try:
+        value = float(raw)
+    except ValueError:
+        return DEFAULT_DECISION_THRESHOLD
+    if 0.0 <= value <= 1.0:
+        return value
+    return DEFAULT_DECISION_THRESHOLD
+
+
+def _model_decision_threshold(meta: dict[str, Any], fallback: float) -> float:
+    raw = meta.get("decision_threshold")
+    if isinstance(raw, int | float) and 0.0 <= float(raw) <= 1.0:
+        return float(raw)
+    return fallback
 
 
 class PredictBody(BaseModel):
@@ -65,6 +87,8 @@ class PredictOut(BaseModel):
             "examples": [
                 {
                     "proba_duplicate": [0.82, 0.31],
+                    "is_duplicate": [True, False],
+                    "decision_threshold": 0.5,
                     "variant": "a",
                     "features": [
                         {
@@ -83,6 +107,19 @@ class PredictOut(BaseModel):
     proba_duplicate: list[float] = Field(
         ...,
         description="P(duplicate) for each pair, same order as the request lists.",
+    )
+    is_duplicate: list[bool] = Field(
+        ...,
+        description=(
+            "Thresholded duplicate decision for each pair, same order as the request lists."
+        ),
+    )
+    decision_threshold: float = Field(
+        ...,
+        description=(
+            "Probability threshold used to compute is_duplicate. Request threshold wins over "
+            "artifact metadata; artifact metadata wins over QUORABUST_DECISION_THRESHOLD."
+        ),
     )
     variant: str = Field(..., description="Scoring variant (a or b) after A/B fallback rules.")
     features: list[dict[str, float]] | None = Field(
@@ -125,6 +162,7 @@ def create_app(
 ) -> FastAPI:
     path_a = model_path_a or os.environ.get("QUORABUST_MODEL_PATH", "")
     path_b = model_path_b or os.environ.get("QUORABUST_MODEL_B", "")
+    default_threshold = _env_decision_threshold()
 
     registry = CollectorRegistry()
     predictions = Counter(
@@ -211,7 +249,8 @@ def create_app(
         description=(
             "Scores one or more question pairs. Optional header "
             "`X-Quorabust-Variant: b` selects the B artifact when configured. "
-            "Set query parameter `explain=true` to return input feature values."
+            "Set query parameter `explain=true` to return input feature values. "
+            "Set `threshold` to override the duplicate decision cutoff for this request."
         ),
         responses={
             400: {"description": "question1 and question2 length mismatch"},
@@ -221,6 +260,15 @@ def create_app(
     def predict(
         body: PredictBody,
         explain: bool = False,
+        threshold: float | None = Query(
+            default=None,
+            ge=0.0,
+            le=1.0,
+            description=(
+                "Optional probability cutoff for is_duplicate. Defaults to artifact metadata "
+                "decision_threshold when present, otherwise QUORABUST_DECISION_THRESHOLD or 0.5."
+            ),
+        ),
         x_quorabust_variant: str | None = Header(
             default=None,
             alias="X-Quorabust-Variant",
@@ -233,6 +281,11 @@ def create_app(
         if v not in state:
             raise HTTPException(status_code=503, detail="requested variant not available")
         bld, clf, _meta = state[v]
+        effective_threshold = (
+            threshold
+            if threshold is not None
+            else _model_decision_threshold(_meta, default_threshold)
+        )
         if len(body.question1) != len(body.question2):
             raise HTTPException(status_code=400, detail="question1 and question2 length mismatch")
         t0 = time.perf_counter()
@@ -250,7 +303,14 @@ def create_app(
                 body.question2,
                 feature_schema=schema if isinstance(schema, list) else None,
             )
-        return PredictOut(proba_duplicate=[float(x) for x in proba], variant=v, features=features)
+        probs = [float(x) for x in proba]
+        return PredictOut(
+            proba_duplicate=probs,
+            is_duplicate=[p >= effective_threshold for p in probs],
+            decision_threshold=effective_threshold,
+            variant=v,
+            features=features,
+        )
 
     return app
 

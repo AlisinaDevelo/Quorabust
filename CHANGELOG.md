@@ -11,6 +11,7 @@
 - Precision, recall, F1, and configurable threshold sweeps in model reports.
 - `POST /predict?explain=true` feature-value explanations for scored pairs.
 - `quorabust-train --metadata-out` for JSON metadata sidecars.
+- Thresholded `/predict` decisions with artifact/env defaults and per-request override.
 
 ### Fixed
 - Capped NumPy below 2.5 so Mypy can parse dependency stubs with the configured

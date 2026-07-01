@@ -15,6 +15,9 @@ This document maps **ambitions** to what ships in-repo and what stays external.
 
 - **`quorabust-serve`**: FastAPI app with `/health`, `/ready`, `/predict`, and **Prometheus** `/metrics` (latency histogram + request counter). Run behind your platform ingress and attach SLO dashboards to those metrics.
 - **Readiness**: `/ready` is 503 until a model path is loaded successfully.
+- **Thresholds**: `/predict` returns the raw probability plus an `is_duplicate`
+  decision. Use `?threshold=...` for per-request policy tests, or set
+  `QUORABUST_DECISION_THRESHOLD` / artifact metadata for service defaults.
 
 ## A/B testing
 

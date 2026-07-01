@@ -1,8 +1,9 @@
 # Quorabust
 
-Production-minded **Quora-style duplicate question detection**: reproducible training,
-artifact metadata, FastAPI serving, Prometheus metrics, drift helpers, A/B model routing,
-load tests, and Markdown model-card reporting.
+Production-minded **semantic duplicate detection service** for Quora-style question
+pairs: reproducible training, artifact metadata, thresholded API decisions, FastAPI
+serving, Prometheus metrics, drift helpers, A/B model routing, load tests, and Markdown
+model-card reporting.
 
 Quorabust is intentionally small enough to inspect quickly while still showing the
 operational shape of an ML-backed backend service.
@@ -15,7 +16,8 @@ overview, training pipeline, train-vs-serve sequence, and the artifact/registry 
 - Pairwise text features with TF-IDF or optional sentence-transformer embeddings
 - XGBoost training with optional holdout evaluation and early stopping
 - Saved artifacts that include lineage, feature schema, dataset checksum, and metrics
-- FastAPI inference with health/readiness checks, OpenAPI docs, Prometheus metrics, and A/B routing
+- FastAPI inference with health/readiness checks, thresholded decisions, OpenAPI docs,
+  Prometheus metrics, and A/B routing
 - Drift helper utilities, JSONL model registry, k6 load test, and Grafana dashboard starter
 - `quorabust-report` model-card generation for artifact review and benchmark summaries
 
@@ -98,7 +100,7 @@ quorabust-serve --host 0.0.0.0 --port 8000
 # optional second artifact: export QUORABUST_MODEL_B=models/other.pkl
 ```
 
-`GET /metrics` exposes Prometheus text; `POST /predict` accepts `{"question1":[...],"question2":[...]}` and optional header `X-Quorabust-Variant: b`. Add `?explain=true` to return per-pair input feature values. Interactive docs: **`/docs`**. Load testing: [docs/LOAD_TESTING.md](docs/LOAD_TESTING.md). Grafana: [docs/GRAFANA.md](docs/GRAFANA.md).
+`GET /metrics` exposes Prometheus text; `POST /predict` accepts `{"question1":[...],"question2":[...]}` and optional header `X-Quorabust-Variant: b`. Responses include `proba_duplicate`, thresholded `is_duplicate`, and `decision_threshold`. Add `?threshold=0.7` to override the duplicate cutoff for one request, or set artifact metadata `decision_threshold` / `QUORABUST_DECISION_THRESHOLD` for the default. Add `?explain=true` to return per-pair input feature values. Interactive docs: **`/docs`**. Load testing: [docs/LOAD_TESTING.md](docs/LOAD_TESTING.md). Grafana: [docs/GRAFANA.md](docs/GRAFANA.md).
 `GET /models` returns allowlisted metadata for loaded variants without leaking local
 artifact paths or training CSV paths.
 
