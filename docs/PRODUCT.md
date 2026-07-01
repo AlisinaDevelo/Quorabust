@@ -20,6 +20,7 @@ It does this with:
 - Reproducible offline training.
 - A deployable FastAPI scoring service.
 - Thresholded decisions, not only raw probabilities.
+- Holdout-selected serving thresholds persisted in artifact metadata.
 - Model-card reporting with threshold sweeps.
 - Artifact metadata, JSON sidecars, and safe public model metadata.
 - Prometheus metrics, A/B model routing, drift helpers, and load-test assets.
@@ -54,7 +55,7 @@ dataset or customer-domain labels before making performance claims.
 Decision threshold precedence:
 
 1. Request query parameter: `?threshold=0.7`.
-2. Artifact metadata: `decision_threshold`.
+2. Holdout-selected artifact metadata: `decision_threshold`.
 3. Environment: `QUORABUST_DECISION_THRESHOLD`.
 4. Default: `0.5`.
 

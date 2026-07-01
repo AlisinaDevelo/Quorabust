@@ -141,6 +141,10 @@ _PUBLIC_META_KEYS = {
     "git_revision",
     "csv_sha256",
     "reference_feature_means",
+    "decision_threshold",
+    "decision_threshold_source",
+    "decision_threshold_metric",
+    "decision_threshold_metrics",
 }
 
 

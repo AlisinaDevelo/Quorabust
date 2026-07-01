@@ -4,7 +4,14 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import accuracy_score, log_loss, roc_auc_score
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    log_loss,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
 from xgboost import XGBClassifier
 
 from quorabust.features import PairFeatureBuilder
@@ -89,7 +96,7 @@ def eval_log_loss(
     X = builder.transform_frame(df, col_q1=col_q1, col_q2=col_q2)
     y = df[label_col].astype(int).to_numpy()
     proba = clf.predict_proba(X)[:, 1]
-    return float(log_loss(y, proba))
+    return float(log_loss(y, proba, labels=[0, 1]))
 
 
 def eval_classification_metrics(
@@ -107,8 +114,52 @@ def eval_classification_metrics(
     y_hat = (proba >= 0.5).astype(int)
     out: dict[str, float] = {
         "accuracy": float(accuracy_score(y, y_hat)),
-        "log_loss": float(log_loss(y, proba)),
+        "log_loss": float(log_loss(y, proba, labels=[0, 1])),
     }
     if len(np.unique(y)) > 1:
         out["roc_auc"] = float(roc_auc_score(y, proba))
     return out
+
+
+def select_decision_threshold(
+    y: np.ndarray,
+    proba: np.ndarray,
+    *,
+    thresholds: list[float] | None = None,
+    optimize_for: str = "f1",
+) -> dict[str, float]:
+    """Choose a probability threshold from labeled probabilities."""
+    candidates = thresholds or [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
+    if optimize_for not in {"accuracy", "precision", "recall", "f1"}:
+        raise ValueError("optimize_for must be one of: accuracy, precision, recall, f1")
+    if not candidates:
+        raise ValueError("at least one threshold is required")
+
+    best: dict[str, float] | None = None
+    for threshold in candidates:
+        if not 0.0 < threshold < 1.0:
+            raise ValueError("thresholds must be between 0 and 1")
+        pred = (proba >= threshold).astype(int)
+        row = {
+            "threshold": float(threshold),
+            "accuracy": float(accuracy_score(y, pred)),
+            "precision": float(precision_score(y, pred, zero_division=0)),
+            "recall": float(recall_score(y, pred, zero_division=0)),
+            "f1": float(f1_score(y, pred, zero_division=0)),
+        }
+        if best is None:
+            best = row
+            continue
+        current_key = (row[optimize_for], row["f1"], row["accuracy"], -abs(row["threshold"] - 0.5))
+        best_key = (
+            best[optimize_for],
+            best["f1"],
+            best["accuracy"],
+            -abs(best["threshold"] - 0.5),
+        )
+        if current_key > best_key:
+            best = row
+
+    if best is None:
+        raise ValueError("at least one threshold is required")
+    return best

@@ -142,6 +142,17 @@ def test_predict_uses_artifact_decision_threshold(tmp_path):
     assert r.json()["decision_threshold"] == 0.91
 
 
+def test_models_exposes_public_decision_threshold_metadata(tmp_path):
+    p = tmp_path / "m.pkl"
+    _tiny_pkl_with_threshold(p, 0.91)
+    app = create_app(model_path_a=str(p))
+    with TestClient(app) as client:
+        r = client.get("/models")
+    assert r.status_code == 200
+    model = r.json()["variants"]["a"]
+    assert model["decision_threshold"] == 0.91
+
+
 def test_predict_threshold_query_overrides_artifact_threshold(tmp_path):
     p = tmp_path / "m.pkl"
     _tiny_pkl_with_threshold(p, 0.91)

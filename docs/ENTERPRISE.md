@@ -14,7 +14,10 @@
 
 ## Lineage and artifacts
 
-Training writes `csv_sha256`, `git_revision`, `quorabust_version`, `feature_schema`, `reference_feature_means` (for drift checks), and metric fields into the pickle `meta` dict. Treat `.pkl` files as **trusted** (pickle); load only from controlled storage.
+Training writes `csv_sha256`, `git_revision`, `quorabust_version`, `feature_schema`,
+`reference_feature_means` (for drift checks), holdout-selected `decision_threshold`
+when an eval split exists, and metric fields into the pickle `meta` dict. Treat `.pkl`
+files as **trusted** (pickle); load only from controlled storage.
 
 Use `quorabust-train --metadata-out models/quorabust.meta.json` to write the same
 lineage and metric metadata as JSON. Reviewers and release tooling can inspect that
@@ -26,8 +29,9 @@ prefer a non-pickle format such as `skops` or ONNX in a future release.
 
 - **`quorabust-serve`**: FastAPI with `/health`, `/ready`, `/predict`, `/metrics` (Prometheus). Configure **`QUORABUST_MODEL_PATH`** and optional **`QUORABUST_MODEL_B`** for A/B; clients may send **`X-Quorabust-Variant: b`**.
 - **Decisioning**: `/predict` returns both `proba_duplicate` and thresholded
-  `is_duplicate`. Clients can pass `?threshold=0.7`; otherwise serving uses artifact
-  metadata `decision_threshold`, then `QUORABUST_DECISION_THRESHOLD`, then `0.5`.
+  `is_duplicate`. Clients can pass `?threshold=0.7`; otherwise serving uses the
+  holdout-selected artifact metadata `decision_threshold`, then
+  `QUORABUST_DECISION_THRESHOLD`, then `0.5`.
 - Wire ingress timeouts and autoscaling to your **latency** SLO using the histogram in `/metrics`. See [LOAD_TESTING.md](LOAD_TESTING.md) for k6 and [GRAFANA.md](GRAFANA.md) for a starter dashboard JSON.
 
 ## Scale and NLP

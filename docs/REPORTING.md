@@ -57,6 +57,8 @@ quorabust-train \
   --out models/quorabust.pkl \
   --metadata-out models/quorabust.meta.json \
   --eval-fraction 0.1 \
+  --thresholds 0.2,0.3,0.4,0.5,0.6,0.7,0.8 \
+  --threshold-metric f1 \
   --seed 42
 
 quorabust-report \
@@ -74,6 +76,11 @@ threshold.
 
 Use `--format json` when you want CI or release tooling to compare metrics without
 scraping Markdown.
+
+When `quorabust-train` has a holdout split, it stores a selected `decision_threshold` in
+artifact metadata. The threshold is chosen from `--thresholds` by maximizing
+`--threshold-metric` (default `f1`). Serving uses that artifact threshold unless the
+request overrides it with `?threshold=...`.
 
 ## Sample model card
 

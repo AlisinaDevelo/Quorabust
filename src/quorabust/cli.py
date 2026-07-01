@@ -10,7 +10,12 @@ import pandas as pd
 
 from quorabust.drift import feature_means_from_matrix
 from quorabust.lineage import git_revision, sha256_file
-from quorabust.model import eval_classification_metrics, train_duplicate_classifier
+from quorabust.model import (
+    eval_classification_metrics,
+    predict_proba_duplicate,
+    select_decision_threshold,
+    train_duplicate_classifier,
+)
 from quorabust.persist import save_classifier, save_metadata_sidecar
 from quorabust.registry import append_model_record
 
@@ -30,6 +35,24 @@ def _load_quora_csv(path: Path) -> pd.DataFrame:
     if missing:
         raise ValueError(f"Missing columns {sorted(missing)}; found {list(df.columns)}")
     return df
+
+
+def _parse_thresholds(raw: str) -> list[float]:
+    thresholds: list[float] = []
+    for part in raw.split(","):
+        value = part.strip()
+        if not value:
+            continue
+        try:
+            threshold = float(value)
+        except ValueError as exc:
+            raise ValueError(f"Invalid threshold: {value}") from exc
+        if not 0.0 < threshold < 1.0:
+            raise ValueError("thresholds must be between 0 and 1")
+        thresholds.append(threshold)
+    if not thresholds:
+        raise ValueError("at least one threshold is required")
+    return thresholds
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -79,10 +102,26 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="If set, write artifact metadata JSON here without requiring pickle loading",
     )
+    p.add_argument(
+        "--thresholds",
+        default="0.2,0.3,0.4,0.5,0.6,0.7,0.8",
+        help="Comma-separated candidate thresholds for holdout-based decision selection",
+    )
+    p.add_argument(
+        "--threshold-metric",
+        choices=["accuracy", "precision", "recall", "f1"],
+        default="f1",
+        help="Metric to optimize when selecting a decision threshold from the holdout",
+    )
     args = p.parse_args(argv)
 
     if not args.csv.is_file():
         print(f"File not found: {args.csv}", file=sys.stderr)
+        return 1
+    try:
+        threshold_candidates = _parse_thresholds(args.thresholds)
+    except ValueError as e:
+        print(e, file=sys.stderr)
         return 1
 
     try:
@@ -135,6 +174,26 @@ def main(argv: list[str] | None = None) -> int:
     m = eval_classification_metrics(builder, clf, eval_target)
     for k, v in m.items():
         meta[f"eval_{k}"] = v
+    if eval_df is not None:
+        y_eval = eval_df["is_duplicate"].astype(int).to_numpy()
+        p_eval = predict_proba_duplicate(
+            builder,
+            clf,
+            eval_df["question1"].astype(str).tolist(),
+            eval_df["question2"].astype(str).tolist(),
+        )[:, 1]
+        selected_threshold = select_decision_threshold(
+            y_eval,
+            p_eval,
+            thresholds=threshold_candidates,
+            optimize_for=args.threshold_metric,
+        )
+        meta["decision_threshold"] = selected_threshold["threshold"]
+        meta["decision_threshold_source"] = "eval_holdout"
+        meta["decision_threshold_metric"] = args.threshold_metric
+        meta["decision_threshold_metrics"] = {
+            k: v for k, v in selected_threshold.items() if k != "threshold"
+        }
     print(
         "metrics: "
         + ", ".join(f"{k}={v:.4f}" for k, v in sorted(m.items())),
@@ -155,6 +214,8 @@ def main(argv: list[str] | None = None) -> int:
                 "feature_backend": args.feature_backend,
                 "git_revision": meta.get("git_revision"),
                 "quorabust_version": meta.get("quorabust_version"),
+                "decision_threshold": meta.get("decision_threshold"),
+                "decision_threshold_metric": meta.get("decision_threshold_metric"),
                 "eval_metrics": {k: meta[k] for k in meta if k.startswith("eval_")},
             },
         )
