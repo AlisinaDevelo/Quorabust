@@ -93,6 +93,24 @@ quorabust-validate-report \
   --require-calibration
 ```
 
+Use repeated `--compare-model label=path` arguments when you need to compare trained
+backends against the same holdout split:
+
+```bash
+quorabust-report \
+  --model models/quorabust-tfidf.pkl \
+  --artifact-label quorabust-tfidf.pkl \
+  --compare-model tfidf=models/quorabust-tfidf.pkl \
+  --compare-model embedding=models/quorabust-embedding.pkl \
+  --compare-model cross=models/quorabust-cross.pkl \
+  --eval-csv data/processed/holdout.csv \
+  --format json \
+  --out reports/backend-comparison.json
+```
+
+The comparison rows are sorted by F1. Treat the table as meaningful only when all
+artifacts use the same holdout CSV, threshold, and metric code.
+
 When `quorabust-train` has a holdout split, it stores a selected `decision_threshold` in
 artifact metadata. The threshold is chosen from `--thresholds` by maximizing
 `--threshold-metric` (default `f1`). Serving uses that artifact threshold unless the

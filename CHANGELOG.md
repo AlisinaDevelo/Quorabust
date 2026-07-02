@@ -17,6 +17,7 @@
 - Holdout-selected `decision_threshold` metadata from `quorabust-train`.
 - `quorabust-validate-report` release gate for machine-readable model-card JSON.
 - Optional `--feature-backend cross-encoder` for modern transformer pair scoring.
+- `quorabust-report --compare-model label=path` for same-holdout backend comparisons.
 
 ### Fixed
 - Capped NumPy below 2.5 so Mypy can parse dependency stubs with the configured

@@ -9,6 +9,7 @@ from quorabust.report import (
     calibration_summary,
     evaluate_holdout,
     main,
+    render_comparison_report,
     render_model_card,
     threshold_sweep,
 )
@@ -145,6 +146,37 @@ def test_threshold_sweep_returns_tradeoff_rows(tmp_path):
     assert all(0.0 <= row["recall"] <= 1.0 for row in rows)
 
 
+def test_render_comparison_report_sorts_by_f1():
+    report = render_comparison_report(
+        [
+            {
+                "artifact": "tfidf",
+                "feature_backend": "tfidf",
+                "threshold": 0.5,
+                "accuracy": 0.7,
+                "precision": 0.7,
+                "recall": 0.7,
+                "f1": 0.7,
+                "roc_auc": 0.75,
+                "log_loss": 0.5,
+            },
+            {
+                "artifact": "cross",
+                "feature_backend": "cross-encoder",
+                "threshold": 0.5,
+                "accuracy": 0.9,
+                "precision": 0.9,
+                "recall": 0.9,
+                "f1": 0.9,
+                "roc_auc": 0.95,
+                "log_loss": 0.2,
+            },
+        ]
+    )
+    assert report.index("| cross |") < report.index("| tfidf |")
+    assert "## Backend Comparison" in report
+
+
 def test_report_cli_writes_model_card(tmp_path):
     model, _, _ = _artifact(tmp_path)
     eval_csv = tmp_path / "eval.csv"
@@ -206,6 +238,41 @@ def test_report_cli_writes_json_payload(tmp_path):
     assert "calibration" in payload
     assert payload["confusion_matrix"]["labels"] == ["not_duplicate", "duplicate"]
     assert len(payload["threshold_sweep"]) == 3
+
+
+def test_report_cli_writes_comparison_json(tmp_path):
+    model, _, _ = _artifact(tmp_path)
+    eval_csv = tmp_path / "eval.csv"
+    _df().to_csv(eval_csv, index=False)
+    out = tmp_path / "COMPARE.json"
+
+    assert (
+        main(
+            [
+                "--model",
+                str(model),
+                "--compare-model",
+                f"tfidf={model}",
+                "--eval-csv",
+                str(eval_csv),
+                "--format",
+                "json",
+                "--out",
+                str(out),
+            ]
+        )
+        == 0
+    )
+
+    payload = json.loads(out.read_text(encoding="utf-8"))
+    assert payload["artifact"] == str(model.resolve())
+    assert payload["comparison"][0]["artifact"] == "tfidf"
+    assert payload["comparison"][0]["feature_backend"] == "tfidf"
+
+
+def test_report_cli_rejects_comparison_without_eval_csv(tmp_path):
+    model, _, _ = _artifact(tmp_path)
+    assert main(["--model", str(model), "--compare-model", f"tfidf={model}"]) == 1
 
 
 def test_report_cli_rejects_bad_threshold(tmp_path):

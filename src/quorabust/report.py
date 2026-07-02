@@ -390,6 +390,58 @@ def render_model_card(
     return "\n".join(parts)
 
 
+def _comparison_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return sorted(rows, key=lambda row: row.get("f1", 0.0), reverse=True)
+
+
+def render_comparison_report(rows: list[dict[str, Any]]) -> str:
+    """Render comparable artifact metrics as a Markdown table."""
+    metric_rows = [
+        [
+            row["artifact"],
+            row.get("feature_backend", ""),
+            row.get("threshold", ""),
+            row.get("f1", ""),
+            row.get("precision", ""),
+            row.get("recall", ""),
+            row.get("accuracy", ""),
+            row.get("roc_auc", ""),
+            row.get("log_loss", ""),
+        ]
+        for row in _comparison_rows(rows)
+    ]
+    return "\n".join(
+        [
+            "# Quorabust Model Comparison",
+            "",
+            "## Backend Comparison",
+            "",
+            _markdown_table(
+                [
+                    "artifact",
+                    "feature_backend",
+                    "threshold",
+                    "f1",
+                    "precision",
+                    "recall",
+                    "accuracy",
+                    "roc_auc",
+                    "log_loss",
+                ],
+                metric_rows,
+            ),
+            "",
+            "## Caveats",
+            "",
+            (
+                "Compare rows only when every artifact was evaluated against the same "
+                "holdout CSV, threshold policy, and metric code."
+            ),
+            "",
+        ]
+    )
+
+
 def build_report_payload(
     *,
     artifact: str,
@@ -447,6 +499,50 @@ def build_report_payload(
     return payload
 
 
+def _parse_compare_model(raw: str) -> tuple[str, Path]:
+    if "=" not in raw:
+        raise ValueError("--compare-model must use label=path")
+    label, value = raw.split("=", 1)
+    label = label.strip()
+    path = Path(value.strip())
+    if not label:
+        raise ValueError("--compare-model label cannot be empty")
+    if not path.is_file():
+        raise ValueError(f"File not found: {path}")
+    return label, path
+
+
+def _comparison_metrics(
+    label: str,
+    path: Path,
+    eval_df: pd.DataFrame,
+    *,
+    threshold: float,
+    calibration_bins: int,
+) -> dict[str, Any]:
+    builder, clf, meta = load_classifier(path)
+    metrics = evaluate_holdout(
+        builder,
+        clf,
+        eval_df,
+        threshold=threshold,
+        calibration_bins=calibration_bins,
+    )
+    return {
+        "artifact": label,
+        "feature_backend": meta.get("feature_backend", ""),
+        "threshold": metrics.get("threshold"),
+        "accuracy": metrics.get("accuracy"),
+        "precision": metrics.get("precision"),
+        "recall": metrics.get("recall"),
+        "f1": metrics.get("f1"),
+        "roc_auc": metrics.get("roc_auc"),
+        "log_loss": metrics.get("log_loss"),
+        "positive_rate": metrics.get("positive_rate"),
+        "predicted_positive_rate": metrics.get("predicted_positive_rate"),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Generate a model report for a Quorabust artifact.",
@@ -481,6 +577,12 @@ def main(argv: list[str] | None = None) -> int:
         help="Public artifact label to print instead of the local model path",
     )
     parser.add_argument(
+        "--compare-model",
+        action="append",
+        default=[],
+        help="Compare another artifact on the same eval CSV, formatted as label=path",
+    )
+    parser.add_argument(
         "--format",
         choices=["markdown", "json"],
         default="markdown",
@@ -507,6 +609,7 @@ def main(argv: list[str] | None = None) -> int:
     builder, clf, meta = load_classifier(args.model)
     holdout_metrics = None
     sweep_metrics = None
+    comparison_metrics = None
     if args.eval_csv is not None:
         if not args.eval_csv.is_file():
             print(f"File not found: {args.eval_csv}", file=sys.stderr)
@@ -526,22 +629,37 @@ def main(argv: list[str] | None = None) -> int:
                 eval_df,
                 thresholds=thresholds,
             )
+            if args.compare_model:
+                comparison_metrics = [
+                    _comparison_metrics(
+                        label,
+                        path,
+                        eval_df,
+                        threshold=args.threshold,
+                        calibration_bins=args.calibration_bins,
+                    )
+                    for label, path in (_parse_compare_model(raw) for raw in args.compare_model)
+                ]
         except ValueError as exc:
             print(str(exc), file=sys.stderr)
             return 1
+    elif args.compare_model:
+        print("--compare-model requires --eval-csv", file=sys.stderr)
+        return 1
 
     artifact = args.artifact_label or str(args.model.resolve())
     if args.format == "json":
-        report = json.dumps(
-            build_report_payload(
-                artifact=artifact,
-                meta=meta,
-                holdout_metrics=holdout_metrics,
-                sweep_metrics=sweep_metrics,
-            ),
-            indent=2,
-            sort_keys=True,
+        payload = build_report_payload(
+            artifact=artifact,
+            meta=meta,
+            holdout_metrics=holdout_metrics,
+            sweep_metrics=sweep_metrics,
         )
+        if comparison_metrics is not None:
+            payload["comparison"] = _comparison_rows(comparison_metrics)
+        report = json.dumps(payload, indent=2, sort_keys=True)
+    elif comparison_metrics is not None:
+        report = render_comparison_report(comparison_metrics)
     else:
         report = render_model_card(
             artifact=artifact,

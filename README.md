@@ -86,6 +86,8 @@ comparable model claims; the command accepts the same `question1`, `question2`,
 `is_duplicate` column contract as training.
 Use `quorabust-validate-report --require-holdout --require-calibration` to fail release
 jobs when a JSON model card is missing required review fields.
+Use repeated `--compare-model label=path` flags to compare TF-IDF, embedding, and
+cross-encoder artifacts against the same holdout split.
 See [docs/REPORTING.md](docs/REPORTING.md) for the CI smoke workflow and
 real-evaluation checklist.
 
