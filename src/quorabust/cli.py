@@ -81,14 +81,22 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--seed", type=int, default=42)
     p.add_argument(
         "--feature-backend",
-        choices=["tfidf", "embedding"],
+        choices=["tfidf", "embedding", "cross-encoder"],
         default="tfidf",
-        help="tfidf (default) or sentence-transformer embeddings (requires nlp extra)",
+        help=(
+            "tfidf (default), sentence-transformer embeddings, or cross-encoder pair scores "
+            "(requires nlp extra)"
+        ),
     )
     p.add_argument(
         "--embedding-model",
         default="sentence-transformers/all-MiniLM-L6-v2",
         help="When --feature-backend=embedding, SentenceTransformer model id",
+    )
+    p.add_argument(
+        "--cross-encoder-model",
+        default="cross-encoder/quora-distilroberta-base",
+        help="When --feature-backend=cross-encoder, CrossEncoder model id",
     )
     p.add_argument(
         "--registry-dir",
@@ -146,6 +154,10 @@ def main(argv: list[str] | None = None) -> int:
         from quorabust.embedding_features import PairEmbeddingBuilder
 
         feature_builder = PairEmbeddingBuilder(model_name=args.embedding_model)
+    elif args.feature_backend == "cross-encoder":
+        from quorabust.cross_encoder_features import PairCrossEncoderBuilder
+
+        feature_builder = PairCrossEncoderBuilder(model_name=args.cross_encoder_model)
 
     builder, clf = train_duplicate_classifier(
         train_df,
@@ -154,10 +166,11 @@ def main(argv: list[str] | None = None) -> int:
         feature_builder=feature_builder,
     )
 
-    if args.feature_backend == "embedding":
-        feat_names = ["cos", "l2", "mad", "len_ratio", "len_sum"]
-    else:
-        feat_names = ["cos", "jaccard", "len_ratio", "abs_len_diff", "len_sum"]
+    feat_names = (
+        builder.feature_names()
+        if hasattr(builder, "feature_names")
+        else ["feature_0", "feature_1", "feature_2", "feature_3", "feature_4"]
+    )
 
     meta: dict[str, Any] = {
         "n_train": len(train_df),

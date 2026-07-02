@@ -2,7 +2,16 @@ import json
 
 import pandas as pd
 
+import quorabust.cross_encoder_features as cef
 from quorabust.cli import main
+
+
+class _FakeCrossEncoder:
+    def __init__(self, model_name: str) -> None:
+        self.model_name = model_name
+
+    def predict(self, pairs, show_progress_bar: bool = False):
+        return [0.9 if idx % 2 else 0.1 for idx, _pair in enumerate(pairs)]
 
 
 def _write_synthetic_csv(path, n: int = 30) -> None:
@@ -99,6 +108,38 @@ def test_cli_rejects_bad_threshold_grid(tmp_path):
         )
         == 1
     )
+
+
+def test_cli_trains_with_cross_encoder_backend(tmp_path, monkeypatch):
+    monkeypatch.setattr(cef, "CrossEncoder", _FakeCrossEncoder)
+    csv = tmp_path / "train.csv"
+    _write_synthetic_csv(csv)
+    out = tmp_path / "model.pkl"
+    meta = tmp_path / "model.meta.json"
+
+    assert (
+        main(
+            [
+                "--csv",
+                str(csv),
+                "--out",
+                str(out),
+                "--feature-backend",
+                "cross-encoder",
+                "--cross-encoder-model",
+                "fake-cross-encoder",
+                "--metadata-out",
+                str(meta),
+                "--eval-fraction",
+                "0",
+            ]
+        )
+        == 0
+    )
+
+    payload = json.loads(meta.read_text(encoding="utf-8"))
+    assert payload["feature_backend"] == "cross-encoder"
+    assert payload["feature_schema"] == ["cross_score", "len_ratio", "abs_len_diff", "len_sum"]
 
 
 def test_cli_rejects_bad_columns(tmp_path):

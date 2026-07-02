@@ -36,8 +36,8 @@ The modern path is:
 1. **TF-IDF + XGBoost baseline** for speed, explainable feature values, and cheap serving.
 2. **Sentence-transformer embeddings + XGBoost** for better semantic recall when wording
    differs.
-3. **Cross-encoder reranker** for the highest-accuracy pair scoring when latency and
-   compute budget allow it.
+3. **Cross-encoder pair scoring + XGBoost** for the highest-accuracy pair scoring when
+   latency and compute budget allow it.
 
 Do not claim state-of-the-art quality from the checked-in smoke model. Use a real held-out
 dataset or customer-domain labels before making performance claims.

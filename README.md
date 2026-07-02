@@ -15,7 +15,8 @@ buyer-facing use cases, method strategy, and production gaps.
 
 ## What it demonstrates
 
-- Pairwise text features with TF-IDF or optional sentence-transformer embeddings
+- Pairwise text features with TF-IDF, optional sentence-transformer embeddings, or
+  optional cross-encoder pair scoring
 - XGBoost training with optional holdout evaluation and early stopping
 - Saved artifacts that include lineage, feature schema, dataset checksum, and metrics
 - FastAPI inference with health/readiness checks, thresholded decisions, OpenAPI docs,
@@ -66,7 +67,7 @@ quorabust-train --csv data/raw/train.csv --out models/quorabust.pkl
 python -m quorabust --csv data/raw/train.csv --out models/quorabust.pkl   # equivalent
 ```
 
-Options: `--max-rows N`, `--eval-fraction 0.1` (default), `--eval-fraction 0` to train on all rows without a holdout, `--seed`, `--feature-backend {tfidf,embedding}`, `--embedding-model …`, `--thresholds`, `--threshold-metric {accuracy,precision,recall,f1}` for holdout-based decision-threshold selection, `--registry-dir` (JSONL registry), `--metadata-out` (JSON sidecar for reviewing artifact lineage without loading the pickle).
+Options: `--max-rows N`, `--eval-fraction 0.1` (default), `--eval-fraction 0` to train on all rows without a holdout, `--seed`, `--feature-backend {tfidf,embedding,cross-encoder}`, `--embedding-model …`, `--cross-encoder-model …`, `--thresholds`, `--threshold-metric {accuracy,precision,recall,f1}` for holdout-based decision-threshold selection, `--registry-dir` (JSONL registry), `--metadata-out` (JSON sidecar for reviewing artifact lineage without loading the pickle).
 
 ### Generate a model card
 

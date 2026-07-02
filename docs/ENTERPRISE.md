@@ -36,7 +36,10 @@ prefer a non-pickle format such as `skops` or ONNX in a future release.
 
 ## Scale and NLP
 
-See [SCALING.md](SCALING.md) for chunked CSV I/O, optional **embedding** training (`pip install ".[nlp]"`, `quorabust-train --feature-backend embedding`), and pointers to distributed XGBoost.
+See [SCALING.md](SCALING.md) for chunked CSV I/O, optional **embedding** training
+(`pip install ".[nlp]"`, `quorabust-train --feature-backend embedding`), optional
+**cross-encoder** pair scoring (`quorabust-train --feature-backend cross-encoder`), and
+pointers to distributed XGBoost.
 
 ## Registry and drift (lightweight)
 

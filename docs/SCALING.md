@@ -10,6 +10,12 @@ This document maps **ambitions** to what ships in-repo and what stays external.
 ## Modern NLP (embeddings)
 
 - **Optional extra** `pip install ".[nlp]"`**: `PairEmbeddingBuilder` in `quorabust.embedding_features` uses `sentence-transformers` to encode pairs and feeds cosine / L2 / pooling stats into the same XGBoost head. Training can select `--feature-backend embedding` in `quorabust-train`.
+- **Cross-encoder pair scoring**: `PairCrossEncoderBuilder` in
+  `quorabust.cross_encoder_features` uses a Sentence Transformers `CrossEncoder` to score
+  each pair directly, then feeds that score plus length stats into the same XGBoost head.
+  Select it with `--feature-backend cross-encoder`. This is the modern high-accuracy path
+  for pair scoring, but it is slower than TF-IDF or bi-encoder embeddings because every
+  pair must be passed through the transformer jointly.
 
 ## Online serving, SLOs, monitoring
 
