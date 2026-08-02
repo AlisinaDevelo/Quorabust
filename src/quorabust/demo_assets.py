@@ -9,10 +9,11 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 
+import numpy as np
 import pandas as pd
 
+from quorabust.features import PairFeatureBuilder
 from quorabust.lineage import sha256_file
-from quorabust.model import train_duplicate_classifier
 from quorabust.persist import save_classifier
 
 DEMO_REQUEST = {
@@ -43,22 +44,21 @@ def _load_smoke_csv(path: Path) -> pd.DataFrame:
     return df
 
 
-def _train_smoke_artifact(csv_path: Path, model_path: Path, seed: int) -> None:
+class _DemoDuplicateClassifier:
+    """Deterministic scorer for API snapshots; not a benchmark model."""
+
+    def predict_proba(self, x: np.ndarray) -> np.ndarray:
+        cos = x[:, 0]
+        duplicate = np.where(cos > 0.1, 0.95, 0.25)
+        return np.column_stack([1.0 - duplicate, duplicate])
+
+
+def _write_smoke_artifact(csv_path: Path, model_path: Path, seed: int) -> None:
     df = _load_smoke_csv(csv_path)
-    builder, clf = train_duplicate_classifier(
-        df,
-        random_state=seed,
-        xgb_params={
-            "n_estimators": 24,
-            "max_depth": 3,
-            "learning_rate": 0.2,
-        },
-    )
-    feature_schema = (
-        builder.feature_names()
-        if hasattr(builder, "feature_names")
-        else ["feature_0", "feature_1", "feature_2", "feature_3", "feature_4"]
-    )
+    builder = PairFeatureBuilder()
+    builder.fit_from_frame(df)
+    clf = _DemoDuplicateClassifier()
+    feature_schema = builder.feature_names()
     save_classifier(
         model_path,
         builder,
@@ -72,6 +72,7 @@ def _train_smoke_artifact(csv_path: Path, model_path: Path, seed: int) -> None:
             "csv_sha256": sha256_file(csv_path),
             "decision_threshold": 0.5,
             "decision_threshold_source": "demo_default",
+            "demo_scorer": "deterministic_tfidf_contract",
         },
     )
 
@@ -117,7 +118,7 @@ def build_demo_assets(csv_path: Path, out_dir: Path, seed: int = 7) -> list[Path
     written: list[Path] = []
     with TemporaryDirectory(prefix="quorabust-demo-") as tmp:
         model_path = Path(tmp) / "quorabust-smoke.pkl"
-        _train_smoke_artifact(csv_path, model_path, seed)
+        _write_smoke_artifact(csv_path, model_path, seed)
         app = create_app(model_path_a=str(model_path))
         with TestClient(app) as client:
             predict_response = client.post(
@@ -149,6 +150,7 @@ def build_demo_assets(csv_path: Path, out_dir: Path, seed: int = 7) -> list[Path
                 "",
                 "Generated from `examples/smoke_pairs.csv` with `quorabust-demo-assets`.",
                 "These files demonstrate the serving contract and are not model-quality claims.",
+                "The snapshot uses a deterministic TF-IDF demo scorer so CI stays stable.",
                 "",
                 "- `predict-request.json`: sample batch scoring payload.",
                 "- `predict-response.json`: response shape with a request threshold override "
