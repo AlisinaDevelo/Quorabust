@@ -19,6 +19,7 @@
 - Optional `--feature-backend cross-encoder` for modern transformer pair scoring.
 - `quorabust-report --compare-model label=path` for same-holdout backend comparisons.
 - Docker Compose demo stack for API, Prometheus, and Grafana.
+- `quorabust-demo-assets` for generated API request/response and OpenAPI snapshots.
 
 ### Fixed
 - Docker image now installs serving dependencies via `.[serve]`.

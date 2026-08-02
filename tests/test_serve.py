@@ -93,6 +93,8 @@ def test_openapi_includes_predict_examples(tmp_path):
     body = spec["components"]["schemas"]["PredictBody"]
     examples = body.get("examples") or []
     assert examples and "question1" in examples[0]
+    metrics_content = spec["paths"]["/metrics"]["get"]["responses"]["200"]["content"]
+    assert "text/plain" in metrics_content
 
 
 def test_models_returns_safe_public_metadata(tmp_path):

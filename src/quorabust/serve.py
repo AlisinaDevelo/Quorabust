@@ -237,7 +237,7 @@ def create_app(
         }
         return {"variants": variants}
 
-    @app.get("/metrics", tags=["operations"])
+    @app.get("/metrics", response_class=PlainTextResponse, tags=["operations"])
     def metrics() -> PlainTextResponse:
         data = generate_latest(registry)
         return PlainTextResponse(

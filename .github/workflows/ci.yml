@@ -34,6 +34,11 @@ jobs:
         run: quorabust-report --help
       - name: Report validator CLI
         run: quorabust-validate-report --help
+      - name: Demo assets CLI
+        run: |
+          quorabust-demo-assets --out /tmp/quorabust-demo-assets
+          test -s /tmp/quorabust-demo-assets/predict-response.json
+          test -s /tmp/quorabust-demo-assets/openapi-excerpt.json
       - name: Smoke model report
         run: |
           quorabust-train \

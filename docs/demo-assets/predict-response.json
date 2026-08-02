@@ -1,0 +1,28 @@
+{
+  "decision_threshold": 0.9,
+  "features": [
+    {
+      "abs_len_diff": 3.0,
+      "cos": 0.32888011675261564,
+      "jaccard": 0.18181818181818182,
+      "len_ratio": 0.625,
+      "len_sum": 13.0
+    },
+    {
+      "abs_len_diff": 0.0,
+      "cos": 0.0,
+      "jaccard": 0.09090909090909091,
+      "len_ratio": 1.0,
+      "len_sum": 12.0
+    }
+  ],
+  "is_duplicate": [
+    true,
+    false
+  ],
+  "proba_duplicate": [
+    0.9232911467552185,
+    0.8031141757965088
+  ],
+  "variant": "a"
+}

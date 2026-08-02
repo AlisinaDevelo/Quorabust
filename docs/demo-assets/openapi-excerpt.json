@@ -1,0 +1,299 @@
+{
+  "components": {
+    "schemas": {
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "PredictBody": {
+        "description": "Batch of question pairs; ``question1[i]`` is paired with ``question2[i]``.",
+        "examples": [
+          {
+            "question1": [
+              "How do I learn Python?",
+              "Best pizza in NYC?"
+            ],
+            "question2": [
+              "What is the best way to learn Python?",
+              "Where is good pizza in New York?"
+            ]
+          }
+        ],
+        "properties": {
+          "question1": {
+            "description": "First question in each pair (same length as question2).",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Question1",
+            "type": "array"
+          },
+          "question2": {
+            "description": "Second question in each pair (same length as question1).",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Question2",
+            "type": "array"
+          }
+        },
+        "required": [
+          "question1",
+          "question2"
+        ],
+        "title": "PredictBody",
+        "type": "object"
+      },
+      "PredictOut": {
+        "description": "Per-row duplicate probabilities and which model variant served the request.",
+        "examples": [
+          {
+            "decision_threshold": 0.5,
+            "features": [
+              {
+                "abs_len_diff": 1.0,
+                "cos": 0.73,
+                "jaccard": 0.42,
+                "len_ratio": 0.8,
+                "len_sum": 9.0
+              }
+            ],
+            "is_duplicate": [
+              true,
+              false
+            ],
+            "proba_duplicate": [
+              0.82,
+              0.31
+            ],
+            "variant": "a"
+          }
+        ],
+        "properties": {
+          "decision_threshold": {
+            "description": "Probability threshold used to compute is_duplicate. Request threshold wins over artifact metadata; artifact metadata wins over QUORABUST_DECISION_THRESHOLD.",
+            "title": "Decision Threshold",
+            "type": "number"
+          },
+          "features": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": {
+                    "type": "number"
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional per-pair model input feature values when `explain=true`. These are feature values, not causal explanations.",
+            "title": "Features"
+          },
+          "is_duplicate": {
+            "description": "Thresholded duplicate decision for each pair, same order as the request lists.",
+            "items": {
+              "type": "boolean"
+            },
+            "title": "Is Duplicate",
+            "type": "array"
+          },
+          "proba_duplicate": {
+            "description": "P(duplicate) for each pair, same order as the request lists.",
+            "items": {
+              "type": "number"
+            },
+            "title": "Proba Duplicate",
+            "type": "array"
+          },
+          "variant": {
+            "description": "Scoring variant (a or b) after A/B fallback rules.",
+            "title": "Variant",
+            "type": "string"
+          }
+        },
+        "required": [
+          "proba_duplicate",
+          "is_duplicate",
+          "decision_threshold",
+          "variant"
+        ],
+        "title": "PredictOut",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "Quorabust 0.3.2",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/metrics": {
+      "get": {
+        "operationId": "metrics_metrics_get",
+        "responses": {
+          "200": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Metrics",
+        "tags": [
+          "operations"
+        ]
+      }
+    },
+    "/models": {
+      "get": {
+        "description": "Returns allowlisted metadata for loaded variants. Local artifact paths and training CSV paths are intentionally omitted.",
+        "operationId": "models_models_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "additionalProperties": {
+                      "additionalProperties": true,
+                      "type": "object"
+                    },
+                    "type": "object"
+                  },
+                  "title": "Response Models Models Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "503": {
+            "description": "No models loaded"
+          }
+        },
+        "summary": "List loaded model metadata",
+        "tags": [
+          "operations"
+        ]
+      }
+    },
+    "/predict": {
+      "post": {
+        "description": "Scores one or more question pairs. Optional header `X-Quorabust-Variant: b` selects the B artifact when configured. Set query parameter `explain=true` to return input feature values. Set `threshold` to override the duplicate decision cutoff for this request.",
+        "operationId": "predict_predict_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "explain",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Explain",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Optional probability cutoff for is_duplicate. Defaults to artifact metadata decision_threshold when present, otherwise QUORABUST_DECISION_THRESHOLD or 0.5.",
+            "in": "query",
+            "name": "threshold",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 1.0,
+                  "minimum": 0.0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional probability cutoff for is_duplicate. Defaults to artifact metadata decision_threshold when present, otherwise QUORABUST_DECISION_THRESHOLD or 0.5.",
+              "title": "Threshold"
+            }
+          },
+          {
+            "description": "A/B variant: `a` (default) or `b` if a second model is loaded.",
+            "in": "header",
+            "name": "X-Quorabust-Variant",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A/B variant: `a` (default) or `b` if a second model is loaded.",
+              "title": "X-Quorabust-Variant"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PredictBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "description": "question1 and question2 length mismatch"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "503": {
+            "description": "Model not loaded or variant unavailable"
+          }
+        },
+        "summary": "Predict duplicate probability",
+        "tags": [
+          "scoring"
+        ]
+      }
+    }
+  }
+}
