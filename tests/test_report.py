@@ -2,9 +2,11 @@ import json
 
 import pandas as pd
 
+from quorabust.lineage import sha256_file
 from quorabust.model import train_duplicate_classifier
 from quorabust.persist import save_classifier
 from quorabust.report import (
+    build_evaluation_manifest,
     build_report_payload,
     calibration_summary,
     evaluate_holdout,
@@ -60,7 +62,12 @@ def test_render_model_card_includes_metadata_and_persisted_metrics():
 def test_build_report_payload_is_machine_readable():
     payload = build_report_payload(
         artifact="model.pkl",
-        meta={"feature_backend": "tfidf", "eval_accuracy": 0.75, "csv": "/private/train.csv"},
+        meta={
+            "feature_backend": "tfidf",
+            "eval_accuracy": 0.75,
+            "csv": "/private/train.csv",
+            "training_command": "quorabust-train --csv /private/train.csv",
+        },
         holdout_metrics={
             "n": 10,
             "threshold": 0.5,
@@ -112,6 +119,53 @@ def test_build_report_payload_is_machine_readable():
     assert payload["calibration"]["expected_calibration_error"] == 0.05
     assert payload["threshold_sweep"][0]["f1"] == 0.8
     assert "csv" not in payload["training_metadata"]
+    assert "training_command" not in payload["training_metadata"]
+
+
+def test_build_evaluation_manifest_captures_reproducibility_context(tmp_path):
+    model, _, _ = _artifact(tmp_path)
+    eval_csv = tmp_path / "holdout.csv"
+    _df().to_csv(eval_csv, index=False)
+
+    manifest = build_evaluation_manifest(
+        artifact_path=model,
+        artifact_label="tfidf-v1.pkl",
+        eval_path=eval_csv,
+        eval_df=_df(),
+        meta={
+            "git_revision": "train-commit",
+            "quorabust_version": "0.3.2",
+            "csv_sha256": "train-dataset-hash",
+            "feature_backend": "tfidf",
+            "n_train": 100,
+            "seed": 42,
+            "split_strategy": "shuffled_prefix_holdout",
+            "training_command": "quorabust-train --csv data/raw/train.csv",
+        },
+        threshold=0.5,
+        thresholds=[0.3, 0.5, 0.7],
+        calibration_bins=10,
+        command="quorabust-report --eval-csv holdout.csv",
+    )
+
+    assert manifest["schema_version"] == 1
+    assert manifest["artifact"] == {
+        "label": "tfidf-v1.pkl",
+        "sha256": sha256_file(model),
+    }
+    assert manifest["evaluation_dataset"]["sha256"] == sha256_file(eval_csv)
+    assert manifest["evaluation_dataset"]["rows"] == 30
+    assert manifest["evaluation_dataset"]["positive_count"] == 15
+    assert manifest["evaluation_dataset"]["positive_rate"] == 0.5
+    assert manifest["evaluation_policy"] == {
+        "threshold": 0.5,
+        "thresholds": [0.3, 0.5, 0.7],
+        "calibration_bins": 10,
+    }
+    assert manifest["training_lineage"]["git_revision"] == "train-commit"
+    assert manifest["command"] == "quorabust-report --eval-csv holdout.csv"
+    assert manifest["runtime"]["report_git_revision"]
+    assert manifest["generated_at_utc"].endswith("Z")
 
 
 def test_evaluate_holdout_returns_confusion_counts(tmp_path):
@@ -213,6 +267,7 @@ def test_report_cli_writes_json_payload(tmp_path):
     eval_csv = tmp_path / "eval.csv"
     _df().to_csv(eval_csv, index=False)
     out = tmp_path / "MODEL_CARD.json"
+    manifest_out = tmp_path / "MODEL_CARD.manifest.json"
 
     assert (
         main(
@@ -227,6 +282,8 @@ def test_report_cli_writes_json_payload(tmp_path):
                 "json",
                 "--out",
                 str(out),
+                "--manifest-out",
+                str(manifest_out),
             ]
         )
         == 0
@@ -238,6 +295,8 @@ def test_report_cli_writes_json_payload(tmp_path):
     assert "calibration" in payload
     assert payload["confusion_matrix"]["labels"] == ["not_duplicate", "duplicate"]
     assert len(payload["threshold_sweep"]) == 3
+    assert payload["evaluation_manifest"]["evaluation_dataset"]["rows"] == 30
+    assert json.loads(manifest_out.read_text(encoding="utf-8")) == payload["evaluation_manifest"]
 
 
 def test_report_cli_writes_comparison_json(tmp_path):

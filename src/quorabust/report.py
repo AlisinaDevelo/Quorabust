@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import platform
+import shlex
 import sys
+from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
@@ -20,6 +23,7 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 
+from quorabust.lineage import git_revision, sha256_file
 from quorabust.model import predict_proba_duplicate
 from quorabust.persist import load_classifier
 
@@ -29,10 +33,18 @@ _METADATA_KEYS = [
     "feature_schema",
     "n_train",
     "n_eval",
+    "eval_fraction",
+    "split_strategy",
+    "max_rows",
     "seed",
+    "threshold_candidates",
+    "threshold_metric",
     "quorabust_version",
     "git_revision",
     "csv_sha256",
+    "decision_threshold",
+    "decision_threshold_source",
+    "decision_threshold_metric",
 ]
 
 
@@ -100,6 +112,74 @@ def _parse_thresholds(raw: str) -> list[float]:
     if not out:
         raise ValueError("at least one threshold is required")
     return out
+
+
+def _report_command(argv: list[str] | None) -> str:
+    arguments = sys.argv[1:] if argv is None else argv
+    return shlex.join(["quorabust-report", *(str(value) for value in arguments)])
+
+
+def build_evaluation_manifest(
+    *,
+    artifact_path: Path,
+    artifact_label: str,
+    eval_path: Path,
+    eval_df: pd.DataFrame,
+    meta: dict[str, Any],
+    threshold: float,
+    thresholds: list[float],
+    calibration_bins: int,
+    command: str,
+) -> dict[str, Any]:
+    """Build an auditable, path-light record for a holdout evaluation run."""
+    labels = eval_df["is_duplicate"].astype(int)
+    lineage_keys = [
+        "git_revision",
+        "quorabust_version",
+        "csv_sha256",
+        "feature_backend",
+        "n_train",
+        "n_eval",
+        "eval_fraction",
+        "split_strategy",
+        "max_rows",
+        "seed",
+        "threshold_candidates",
+        "threshold_metric",
+        "training_command",
+        "decision_threshold",
+        "decision_threshold_source",
+        "decision_threshold_metric",
+    ]
+    training_lineage = {key: meta[key] for key in lineage_keys if key in meta}
+    return {
+        "schema_version": 1,
+        "artifact": {
+            "label": artifact_label,
+            "sha256": sha256_file(artifact_path),
+        },
+        "evaluation_dataset": {
+            "sha256": sha256_file(eval_path),
+            "rows": int(len(eval_df)),
+            "columns": list(eval_df.columns),
+            "positive_count": int(labels.sum()),
+            "positive_rate": float(labels.mean()),
+        },
+        "evaluation_policy": {
+            "threshold": float(threshold),
+            "thresholds": [float(value) for value in thresholds],
+            "calibration_bins": int(calibration_bins),
+        },
+        "training_lineage": training_lineage,
+        "runtime": {
+            "python_version": platform.python_version(),
+            "system": platform.system(),
+            "machine": platform.machine(),
+            "report_git_revision": git_revision(),
+        },
+        "command": command,
+        "generated_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    }
 
 
 def _metrics_at_threshold(y: np.ndarray, proba: np.ndarray, threshold: float) -> dict[str, Any]:
@@ -223,6 +303,7 @@ def render_model_card(
     meta: dict[str, Any],
     holdout_metrics: dict[str, Any] | None = None,
     sweep_metrics: list[dict[str, Any]] | None = None,
+    evaluation_manifest: dict[str, Any] | None = None,
 ) -> str:
     """Render artifact metadata and optional holdout metrics as Markdown."""
     artifact_rows = [
@@ -366,6 +447,18 @@ def render_model_card(
                 ]
             )
 
+    if evaluation_manifest is not None:
+        parts.extend(
+            [
+                "",
+                "## Reproducibility",
+                "",
+                "```json",
+                json.dumps(evaluation_manifest, indent=2, sort_keys=True),
+                "```",
+            ]
+        )
+
     parts.extend(
         [
             "",
@@ -394,7 +487,11 @@ def _comparison_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return sorted(rows, key=lambda row: row.get("f1", 0.0), reverse=True)
 
 
-def render_comparison_report(rows: list[dict[str, Any]]) -> str:
+def render_comparison_report(
+    rows: list[dict[str, Any]],
+    *,
+    evaluation_manifest: dict[str, Any] | None = None,
+) -> str:
     """Render comparable artifact metrics as a Markdown table."""
     metric_rows = [
         [
@@ -410,8 +507,7 @@ def render_comparison_report(rows: list[dict[str, Any]]) -> str:
         ]
         for row in _comparison_rows(rows)
     ]
-    return "\n".join(
-        [
+    parts = [
             "# Quorabust Model Comparison",
             "",
             "## Backend Comparison",
@@ -439,7 +535,18 @@ def render_comparison_report(rows: list[dict[str, Any]]) -> str:
             ),
             "",
         ]
-    )
+    if evaluation_manifest is not None:
+        parts.extend(
+            [
+                "## Reproducibility",
+                "",
+                "```json",
+                json.dumps(evaluation_manifest, indent=2, sort_keys=True),
+                "```",
+                "",
+            ]
+        )
+    return "\n".join(parts)
 
 
 def build_report_payload(
@@ -448,6 +555,7 @@ def build_report_payload(
     meta: dict[str, Any],
     holdout_metrics: dict[str, Any] | None = None,
     sweep_metrics: list[dict[str, Any]] | None = None,
+    evaluation_manifest: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build a machine-readable report payload for CI and model comparisons."""
     payload: dict[str, Any] = {
@@ -496,6 +604,8 @@ def build_report_payload(
         }
         if sweep_metrics:
             payload["threshold_sweep"] = sweep_metrics
+    if evaluation_manifest is not None:
+        payload["evaluation_manifest"] = evaluation_manifest
     return payload
 
 
@@ -589,6 +699,12 @@ def main(argv: list[str] | None = None) -> int:
         help="Report format to print or write",
     )
     parser.add_argument("--out", type=Path, default=None, help="Write report here")
+    parser.add_argument(
+        "--manifest-out",
+        type=Path,
+        default=None,
+        help="Write the holdout reproducibility manifest as JSON",
+    )
     args = parser.parse_args(argv)
 
     if not args.model.is_file():
@@ -606,10 +722,17 @@ def main(argv: list[str] | None = None) -> int:
         print(str(exc), file=sys.stderr)
         return 1
 
+    if args.manifest_out is not None and args.eval_csv is None:
+        print("--manifest-out requires --eval-csv", file=sys.stderr)
+        return 1
+
     builder, clf, meta = load_classifier(args.model)
+    artifact = args.artifact_label or str(args.model.resolve())
+    eval_df = None
     holdout_metrics = None
     sweep_metrics = None
     comparison_metrics = None
+    evaluation_manifest = None
     if args.eval_csv is not None:
         if not args.eval_csv.is_file():
             print(f"File not found: {args.eval_csv}", file=sys.stderr)
@@ -647,25 +770,42 @@ def main(argv: list[str] | None = None) -> int:
         print("--compare-model requires --eval-csv", file=sys.stderr)
         return 1
 
-    artifact = args.artifact_label or str(args.model.resolve())
+    if eval_df is not None:
+        evaluation_manifest = build_evaluation_manifest(
+            artifact_path=args.model,
+            artifact_label=artifact,
+            eval_path=args.eval_csv,
+            eval_df=eval_df,
+            meta=meta,
+            threshold=args.threshold,
+            thresholds=thresholds,
+            calibration_bins=args.calibration_bins,
+            command=_report_command(argv),
+        )
+
     if args.format == "json":
         payload = build_report_payload(
             artifact=artifact,
             meta=meta,
             holdout_metrics=holdout_metrics,
             sweep_metrics=sweep_metrics,
+            evaluation_manifest=evaluation_manifest,
         )
         if comparison_metrics is not None:
             payload["comparison"] = _comparison_rows(comparison_metrics)
         report = json.dumps(payload, indent=2, sort_keys=True)
     elif comparison_metrics is not None:
-        report = render_comparison_report(comparison_metrics)
+        report = render_comparison_report(
+            comparison_metrics,
+            evaluation_manifest=evaluation_manifest,
+        )
     else:
         report = render_model_card(
             artifact=artifact,
             meta=meta,
             holdout_metrics=holdout_metrics,
             sweep_metrics=sweep_metrics,
+            evaluation_manifest=evaluation_manifest,
         )
     if args.out is None:
         print(report)
@@ -673,6 +813,13 @@ def main(argv: list[str] | None = None) -> int:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(report + "\n", encoding="utf-8")
         print(f"wrote {args.out.resolve()}")
+    if args.manifest_out is not None and evaluation_manifest is not None:
+        args.manifest_out.parent.mkdir(parents=True, exist_ok=True)
+        args.manifest_out.write_text(
+            json.dumps(evaluation_manifest, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        print(f"wrote {args.manifest_out.resolve()}")
     return 0
 
 
