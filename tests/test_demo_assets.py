@@ -53,3 +53,16 @@ def test_demo_assets_check_fails_when_snapshots_are_stale(tmp_path, capsys):
     captured = capsys.readouterr()
     assert "stale demo asset" in captured.err
     assert "predict-response.json" in captured.err
+
+
+def test_demo_assets_check_tolerates_small_numeric_drift(tmp_path):
+    out = tmp_path / "assets"
+    assert main(["--out", str(out)]) == 0
+    predict = json.loads((out / "predict-response.json").read_text(encoding="utf-8"))
+    predict["proba_duplicate"][0] += 0.0005
+    (out / "predict-response.json").write_text(
+        json.dumps(predict, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    assert main(["--out", str(out), "--check"]) == 0

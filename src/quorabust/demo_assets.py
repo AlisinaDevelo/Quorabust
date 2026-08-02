@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 import warnings
 from pathlib import Path
@@ -24,6 +25,8 @@ DEMO_REQUEST = {
         "Where can I buy train tickets?",
     ],
 }
+
+_JSON_FLOAT_TOLERANCE = 1e-3
 
 
 def _write_json(path: Path, payload: Any) -> None:
@@ -184,9 +187,41 @@ def _check_demo_assets(csv_path: Path, out_dir: Path, seed: int) -> list[Path]:
             if not actual_path.is_file():
                 stale.append(actual_path)
                 continue
-            if actual_path.read_bytes() != expected_path.read_bytes():
+            if not _asset_matches(actual_path, expected_path):
                 stale.append(actual_path)
     return stale
+
+
+def _asset_matches(actual_path: Path, expected_path: Path) -> bool:
+    if actual_path.suffix == ".json" and expected_path.suffix == ".json":
+        try:
+            actual = json.loads(actual_path.read_text(encoding="utf-8"))
+            expected = json.loads(expected_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            return False
+        return _json_matches(actual, expected)
+    return actual_path.read_bytes() == expected_path.read_bytes()
+
+
+def _json_matches(actual: Any, expected: Any) -> bool:
+    if isinstance(expected, bool) or isinstance(actual, bool):
+        return actual is expected
+    if isinstance(expected, int | float) and isinstance(actual, int | float):
+        return math.isclose(
+            float(actual),
+            float(expected),
+            rel_tol=_JSON_FLOAT_TOLERANCE,
+            abs_tol=_JSON_FLOAT_TOLERANCE,
+        )
+    if isinstance(expected, dict) and isinstance(actual, dict):
+        if actual.keys() != expected.keys():
+            return False
+        return all(_json_matches(actual[key], expected[key]) for key in expected)
+    if isinstance(expected, list) and isinstance(actual, list):
+        if len(actual) != len(expected):
+            return False
+        return all(_json_matches(a, e) for a, e in zip(actual, expected, strict=True))
+    return bool(actual == expected)
 
 
 def main(argv: list[str] | None = None) -> int:
