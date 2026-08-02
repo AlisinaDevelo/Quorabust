@@ -12,7 +12,6 @@
         "abs_len_diff",
         "len_sum"
       ],
-      "git_revision": "f63d82f4be9fdf1134539896ed17b40f0de4d74e",
       "n_eval": 0,
       "n_train": 32,
       "seed": 7

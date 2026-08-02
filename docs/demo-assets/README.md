@@ -13,3 +13,9 @@ Regenerate:
 ```bash
 quorabust-demo-assets --out docs/demo-assets
 ```
+
+CI freshness check:
+
+```bash
+quorabust-demo-assets --out docs/demo-assets --check
+```

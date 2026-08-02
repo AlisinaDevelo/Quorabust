@@ -37,8 +37,7 @@ jobs:
       - name: Demo assets CLI
         run: |
           quorabust-demo-assets --out /tmp/quorabust-demo-assets
-          test -s /tmp/quorabust-demo-assets/predict-response.json
-          test -s /tmp/quorabust-demo-assets/openapi-excerpt.json
+          quorabust-demo-assets --out docs/demo-assets --check
       - name: Smoke model report
         run: |
           quorabust-train \

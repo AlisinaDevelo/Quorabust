@@ -33,3 +33,23 @@ def test_demo_assets_cli_fails_for_missing_csv(tmp_path, capsys):
 
     assert code == 1
     assert "demo CSV not found" in capsys.readouterr().err
+
+
+def test_demo_assets_check_passes_when_snapshots_are_current(tmp_path):
+    out = tmp_path / "assets"
+    assert main(["--out", str(out)]) == 0
+
+    assert main(["--out", str(out), "--check"]) == 0
+
+
+def test_demo_assets_check_fails_when_snapshots_are_stale(tmp_path, capsys):
+    out = tmp_path / "assets"
+    assert main(["--out", str(out)]) == 0
+    (out / "predict-response.json").write_text("{}\n", encoding="utf-8")
+
+    code = main(["--out", str(out), "--check"])
+
+    assert code == 1
+    captured = capsys.readouterr()
+    assert "stale demo asset" in captured.err
+    assert "predict-response.json" in captured.err

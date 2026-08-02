@@ -11,6 +11,7 @@ in [demo-assets](demo-assets). Regenerate them with:
 
 ```bash
 quorabust-demo-assets --out docs/demo-assets
+quorabust-demo-assets --out docs/demo-assets --check
 ```
 
 ## Build a smoke model

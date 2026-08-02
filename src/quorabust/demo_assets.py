@@ -10,7 +10,7 @@ from typing import Any
 
 import pandas as pd
 
-from quorabust.lineage import git_revision, sha256_file
+from quorabust.lineage import sha256_file
 from quorabust.model import train_duplicate_classifier
 from quorabust.persist import save_classifier
 
@@ -67,7 +67,6 @@ def _train_smoke_artifact(csv_path: Path, model_path: Path, seed: int) -> None:
             "n_eval": 0,
             "seed": seed,
             "csv_sha256": sha256_file(csv_path),
-            "git_revision": git_revision(),
             "decision_threshold": 0.5,
             "decision_threshold_source": "demo_default",
         },
@@ -161,12 +160,33 @@ def build_demo_assets(csv_path: Path, out_dir: Path, seed: int = 7) -> list[Path
                 "quorabust-demo-assets --out docs/demo-assets",
                 "```",
                 "",
+                "CI freshness check:",
+                "",
+                "```bash",
+                "quorabust-demo-assets --out docs/demo-assets --check",
+                "```",
+                "",
             ]
         ),
         encoding="utf-8",
     )
     written.append(readme)
     return written
+
+
+def _check_demo_assets(csv_path: Path, out_dir: Path, seed: int) -> list[Path]:
+    with TemporaryDirectory(prefix="quorabust-demo-check-") as tmp:
+        expected_dir = Path(tmp) / "assets"
+        expected = build_demo_assets(csv_path, expected_dir, seed=seed)
+        stale: list[Path] = []
+        for expected_path in expected:
+            actual_path = out_dir / expected_path.relative_to(expected_dir)
+            if not actual_path.is_file():
+                stale.append(actual_path)
+                continue
+            if actual_path.read_bytes() != expected_path.read_bytes():
+                stale.append(actual_path)
+    return stale
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -186,9 +206,23 @@ def main(argv: list[str] | None = None) -> int:
         help="Directory for generated JSON and README snapshots.",
     )
     parser.add_argument("--seed", type=int, default=7)
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Fail if generated snapshots differ from the files already in --out.",
+    )
     args = parser.parse_args(argv)
 
     try:
+        if args.check:
+            stale = _check_demo_assets(args.csv, args.out, seed=args.seed)
+            if stale:
+                for path in stale:
+                    print(f"stale demo asset: {path}", file=sys.stderr)
+                return 1
+            print(f"demo assets are current in {args.out}")
+            return 0
+
         written = build_demo_assets(args.csv, args.out, seed=args.seed)
     except (FileNotFoundError, RuntimeError, ValueError) as exc:
         print(exc, file=sys.stderr)

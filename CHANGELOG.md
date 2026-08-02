@@ -20,6 +20,7 @@
 - `quorabust-report --compare-model label=path` for same-holdout backend comparisons.
 - Docker Compose demo stack for API, Prometheus, and Grafana.
 - `quorabust-demo-assets` for generated API request/response and OpenAPI snapshots.
+- `quorabust-demo-assets --check` for CI freshness checks on committed demo snapshots.
 
 ### Fixed
 - Docker image now installs serving dependencies via `.[serve]`.
