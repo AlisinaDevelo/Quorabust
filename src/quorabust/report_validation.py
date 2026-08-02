@@ -36,6 +36,28 @@ _REQUIRED_CALIBRATION = {
     "mean_observed_rate",
     "bins",
 }
+_REQUIRED_MANIFEST = {
+    "schema_version",
+    "artifact",
+    "evaluation_dataset",
+    "evaluation_policy",
+    "training_lineage",
+    "runtime",
+    "command",
+    "generated_at_utc",
+}
+_REQUIRED_MANIFEST_SECTIONS = {
+    "artifact": {"label", "sha256"},
+    "evaluation_dataset": {
+        "sha256",
+        "rows",
+        "columns",
+        "positive_count",
+        "positive_rate",
+    },
+    "evaluation_policy": {"threshold", "thresholds", "calibration_bins"},
+    "runtime": {"python_version", "system", "machine", "report_git_revision"},
+}
 
 
 def _missing_keys(obj: Any, keys: set[str]) -> list[str]:
@@ -49,6 +71,7 @@ def validate_report_payload(
     *,
     require_holdout: bool = False,
     require_calibration: bool = False,
+    require_manifest: bool = False,
 ) -> list[str]:
     """Return validation errors for a machine-readable Quorabust report payload."""
     if not isinstance(payload, dict):
@@ -86,6 +109,21 @@ def validate_report_payload(
         if not isinstance(bins, list) or not bins:
             errors.append("calibration.bins must be a non-empty list")
 
+    manifest = payload.get("evaluation_manifest")
+    if require_manifest and manifest is None:
+        errors.append("missing evaluation_manifest")
+    if manifest is not None:
+        for key in _missing_keys(manifest, _REQUIRED_MANIFEST):
+            errors.append(f"missing evaluation_manifest field: {key}")
+        if isinstance(manifest, dict):
+            for section, keys in _REQUIRED_MANIFEST_SECTIONS.items():
+                value = manifest.get(section)
+                if not isinstance(value, dict):
+                    errors.append(f"evaluation_manifest.{section} must be an object")
+                    continue
+                for key in _missing_keys(value, keys):
+                    errors.append(f"missing evaluation_manifest.{section} field: {key}")
+
     return errors
 
 
@@ -104,6 +142,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Fail unless calibration diagnostics are present",
     )
+    parser.add_argument(
+        "--require-manifest",
+        action="store_true",
+        help="Fail unless holdout reproducibility metadata is present",
+    )
     args = parser.parse_args(argv)
 
     if not args.report.is_file():
@@ -119,6 +162,7 @@ def main(argv: list[str] | None = None) -> int:
         payload,
         require_holdout=args.require_holdout,
         require_calibration=args.require_calibration,
+        require_manifest=args.require_manifest,
     )
     if errors:
         for error in errors:

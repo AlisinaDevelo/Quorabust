@@ -52,6 +52,31 @@ def _payload():
                 }
             ],
         },
+        "evaluation_manifest": {
+            "schema_version": 1,
+            "artifact": {"label": "model.pkl", "sha256": "a" * 64},
+            "evaluation_dataset": {
+                "sha256": "b" * 64,
+                "rows": 10,
+                "columns": ["question1", "question2", "is_duplicate"],
+                "positive_count": 5,
+                "positive_rate": 0.5,
+            },
+            "evaluation_policy": {
+                "threshold": 0.5,
+                "thresholds": [0.3, 0.5, 0.7],
+                "calibration_bins": 5,
+            },
+            "training_lineage": {"git_revision": "abc123"},
+            "runtime": {
+                "python_version": "3.12.0",
+                "system": "Darwin",
+                "machine": "arm64",
+                "report_git_revision": "def456",
+            },
+            "command": "quorabust-report --eval-csv holdout.csv",
+            "generated_at_utc": "2026-08-02T12:00:00Z",
+        },
     }
 
 
@@ -60,6 +85,7 @@ def test_validate_report_payload_accepts_release_report():
         _payload(),
         require_holdout=True,
         require_calibration=True,
+        require_manifest=True,
     ) == []
 
 
@@ -77,7 +103,18 @@ def test_validate_report_payload_reports_missing_fields():
 def test_validate_report_cli_passes(tmp_path):
     report = tmp_path / "report.json"
     report.write_text(json.dumps(_payload()), encoding="utf-8")
-    assert main(["--report", str(report), "--require-holdout", "--require-calibration"]) == 0
+    assert (
+        main(
+            [
+                "--report",
+                str(report),
+                "--require-holdout",
+                "--require-calibration",
+                "--require-manifest",
+            ]
+        )
+        == 0
+    )
 
 
 def test_validate_report_cli_fails_for_missing_holdout(tmp_path):
@@ -86,3 +123,13 @@ def test_validate_report_cli_fails_for_missing_holdout(tmp_path):
     report = tmp_path / "report.json"
     report.write_text(json.dumps(payload), encoding="utf-8")
     assert main(["--report", str(report), "--require-holdout"]) == 1
+
+
+def test_validate_report_payload_reports_missing_manifest():
+    payload = _payload()
+    del payload["evaluation_manifest"]
+
+    assert "missing evaluation_manifest" in validate_report_payload(
+        payload,
+        require_manifest=True,
+    )
