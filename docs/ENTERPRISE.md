@@ -34,6 +34,8 @@ prefer a non-pickle format such as `skops` or ONNX in a future release.
   `QUORABUST_DECISION_THRESHOLD`, then `0.5`.
 - **Local demo**: `compose.yaml` runs the API, Prometheus, and Grafana together. See
   [DEMO.md](DEMO.md).
+- **Hosted demo**: expose only the smoke model and label it clearly as non-production.
+  See [HOSTED_DEMO.md](HOSTED_DEMO.md).
 - Wire ingress timeouts and autoscaling to your **latency** SLO using the histogram in `/metrics`. See [LOAD_TESTING.md](LOAD_TESTING.md) for k6 and [GRAFANA.md](GRAFANA.md) for a starter dashboard JSON.
 
 ## Scale and NLP

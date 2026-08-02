@@ -21,6 +21,7 @@
 - Docker Compose demo stack for API, Prometheus, and Grafana.
 - `quorabust-demo-assets` for generated API request/response and OpenAPI snapshots.
 - `quorabust-demo-assets --check` for CI freshness checks on committed demo snapshots.
+- Hosted-demo checklist for safe public inspection of the smoke-model API.
 
 ### Fixed
 - Docker image now installs serving dependencies via `.[serve]`.

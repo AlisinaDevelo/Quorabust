@@ -16,6 +16,8 @@ buyer-facing use cases, method strategy, and production gaps.
 via Docker Compose.
 **API snapshots:** [docs/demo-assets](docs/demo-assets) — generated request/response and
 OpenAPI excerpts for quick inspection without running the service.
+**Hosted demo checklist:** [docs/HOSTED_DEMO.md](docs/HOSTED_DEMO.md) — safe public demo
+requirements and portfolio capture notes.
 
 ## What it demonstrates
 

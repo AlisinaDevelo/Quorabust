@@ -14,6 +14,9 @@ quorabust-demo-assets --out docs/demo-assets
 quorabust-demo-assets --out docs/demo-assets --check
 ```
 
+For a public recruiter-facing deployment, use the safety checklist in
+[HOSTED_DEMO.md](HOSTED_DEMO.md).
+
 ## Build a smoke model
 
 ```bash
