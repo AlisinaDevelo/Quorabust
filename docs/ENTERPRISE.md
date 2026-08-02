@@ -50,7 +50,9 @@ pointers to distributed XGBoost.
 - **`quorabust.registry`**: append JSONL rows with `--registry-dir` after training; swap for MLflow when you need a UI.
 - **`quorabust.drift`**: compare live batch feature means to `meta["reference_feature_means"]`.
 - **`quorabust-validate-report`**: validate JSON model-card reports in CI/release jobs;
-  use `--require-holdout --require-calibration` before promoting a benchmarked artifact.
+  use `--require-holdout --require-calibration --require-manifest` before promoting a
+  benchmarked artifact. The manifest binds the report to model and holdout hashes,
+  training lineage, runtime, and the exact evaluation invocation.
 
 ## Releases
 

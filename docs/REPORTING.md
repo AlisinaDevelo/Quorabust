@@ -31,7 +31,8 @@ quorabust-report \
   --artifact-label quorabust-smoke.pkl \
   --eval-csv examples/smoke_pairs.csv \
   --format json \
-  --out /tmp/quorabust-smoke-model-card.json
+  --out /tmp/quorabust-smoke-model-card.json \
+  --manifest-out /tmp/quorabust-smoke-model-card.manifest.json
 ```
 
 The smoke dataset proves the command path works. It is not a benchmark and should not be
@@ -74,6 +75,13 @@ Record the dataset source, split method, command, commit SHA, and date next to a
 published result. Do not compare artifacts unless they use the same holdout split and
 threshold.
 
+Every report generated with `--eval-csv` includes an `evaluation_manifest` with SHA-256
+hashes for the model and holdout CSV, row and label counts, the threshold policy, training
+lineage, runtime details, the report commit, and the exact report invocation. Use
+`--manifest-out` to write that object as a separate JSON sidecar. It is an audit record,
+not a substitute for a declared dataset source or split policy; the holdout itself must
+still be frozen and kept outside the training data.
+
 Use `--format json` when you want CI or release tooling to compare metrics without
 scraping Markdown.
 
@@ -85,12 +93,14 @@ quorabust-report \
   --artifact-label quorabust-tfidf-v1.pkl \
   --eval-csv data/processed/holdout.csv \
   --format json \
-  --out reports/quorabust-tfidf-v1.json
+  --out reports/quorabust-tfidf-v1.json \
+  --manifest-out reports/quorabust-tfidf-v1.manifest.json
 
 quorabust-validate-report \
   --report reports/quorabust-tfidf-v1.json \
   --require-holdout \
-  --require-calibration
+  --require-calibration \
+  --require-manifest
 ```
 
 Use repeated `--compare-model label=path` arguments when you need to compare trained
