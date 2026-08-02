@@ -59,6 +59,11 @@ def test_cli_writes_metadata_sidecar(tmp_path):
     assert payload["n_train"] > 0
     assert payload["feature_backend"] == "tfidf"
     assert "eval_accuracy" in payload
+    assert payload["eval_fraction"] == 0
+    assert payload["max_rows"] is None
+    assert payload["threshold_candidates"] == [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
+    assert payload["threshold_metric"] == "f1"
+    assert payload["training_command"].startswith("quorabust-train ")
 
 
 def test_cli_persists_holdout_decision_threshold(tmp_path):
@@ -90,6 +95,8 @@ def test_cli_persists_holdout_decision_threshold(tmp_path):
     assert payload["decision_threshold_source"] == "eval_holdout"
     assert payload["decision_threshold_metric"] == "f1"
     assert "f1" in payload["decision_threshold_metrics"]
+    assert payload["eval_fraction"] == 0.1
+    assert payload["threshold_candidates"] == [0.3, 0.5, 0.7]
 
 
 def test_cli_rejects_bad_threshold_grid(tmp_path):

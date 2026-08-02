@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import shlex
 import sys
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
@@ -53,6 +54,12 @@ def _parse_thresholds(raw: str) -> list[float]:
     if not thresholds:
         raise ValueError("at least one threshold is required")
     return thresholds
+
+
+def _training_command(argv: list[str] | None) -> str:
+    """Return a copy-pasteable command that records the training configuration."""
+    arguments = sys.argv[1:] if argv is None else argv
+    return shlex.join(["quorabust-train", *(str(value) for value in arguments)])
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -175,9 +182,15 @@ def main(argv: list[str] | None = None) -> int:
     meta: dict[str, Any] = {
         "n_train": len(train_df),
         "n_eval": len(eval_df) if eval_df is not None else 0,
+        "eval_fraction": args.eval_fraction,
+        "split_strategy": "shuffled_prefix_holdout" if eval_df is not None else "none",
+        "max_rows": args.max_rows,
         "csv": str(args.csv.resolve()),
         "csv_sha256": sha256_file(args.csv),
         "seed": args.seed,
+        "threshold_candidates": threshold_candidates,
+        "threshold_metric": args.threshold_metric,
+        "training_command": _training_command(argv),
         "quorabust_version": _package_version(),
         "git_revision": git_revision(),
         "feature_backend": args.feature_backend,
