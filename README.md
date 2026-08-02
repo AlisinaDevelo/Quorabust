@@ -12,6 +12,8 @@ operational shape of an ML-backed backend service.
 overview, training pipeline, train-vs-serve sequence, and the artifact/registry contract.
 **Enterprise positioning:** [docs/PRODUCT.md](docs/PRODUCT.md) — product surface,
 buyer-facing use cases, method strategy, and production gaps.
+**Local demo stack:** [docs/DEMO.md](docs/DEMO.md) — FastAPI, Prometheus, and Grafana
+via Docker Compose.
 
 ## What it demonstrates
 
@@ -108,7 +110,7 @@ quorabust-serve --host 0.0.0.0 --port 8000
 # optional second artifact: export QUORABUST_MODEL_B=models/other.pkl
 ```
 
-`GET /metrics` exposes Prometheus text; `POST /predict` accepts `{"question1":[...],"question2":[...]}` and optional header `X-Quorabust-Variant: b`. Responses include `proba_duplicate`, thresholded `is_duplicate`, and `decision_threshold`. Add `?threshold=0.7` to override the duplicate cutoff for one request; otherwise serving uses the holdout-selected artifact `decision_threshold` when present, then `QUORABUST_DECISION_THRESHOLD`, then `0.5`. Add `?explain=true` to return per-pair input feature values. Interactive docs: **`/docs`**. Load testing: [docs/LOAD_TESTING.md](docs/LOAD_TESTING.md). Grafana: [docs/GRAFANA.md](docs/GRAFANA.md).
+`GET /metrics` exposes Prometheus text; `POST /predict` accepts `{"question1":[...],"question2":[...]}` and optional header `X-Quorabust-Variant: b`. Responses include `proba_duplicate`, thresholded `is_duplicate`, and `decision_threshold`. Add `?threshold=0.7` to override the duplicate cutoff for one request; otherwise serving uses the holdout-selected artifact `decision_threshold` when present, then `QUORABUST_DECISION_THRESHOLD`, then `0.5`. Add `?explain=true` to return per-pair input feature values. Interactive docs: **`/docs`**. Local demo: [docs/DEMO.md](docs/DEMO.md). Load testing: [docs/LOAD_TESTING.md](docs/LOAD_TESTING.md). Grafana: [docs/GRAFANA.md](docs/GRAFANA.md).
 `GET /models` returns allowlisted metadata for loaded variants without leaking local
 artifact paths or training CSV paths.
 

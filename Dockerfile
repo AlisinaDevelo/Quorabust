@@ -8,7 +8,7 @@ COPY pyproject.toml README.md LICENSE NOTICE ./
 COPY src ./src
 
 RUN python -m pip install --upgrade "pip>=26" \
-    && pip install --no-cache-dir .
+    && pip install --no-cache-dir ".[serve]"
 
 USER appuser
 ENTRYPOINT ["quorabust-train"]
