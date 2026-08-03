@@ -55,10 +55,13 @@ jobs:
             --artifact-label quorabust-smoke.pkl \
             --eval-csv examples/smoke_pairs.csv \
             --format json \
-            --out /tmp/quorabust-smoke-model-card.json
+            --out /tmp/quorabust-smoke-model-card.json \
+            --manifest-out /tmp/quorabust-smoke-model-card.manifest.json
           quorabust-validate-report \
             --report /tmp/quorabust-smoke-model-card.json \
             --require-holdout \
-            --require-calibration
+            --require-calibration \
+            --require-manifest
           test -s /tmp/quorabust-smoke-model-card.md
           test -s /tmp/quorabust-smoke-model-card.json
+          test -s /tmp/quorabust-smoke-model-card.manifest.json
