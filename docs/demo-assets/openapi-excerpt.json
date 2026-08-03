@@ -166,7 +166,7 @@
     },
     "/models": {
       "get": {
-        "description": "Returns allowlisted metadata for loaded variants. Local artifact paths and training CSV paths are intentionally omitted.",
+        "description": "Returns allowlisted metadata for loaded variants. Local artifact paths and training CSV paths are intentionally omitted. If `QUORABUST_API_KEY` is configured, send it in the `X-Quorabust-API-Key` header.",
         "operationId": "models_models_get",
         "responses": {
           "200": {
@@ -187,10 +187,18 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "description": "API key required or invalid"
+          },
           "503": {
             "description": "No models loaded"
           }
         },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
         "summary": "List loaded model metadata",
         "tags": [
           "operations"
@@ -199,7 +207,7 @@
     },
     "/predict": {
       "post": {
-        "description": "Scores one or more question pairs. Optional header `X-Quorabust-Variant: b` selects the B artifact when configured. Set query parameter `explain=true` to return input feature values. Set `threshold` to override the duplicate decision cutoff for this request.",
+        "description": "Scores one or more question pairs. Optional header `X-Quorabust-Variant: b` selects the B artifact when configured. Set query parameter `explain=true` to return input feature values. Set `threshold` to override the duplicate decision cutoff for this request. Deployments can configure `QUORABUST_API_KEY` and `QUORABUST_MAX_BATCH_SIZE` for access control and bounded work.",
         "operationId": "predict_predict_post",
         "parameters": [
           {
@@ -275,6 +283,12 @@
           "400": {
             "description": "question1 and question2 length mismatch"
           },
+          "401": {
+            "description": "API key required or invalid"
+          },
+          "413": {
+            "description": "request batch exceeds configured maximum"
+          },
           "422": {
             "content": {
               "application/json": {
@@ -289,6 +303,11 @@
             "description": "Model not loaded or variant unavailable"
           }
         },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
         "summary": "Predict duplicate probability",
         "tags": [
           "scoring"
