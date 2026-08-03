@@ -71,6 +71,13 @@ quorabust-report \
   --out reports/quorabust-tfidf-v1.md
 ```
 
+When the training CSV contains the Kaggle `qid1` and `qid2` columns, `quorabust-train`
+uses a deterministic connected-component holdout so the same question cannot appear in
+both training and evaluation through a different pair. The artifact metadata records
+`split_strategy: question_component_holdout` and the question-ID columns used. Datasets
+without both complete ID columns retain the deterministic shuffled-row fallback and are
+reported as `shuffled_prefix_holdout`.
+
 Record the dataset source, split method, command, commit SHA, and date next to any
 published result. Do not compare artifacts unless they use the same holdout split and
 threshold.

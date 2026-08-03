@@ -19,6 +19,10 @@ Training writes `csv_sha256`, `git_revision`, `quorabust_version`, `feature_sche
 when an eval split exists, and metric fields into the pickle `meta` dict. Treat `.pkl`
 files as **trusted** (pickle); load only from controlled storage.
 
+When source data includes complete `qid1`/`qid2` columns, the default holdout is split by
+question connected components so a question cannot cross the train/eval boundary. The
+chosen strategy is persisted in metadata for review.
+
 Use `quorabust-train --metadata-out models/quorabust.meta.json` to write the same
 lineage and metric metadata as JSON. Reviewers and release tooling can inspect that
 sidecar without loading executable pickle content. The sidecar is not a replacement for

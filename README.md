@@ -23,6 +23,7 @@ requirements and portfolio capture notes.
 
 - Pairwise text features with TF-IDF, optional sentence-transformer embeddings, or
   optional cross-encoder pair scoring
+- Leakage-aware question-component holdouts when `qid1`/`qid2` identifiers are available
 - XGBoost training with optional holdout evaluation and early stopping
 - Saved artifacts that include lineage, feature schema, dataset checksum, and metrics
 - FastAPI inference with health/readiness checks, thresholded decisions, OpenAPI docs,
