@@ -24,7 +24,8 @@ It does this with:
 - Holdout-selected serving thresholds persisted in artifact metadata.
 - Model-card reporting with threshold sweeps.
 - Artifact metadata, JSON sidecars, and safe public model metadata.
-- Prometheus metrics, A/B model routing, drift helpers, and load-test assets.
+- Prometheus metrics, A/B model routing, drift helpers, load-test assets, and structured
+  request correlation.
 
 ## Method Strategy
 
@@ -75,6 +76,7 @@ What is already in-repo:
 - Model-card report generation.
 - Dependency audit workflow.
 - Safe `/models` metadata endpoint.
+- `X-Request-ID` propagation and privacy-safe structured HTTP request events.
 
 What should be added before a serious production deployment:
 
@@ -84,7 +86,7 @@ What should be added before a serious production deployment:
 - Authentication and rate limiting at the gateway.
 - Key rotation, quotas, and distributed rate limiting at the gateway before broad exposure.
 - A production model registry such as MLflow or an internal equivalent.
-- Structured request IDs and centralized logs.
+- Centralized log shipping and trace propagation in the deployment platform.
 
 ## Portfolio Story
 

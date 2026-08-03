@@ -27,7 +27,7 @@ requirements and portfolio capture notes.
 - XGBoost training with optional holdout evaluation and early stopping
 - Saved artifacts that include lineage, feature schema, dataset checksum, and metrics
 - FastAPI inference with health/readiness checks, thresholded decisions, OpenAPI docs,
-  Prometheus metrics, and A/B routing
+  Prometheus metrics, A/B routing, request IDs, and structured HTTP events
 - Drift helper utilities, JSONL model registry, k6 load test, and Grafana dashboard starter
 - `quorabust-report` model-card generation for artifact review and benchmark summaries
 
@@ -119,7 +119,7 @@ quorabust-serve --host 0.0.0.0 --port 8000
 # optional second artifact: export QUORABUST_MODEL_B=models/other.pkl
 ```
 
-`GET /metrics` exposes Prometheus text; `POST /predict` accepts `{"question1":[...],"question2":[...]}` and optional header `X-Quorabust-Variant: b`. Responses include `proba_duplicate`, thresholded `is_duplicate`, and `decision_threshold`. Add `?threshold=0.7` to override the duplicate cutoff for one request; otherwise serving uses the holdout-selected artifact `decision_threshold` when present, then `QUORABUST_DECISION_THRESHOLD`, then `0.5`. Add `?explain=true` to return per-pair input feature values. Interactive docs: **`/docs`**. Local demo: [docs/DEMO.md](docs/DEMO.md). API snapshots: [docs/demo-assets](docs/demo-assets). Load testing: [docs/LOAD_TESTING.md](docs/LOAD_TESTING.md). Grafana: [docs/GRAFANA.md](docs/GRAFANA.md).
+`GET /metrics` exposes Prometheus text; `POST /predict` accepts `{"question1":[...],"question2":[...]}` and optional header `X-Quorabust-Variant: b`. Responses include `proba_duplicate`, thresholded `is_duplicate`, and `decision_threshold`. Every completed response includes an `X-Request-ID` UUID; clients may provide a canonical UUID to correlate retries and support cases. The `quorabust.http` logger emits one-line JSON request events with method, path, status, duration, and request ID, without question text, headers, or secrets. Add `?threshold=0.7` to override the duplicate cutoff for one request; otherwise serving uses the holdout-selected artifact `decision_threshold` when present, then `QUORABUST_DECISION_THRESHOLD`, then `0.5`. Add `?explain=true` to return per-pair input feature values. Interactive docs: **`/docs`**. Local demo: [docs/DEMO.md](docs/DEMO.md). API snapshots: [docs/demo-assets](docs/demo-assets). Load testing: [docs/LOAD_TESTING.md](docs/LOAD_TESTING.md). Grafana: [docs/GRAFANA.md](docs/GRAFANA.md).
 `GET /models` returns allowlisted metadata for loaded variants without leaking local
 artifact paths or training CSV paths.
 For a deployment-level boundary, set `QUORABUST_API_KEY` to require the

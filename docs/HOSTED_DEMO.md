@@ -13,6 +13,7 @@ is exposed.
 - `/predict?explain=true&threshold=0.9` accepts the sample request from
   [DEMO.md](DEMO.md) and returns `proba_duplicate`, `is_duplicate`,
   `decision_threshold`, `variant`, and feature values.
+- Responses include `X-Request-ID`; use it when sharing a support/debugging example.
 - A visible note near the link says: **demo smoke model, not production quality**.
 
 ## Build inputs
@@ -56,6 +57,8 @@ Optional:
 - Do not accept untrusted uploaded pickle artifacts.
 - Use `QUORABUST_API_KEY` and a small batch cap for a basic public-demo boundary; keep TLS,
   rate limiting, quotas, and key rotation at the host or gateway.
+- Keep request logs privacy-safe and ship only the structured operational event fields;
+  never expose question text or API keys through logs.
 - Disable or protect the demo when it is no longer useful; the goal is inspection, not
   production traffic.
 

@@ -40,6 +40,10 @@ prefer a non-pickle format such as `skops` or ONNX in a future release.
   `X-Quorabust-API-Key` on `/predict` and `/models`. Set
   `QUORABUST_MAX_BATCH_SIZE` to bound scoring work; the default is 256 pairs. Health,
   readiness, and metrics remain available for platform probes and should be network-scoped.
+- **Request correlation**: every completed response includes a canonical `X-Request-ID`
+  UUID. A valid client-provided UUID is reused; malformed values are replaced. The
+  `quorabust.http` logger emits one-line JSON events with method, path, status, duration,
+  and request ID only; question text, headers, tokens, and secrets are not logged.
 - **Local demo**: `compose.yaml` runs the API, Prometheus, and Grafana together. See
   [DEMO.md](DEMO.md).
 - **Hosted demo**: expose only the smoke model and label it clearly as non-production.
@@ -63,7 +67,8 @@ pointers to distributed XGBoost.
   training lineage, runtime, and the exact evaluation invocation.
 - Put TLS termination, distributed rate limiting, quotas, and key rotation at the ingress
   or gateway. The application key and batch cap are defense-in-depth controls, not a
-  replacement for a multi-worker gateway policy.
+  replacement for a multi-worker gateway policy. Ship the JSON request events to the
+  platform log system and propagate the request ID into distributed traces there.
 
 ## Releases
 
