@@ -19,6 +19,7 @@ from quorabust.model import (
 )
 from quorabust.persist import save_classifier, save_metadata_sidecar
 from quorabust.registry import append_model_record
+from quorabust.split import split_train_eval
 
 
 def _package_version() -> str:
@@ -144,17 +145,16 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as e:
         print(e, file=sys.stderr)
         return 1
-    df = df.sample(frac=1.0, random_state=args.seed).reset_index(drop=True)
-    if args.max_rows is not None:
-        df = df.head(args.max_rows).copy()
-
-    n = len(df)
-    eval_df = None
-    train_df = df
-    if args.eval_fraction > 0 and n >= 20:
-        n_eval = max(1, min(int(n * args.eval_fraction), n - 1))
-        eval_df = df.iloc[:n_eval].copy()
-        train_df = df.iloc[n_eval:].copy()
+    try:
+        train_df, eval_df, split_strategy = split_train_eval(
+            df,
+            eval_fraction=args.eval_fraction,
+            seed=args.seed,
+            max_rows=args.max_rows,
+        )
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
 
     feature_builder: Any | None = None
     if args.feature_backend == "embedding":
@@ -183,7 +183,10 @@ def main(argv: list[str] | None = None) -> int:
         "n_train": len(train_df),
         "n_eval": len(eval_df) if eval_df is not None else 0,
         "eval_fraction": args.eval_fraction,
-        "split_strategy": "shuffled_prefix_holdout" if eval_df is not None else "none",
+        "split_strategy": split_strategy,
+        "question_id_columns": ["qid1", "qid2"]
+        if split_strategy == "question_component_holdout"
+        else [],
         "max_rows": args.max_rows,
         "csv": str(args.csv.resolve()),
         "csv_sha256": sha256_file(args.csv),

@@ -99,6 +99,40 @@ def test_cli_persists_holdout_decision_threshold(tmp_path):
     assert payload["threshold_candidates"] == [0.3, 0.5, 0.7]
 
 
+def test_cli_uses_question_component_holdout_when_ids_are_available(tmp_path):
+    n = 40
+    csv = tmp_path / "train-with-qids.csv"
+    pd.DataFrame(
+        {
+            "qid1": list(range(1, n * 2, 2)),
+            "qid2": list(range(2, n * 2 + 1, 2)),
+            "question1": [f"how to do task {i}" for i in range(n)],
+            "question2": [f"task {i} instructions" for i in range(n)],
+            "is_duplicate": [i % 2 for i in range(n)],
+        }
+    ).to_csv(csv, index=False)
+    out = tmp_path / "model.pkl"
+    meta = tmp_path / "model.meta.json"
+
+    assert (
+        main(
+            [
+                "--csv",
+                str(csv),
+                "--out",
+                str(out),
+                "--metadata-out",
+                str(meta),
+            ]
+        )
+        == 0
+    )
+
+    payload = json.loads(meta.read_text(encoding="utf-8"))
+    assert payload["split_strategy"] == "question_component_holdout"
+    assert payload["n_eval"] > 0
+
+
 def test_cli_rejects_bad_threshold_grid(tmp_path):
     csv = tmp_path / "train.csv"
     _write_synthetic_csv(csv)
