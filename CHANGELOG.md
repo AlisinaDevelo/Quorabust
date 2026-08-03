@@ -27,6 +27,7 @@
 - Connected-component holdouts using `qid1`/`qid2` to prevent question-level leakage.
 - Optional API-key protection for scoring/model metadata and bounded prediction batches.
 - `X-Request-ID` propagation and privacy-safe structured JSON HTTP request events.
+- Endpoint-level Prometheus RED metrics with bounded route labels and an expanded Grafana dashboard.
 
 ### Fixed
 - Docker image now installs serving dependencies via `.[serve]`.

@@ -25,7 +25,7 @@ It does this with:
 - Model-card reporting with threshold sweeps.
 - Artifact metadata, JSON sidecars, and safe public model metadata.
 - Prometheus metrics, A/B model routing, drift helpers, load-test assets, and structured
-  request correlation.
+  request correlation, including route-level RED counters and latency histograms.
 
 ## Method Strategy
 

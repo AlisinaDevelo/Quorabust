@@ -44,6 +44,9 @@ prefer a non-pickle format such as `skops` or ONNX in a future release.
   UUID. A valid client-provided UUID is reused; malformed values are replaced. The
   `quorabust.http` logger emits one-line JSON events with method, path, status, duration,
   and request ID only; question text, headers, tokens, and secrets are not logged.
+- **HTTP RED metrics**: `quorabust_http_requests_total` records method, matched route,
+  and status code; `quorabust_http_request_duration_seconds` records endpoint latency.
+  Unknown paths use a fixed `<unmatched>` label to prevent metric-cardinality abuse.
 - **Local demo**: `compose.yaml` runs the API, Prometheus, and Grafana together. See
   [DEMO.md](DEMO.md).
 - **Hosted demo**: expose only the smoke model and label it clearly as non-production.

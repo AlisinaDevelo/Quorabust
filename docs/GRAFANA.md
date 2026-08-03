@@ -6,6 +6,13 @@
 
 - **`quorabust_predictions_total{variant="a"|"b"}`** — Counter incremented per successful `POST /predict`.
 - **`quorabust_predict_latency_seconds_*{variant=...}`** — Histogram of handler latency (seconds).
+- **`quorabust_http_requests_total{method=...,path=...,status_code=...}`** — Counter for every
+  completed request, including handled 4xx responses.
+- **`quorabust_http_request_duration_seconds_*{method=...,path=...}`** — Histogram for
+  endpoint latency and p50/p95 calculations.
+
+HTTP metric labels use matched route templates. Unknown paths share the `<unmatched>` label
+so user-controlled URLs cannot create unbounded time series.
 
 Scrape the service with Prometheus (job pointing at `http://<host>:8000/metrics`), then attach Grafana to that Prometheus data source.
 
@@ -22,7 +29,9 @@ For manual import:
    create the data source with that UID or replace `prometheus` in the JSON with your
    existing Prometheus data source UID before importing.
 
-Panels cover request rate by variant, p50/p95 latency, total predictions, and a single-stat p95 for SLO spot-checks. Adjust time range and thresholds to match your environment.
+Panels cover prediction rate by variant, prediction latency, total predictions, HTTP request
+rate by route, HTTP p95 latency by route, and 4xx/5xx rate. Adjust time range and thresholds
+to match your environment.
 
 ## Notes
 
