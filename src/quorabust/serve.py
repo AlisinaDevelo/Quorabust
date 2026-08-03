@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import hmac
+import json
+import logging
 import os
 import time
-from collections.abc import AsyncIterator
+import uuid
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.responses import PlainTextResponse
 from fastapi.security import APIKeyHeader
 from prometheus_client import CollectorRegistry, Counter, Histogram, generate_latest
@@ -22,6 +25,46 @@ from quorabust.persist import load_classifier
 DEFAULT_DECISION_THRESHOLD = 0.5
 DEFAULT_MAX_BATCH_SIZE = 256
 API_KEY_HEADER = "X-Quorabust-API-Key"
+REQUEST_ID_HEADER = "X-Request-ID"
+HTTP_LOGGER = logging.getLogger("quorabust.http")
+
+
+def _request_id(raw: str | None) -> str:
+    if raw:
+        try:
+            parsed = uuid.UUID(raw)
+        except (AttributeError, ValueError):
+            pass
+        else:
+            canonical = str(parsed)
+            if canonical == raw.lower():
+                return canonical
+    return str(uuid.uuid4())
+
+
+def _log_http_event(
+    *,
+    request_id: str,
+    method: str,
+    path: str,
+    status_code: int,
+    duration_ms: float,
+) -> None:
+    payload = {
+        "duration_ms": round(duration_ms, 3),
+        "event": "http.request",
+        "method": method,
+        "path": path,
+        "request_id": request_id,
+        "status_code": status_code,
+    }
+    message = json.dumps(payload, separators=(",", ":"), sort_keys=True)
+    if status_code >= 500:
+        HTTP_LOGGER.error(message)
+    elif status_code >= 400:
+        HTTP_LOGGER.warning(message)
+    else:
+        HTTP_LOGGER.info(message)
 
 
 def _dist_version() -> str:
@@ -247,6 +290,35 @@ def create_app(
         ],
     )
 
+    @app.middleware("http")
+    async def request_context(
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
+        request_id = _request_id(request.headers.get(REQUEST_ID_HEADER))
+        request.state.quorabust_request_id = request_id
+        started = time.perf_counter()
+        try:
+            response = await call_next(request)
+        except Exception:
+            _log_http_event(
+                request_id=request_id,
+                method=request.method,
+                path=request.url.path,
+                status_code=500,
+                duration_ms=(time.perf_counter() - started) * 1000,
+            )
+            raise
+        response.headers[REQUEST_ID_HEADER] = request_id
+        _log_http_event(
+            request_id=request_id,
+            method=request.method,
+            path=request.url.path,
+            status_code=response.status_code,
+            duration_ms=(time.perf_counter() - started) * 1000,
+        )
+        return response
+
     @app.get("/health", tags=["operations"])
     def health() -> dict[str, str]:
         return {"status": "ok"}
@@ -265,9 +337,19 @@ def create_app(
         description=(
             "Returns allowlisted metadata for loaded variants. Local artifact paths and "
             "training CSV paths are intentionally omitted. If `QUORABUST_API_KEY` is "
-            "configured, send it in the `X-Quorabust-API-Key` header."
+            "configured, send it in the `X-Quorabust-API-Key` header. Every response "
+            "includes an `X-Request-ID` UUID for support and log correlation."
         ),
         responses={
+            200: {
+                "description": "Loaded model metadata",
+                "headers": {
+                    REQUEST_ID_HEADER: {
+                        "description": "Request correlation UUID.",
+                        "schema": {"type": "string", "format": "uuid"},
+                    }
+                },
+            },
             401: {"description": "API key required or invalid"},
             503: {"description": "No models loaded"},
         },
@@ -301,9 +383,19 @@ def create_app(
             "Set query parameter `explain=true` to return input feature values. "
             "Set `threshold` to override the duplicate decision cutoff for this request. "
             "Deployments can configure `QUORABUST_API_KEY` and "
-            "`QUORABUST_MAX_BATCH_SIZE` for access control and bounded work."
+            "`QUORABUST_MAX_BATCH_SIZE` for access control and bounded work. Every response "
+            "includes an `X-Request-ID` UUID for support and log correlation."
         ),
         responses={
+            200: {
+                "description": "Duplicate probabilities and decisions",
+                "headers": {
+                    REQUEST_ID_HEADER: {
+                        "description": "Request correlation UUID.",
+                        "schema": {"type": "string", "format": "uuid"},
+                    }
+                },
+            },
             401: {"description": "API key required or invalid"},
             400: {"description": "question1 and question2 length mismatch"},
             413: {"description": "request batch exceeds configured maximum"},

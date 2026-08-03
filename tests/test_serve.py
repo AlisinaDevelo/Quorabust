@@ -1,3 +1,7 @@
+import json
+import logging
+import uuid
+
 import pandas as pd
 from starlette.testclient import TestClient
 
@@ -81,6 +85,61 @@ def test_ready_without_model_file():
         assert client.get("/ready").status_code == 503
 
 
+def test_request_id_is_generated_and_logged_without_request_content(caplog):
+    app = create_app()
+
+    with caplog.at_level(logging.INFO, logger="quorabust.http"):
+        with TestClient(app) as client:
+            response = client.get("/health")
+
+    request_id = response.headers["X-Request-ID"]
+    assert str(uuid.UUID(request_id)) == request_id
+    events = [record for record in caplog.records if record.name == "quorabust.http"]
+    assert events
+    event = json.loads(events[-1].getMessage())
+    assert set(event) == {
+        "duration_ms",
+        "event",
+        "method",
+        "path",
+        "request_id",
+        "status_code",
+    }
+    assert event["event"] == "http.request"
+    assert event["method"] == "GET"
+    assert event["path"] == "/health"
+    assert event["request_id"] == request_id
+    assert event["status_code"] == 200
+    assert isinstance(event["duration_ms"], (int, float))
+
+
+def test_request_id_reuses_valid_header_and_replaces_invalid_header():
+    app = create_app()
+    valid_request_id = "123e4567-e89b-42d3-a456-426614174000"
+
+    with TestClient(app) as client:
+        reused = client.get("/health", headers={"X-Request-ID": valid_request_id})
+        replaced = client.get("/health", headers={"X-Request-ID": "not-a-uuid"})
+
+    assert reused.headers["X-Request-ID"] == valid_request_id
+    replaced_request_id = replaced.headers["X-Request-ID"]
+    assert replaced_request_id != "not-a-uuid"
+    assert str(uuid.UUID(replaced_request_id)) == replaced_request_id
+
+
+def test_error_responses_include_request_id(tmp_path):
+    p = tmp_path / "m.pkl"
+    _tiny_pkl(p)
+    app = create_app(model_path_a=str(p), api_key="secret")
+
+    with TestClient(app) as client:
+        response = client.get("/models")
+
+    assert response.status_code == 401
+    request_id = response.headers["X-Request-ID"]
+    assert str(uuid.UUID(request_id)) == request_id
+
+
 def test_openapi_includes_predict_examples(tmp_path):
     p = tmp_path / "m.pkl"
     _tiny_pkl(p)
@@ -90,6 +149,7 @@ def test_openapi_includes_predict_examples(tmp_path):
     post = spec["paths"]["/predict"]["post"]
     assert post.get("summary")
     assert "scoring" in post.get("tags", [])
+    assert "X-Request-ID" in post["responses"]["200"]["headers"]
     body = spec["components"]["schemas"]["PredictBody"]
     examples = body.get("examples") or []
     assert examples and "question1" in examples[0]

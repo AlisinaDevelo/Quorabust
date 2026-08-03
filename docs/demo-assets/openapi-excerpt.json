@@ -166,7 +166,7 @@
     },
     "/models": {
       "get": {
-        "description": "Returns allowlisted metadata for loaded variants. Local artifact paths and training CSV paths are intentionally omitted. If `QUORABUST_API_KEY` is configured, send it in the `X-Quorabust-API-Key` header.",
+        "description": "Returns allowlisted metadata for loaded variants. Local artifact paths and training CSV paths are intentionally omitted. If `QUORABUST_API_KEY` is configured, send it in the `X-Quorabust-API-Key` header. Every response includes an `X-Request-ID` UUID for support and log correlation.",
         "operationId": "models_models_get",
         "responses": {
           "200": {
@@ -185,7 +185,16 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Loaded model metadata",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation UUID.",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
           },
           "401": {
             "description": "API key required or invalid"
@@ -207,7 +216,7 @@
     },
     "/predict": {
       "post": {
-        "description": "Scores one or more question pairs. Optional header `X-Quorabust-Variant: b` selects the B artifact when configured. Set query parameter `explain=true` to return input feature values. Set `threshold` to override the duplicate decision cutoff for this request. Deployments can configure `QUORABUST_API_KEY` and `QUORABUST_MAX_BATCH_SIZE` for access control and bounded work.",
+        "description": "Scores one or more question pairs. Optional header `X-Quorabust-Variant: b` selects the B artifact when configured. Set query parameter `explain=true` to return input feature values. Set `threshold` to override the duplicate decision cutoff for this request. Deployments can configure `QUORABUST_API_KEY` and `QUORABUST_MAX_BATCH_SIZE` for access control and bounded work. Every response includes an `X-Request-ID` UUID for support and log correlation.",
         "operationId": "predict_predict_post",
         "parameters": [
           {
@@ -278,7 +287,16 @@
                 }
               }
             },
-            "description": "Successful Response"
+            "description": "Duplicate probabilities and decisions",
+            "headers": {
+              "X-Request-ID": {
+                "description": "Request correlation UUID.",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
           },
           "400": {
             "description": "question1 and question2 length mismatch"
