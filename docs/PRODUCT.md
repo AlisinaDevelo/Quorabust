@@ -77,6 +77,8 @@ What is already in-repo:
 - Dependency audit workflow.
 - Safe `/models` metadata endpoint.
 - `X-Request-ID` propagation and privacy-safe structured HTTP request events.
+- Optional SHA-256 artifact pinning before pickle loading, with digests in sidecars and
+  the lightweight registry.
 
 What should be added before a serious production deployment:
 

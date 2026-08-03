@@ -25,9 +25,16 @@ chosen strategy is persisted in metadata for review.
 
 Use `quorabust-train --metadata-out models/quorabust.meta.json` to write the same
 lineage and metric metadata as JSON. Reviewers and release tooling can inspect that
-sidecar without loading executable pickle content. The sidecar is not a replacement for
-the model artifact; it is a safer inspection path. For untrusted artifact distribution,
-prefer a non-pickle format such as `skops` or ONNX in a future release.
+sidecar without loading executable pickle content. The sidecar also records the
+post-save `artifact_sha256`, and `--registry-dir` records the same digest in
+`models.jsonl`. The sidecar is not a replacement for the model artifact; it is a safer
+inspection path.
+
+For serving, set `QUORABUST_MODEL_SHA256` and optionally `QUORABUST_MODEL_B_SHA256` to
+pin the exact artifact bytes. Quorabust verifies the digest before unpickling and fails
+startup on a mismatch. This is an integrity check, not a cryptographic signature; keep
+the expected digest in trusted deployment configuration. For untrusted artifact
+distribution, prefer a non-pickle format such as `skops` or ONNX in a future release.
 
 ## Serving and SLOs
 
@@ -40,6 +47,9 @@ prefer a non-pickle format such as `skops` or ONNX in a future release.
   `X-Quorabust-API-Key` on `/predict` and `/models`. Set
   `QUORABUST_MAX_BATCH_SIZE` to bound scoring work; the default is 256 pairs. Health,
   readiness, and metrics remain available for platform probes and should be network-scoped.
+- **Artifact integrity**: pin `QUORABUST_MODEL_SHA256` and
+  `QUORABUST_MODEL_B_SHA256` when promoting artifacts; mismatches fail before pickle
+  loading.
 - **Request correlation**: every completed response includes a canonical `X-Request-ID`
   UUID. A valid client-provided UUID is reused; malformed values are replaced. The
   `quorabust.http` logger emits one-line JSON events with method, path, status, duration,

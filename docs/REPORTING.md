@@ -89,6 +89,10 @@ lineage, runtime details, the report commit, and the exact report invocation. Us
 not a substitute for a declared dataset source or split policy; the holdout itself must
 still be frozen and kept outside the training data.
 
+Training metadata sidecars also include the post-save `artifact_sha256`. Use that digest
+as `QUORABUST_MODEL_SHA256` (and `QUORABUST_MODEL_B_SHA256` for A/B) to make serving fail
+closed if the promoted pickle bytes change.
+
 Use `--format json` when you want CI or release tooling to compare metrics without
 scraping Markdown.
 

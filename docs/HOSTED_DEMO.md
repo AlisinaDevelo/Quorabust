@@ -48,6 +48,8 @@ Optional:
 
 - `QUORABUST_DECISION_THRESHOLD=0.5` for a default decision cutoff.
 - `QUORABUST_MODEL_B=...` only when demonstrating A/B routing.
+- `QUORABUST_MODEL_SHA256=...` to pin the deployed smoke artifact bytes.
+- `QUORABUST_MODEL_B_SHA256=...` to pin an A/B artifact when used.
 - `QUORABUST_API_KEY=...` to require `X-Quorabust-API-Key` on scoring and model metadata.
 - `QUORABUST_MAX_BATCH_SIZE=32` (or another small value) to bound public demo work.
 
@@ -55,6 +57,8 @@ Optional:
 
 - Do not expose private or customer-trained artifacts from this demo.
 - Do not accept untrusted uploaded pickle artifacts.
+- Pin the smoke artifact with `QUORABUST_MODEL_SHA256`; a digest mismatch should prevent
+  startup rather than serve an unreviewed file.
 - Use `QUORABUST_API_KEY` and a small batch cap for a basic public-demo boundary; keep TLS,
   rate limiting, quotas, and key rotation at the host or gateway.
 - Keep request logs privacy-safe and ship only the structured operational event fields;

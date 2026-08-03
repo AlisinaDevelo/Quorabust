@@ -28,6 +28,8 @@
 - Optional API-key protection for scoring/model metadata and bounded prediction batches.
 - `X-Request-ID` propagation and privacy-safe structured JSON HTTP request events.
 - Endpoint-level Prometheus RED metrics with bounded route labels and an expanded Grafana dashboard.
+- Optional SHA-256 artifact pinning before serving unpickles models; training sidecars and
+  JSONL registry records now carry the post-save artifact digest.
 
 ### Fixed
 - Docker image now installs serving dependencies via `.[serve]`.

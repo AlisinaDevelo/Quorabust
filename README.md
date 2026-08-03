@@ -115,8 +115,11 @@ print(meta)  # n_train, metrics, csv_sha256, reference_feature_means, …
 
 ```bash
 export QUORABUST_MODEL_PATH=models/quorabust.pkl
+# optional integrity pin: use the digest recorded in the metadata sidecar/registry
+export QUORABUST_MODEL_SHA256=<64-hex-artifact-sha256>
 quorabust-serve --host 0.0.0.0 --port 8000
 # optional second artifact: export QUORABUST_MODEL_B=models/other.pkl
+# optional A/B integrity pin: export QUORABUST_MODEL_B_SHA256=<64-hex-artifact-sha256>
 ```
 
 `GET /metrics` exposes Prometheus text; `POST /predict` accepts `{"question1":[...],"question2":[...]}` and optional header `X-Quorabust-Variant: b`. Responses include `proba_duplicate`, thresholded `is_duplicate`, and `decision_threshold`. Every completed response includes an `X-Request-ID` UUID; clients may provide a canonical UUID to correlate retries and support cases. The `quorabust.http` logger emits one-line JSON request events with method, path, status, duration, and request ID, without question text, headers, or secrets. Add `?threshold=0.7` to override the duplicate cutoff for one request; otherwise serving uses the holdout-selected artifact `decision_threshold` when present, then `QUORABUST_DECISION_THRESHOLD`, then `0.5`. Add `?explain=true` to return per-pair input feature values. Interactive docs: **`/docs`**. Local demo: [docs/DEMO.md](docs/DEMO.md). API snapshots: [docs/demo-assets](docs/demo-assets). Load testing: [docs/LOAD_TESTING.md](docs/LOAD_TESTING.md). Grafana: [docs/GRAFANA.md](docs/GRAFANA.md).
@@ -130,6 +133,10 @@ For a deployment-level boundary, set `QUORABUST_API_KEY` to require the
 `X-Quorabust-API-Key` header on `/predict` and `/models`, and use
 `QUORABUST_MAX_BATCH_SIZE` to bound request work (default 256). Keep TLS, rate limiting,
 quotas, and key rotation at the gateway.
+For artifact integrity, set `QUORABUST_MODEL_SHA256` and optionally
+`QUORABUST_MODEL_B_SHA256`; serving verifies each digest before unpickling and fails
+startup on a mismatch. `quorabust-train --metadata-out ...` records the post-save
+`artifact_sha256` in the sidecar, and `--registry-dir` records it in `models.jsonl`.
 
 ## Project layout
 
