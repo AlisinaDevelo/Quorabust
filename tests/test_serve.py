@@ -180,6 +180,60 @@ def test_predict_rejects_invalid_threshold(tmp_path):
     assert r.status_code == 422
 
 
+def test_predict_requires_configured_api_key(tmp_path):
+    p = tmp_path / "m.pkl"
+    _tiny_pkl(p)
+    app = create_app(model_path_a=str(p), api_key="secret")
+    payload = {"question1": ["hello"], "question2": ["hello there"]}
+
+    with TestClient(app) as client:
+        assert client.post("/predict", json=payload).status_code == 401
+        wrong = client.post(
+            "/predict",
+            json=payload,
+            headers={"X-Quorabust-API-Key": "wrong"},
+        )
+        assert wrong.status_code == 401
+        assert wrong.headers["www-authenticate"] == "ApiKey"
+        response = client.post(
+            "/predict",
+            json=payload,
+            headers={"X-Quorabust-API-Key": "secret"},
+        )
+
+    assert response.status_code == 200
+
+
+def test_models_requires_configured_api_key(tmp_path):
+    p = tmp_path / "m.pkl"
+    _tiny_pkl(p)
+    app = create_app(model_path_a=str(p), api_key="secret")
+
+    with TestClient(app) as client:
+        assert client.get("/models").status_code == 401
+        response = client.get("/models", headers={"X-Quorabust-API-Key": "secret"})
+
+    assert response.status_code == 200
+
+
+def test_predict_rejects_batches_over_configured_limit(tmp_path):
+    p = tmp_path / "m.pkl"
+    _tiny_pkl(p)
+    app = create_app(model_path_a=str(p), max_batch_size=1)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/predict",
+            json={
+                "question1": ["hello", "foo"],
+                "question2": ["hello there", "bar"],
+            },
+        )
+
+    assert response.status_code == 413
+    assert "maximum" in response.json()["detail"]
+
+
 def test_models_without_loaded_artifacts_is_unavailable():
     app = create_app(model_path_a="/nonexistent/quorabust_missing.pkl")
     with TestClient(app) as client:

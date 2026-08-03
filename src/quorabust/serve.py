@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hmac
 import os
 import time
 from collections.abc import AsyncIterator
@@ -8,8 +9,9 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, Header, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.responses import PlainTextResponse
+from fastapi.security import APIKeyHeader
 from prometheus_client import CollectorRegistry, Counter, Histogram, generate_latest
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -18,6 +20,8 @@ from quorabust.model import predict_proba_duplicate
 from quorabust.persist import load_classifier
 
 DEFAULT_DECISION_THRESHOLD = 0.5
+DEFAULT_MAX_BATCH_SIZE = 256
+API_KEY_HEADER = "X-Quorabust-API-Key"
 
 
 def _dist_version() -> str:
@@ -45,6 +49,17 @@ def _model_decision_threshold(meta: dict[str, Any], fallback: float) -> float:
     if isinstance(raw, int | float) and 0.0 <= float(raw) <= 1.0:
         return float(raw)
     return fallback
+
+
+def _env_max_batch_size() -> int:
+    raw = os.environ.get("QUORABUST_MAX_BATCH_SIZE")
+    if raw is None:
+        return DEFAULT_MAX_BATCH_SIZE
+    try:
+        value = int(raw)
+    except ValueError:
+        return DEFAULT_MAX_BATCH_SIZE
+    return value if value > 0 else DEFAULT_MAX_BATCH_SIZE
 
 
 class PredictBody(BaseModel):
@@ -163,10 +178,34 @@ def _public_model_meta(meta: dict[str, Any]) -> dict[str, Any]:
 def create_app(
     model_path_a: str | None = None,
     model_path_b: str | None = None,
+    *,
+    api_key: str | None = None,
+    max_batch_size: int | None = None,
 ) -> FastAPI:
     path_a = model_path_a or os.environ.get("QUORABUST_MODEL_PATH", "")
     path_b = model_path_b or os.environ.get("QUORABUST_MODEL_B", "")
     default_threshold = _env_decision_threshold()
+    configured_api_key = api_key if api_key is not None else os.environ.get("QUORABUST_API_KEY")
+    configured_api_key = configured_api_key or None
+    configured_max_batch_size = (
+        max_batch_size if max_batch_size is not None else _env_max_batch_size()
+    )
+    if configured_max_batch_size < 1:
+        raise ValueError("max_batch_size must be at least 1")
+
+    api_key_header = APIKeyHeader(name=API_KEY_HEADER, auto_error=False)
+
+    def require_api_key(
+        provided_key: str | None = Depends(api_key_header),
+    ) -> None:
+        if configured_api_key and (
+            provided_key is None or not hmac.compare_digest(provided_key, configured_api_key)
+        ):
+            raise HTTPException(
+                status_code=401,
+                detail="invalid API key",
+                headers={"WWW-Authenticate": "ApiKey"},
+            )
 
     registry = CollectorRegistry()
     predictions = Counter(
@@ -220,13 +259,18 @@ def create_app(
 
     @app.get(
         "/models",
+        dependencies=[Depends(require_api_key)],
         tags=["operations"],
         summary="List loaded model metadata",
         description=(
             "Returns allowlisted metadata for loaded variants. Local artifact paths and "
-            "training CSV paths are intentionally omitted."
+            "training CSV paths are intentionally omitted. If `QUORABUST_API_KEY` is "
+            "configured, send it in the `X-Quorabust-API-Key` header."
         ),
-        responses={503: {"description": "No models loaded"}},
+        responses={
+            401: {"description": "API key required or invalid"},
+            503: {"description": "No models loaded"},
+        },
     )
     def models() -> dict[str, dict[str, dict[str, Any]]]:
         if not state:
@@ -247,6 +291,7 @@ def create_app(
 
     @app.post(
         "/predict",
+        dependencies=[Depends(require_api_key)],
         response_model=PredictOut,
         tags=["scoring"],
         summary="Predict duplicate probability",
@@ -254,10 +299,14 @@ def create_app(
             "Scores one or more question pairs. Optional header "
             "`X-Quorabust-Variant: b` selects the B artifact when configured. "
             "Set query parameter `explain=true` to return input feature values. "
-            "Set `threshold` to override the duplicate decision cutoff for this request."
+            "Set `threshold` to override the duplicate decision cutoff for this request. "
+            "Deployments can configure `QUORABUST_API_KEY` and "
+            "`QUORABUST_MAX_BATCH_SIZE` for access control and bounded work."
         ),
         responses={
+            401: {"description": "API key required or invalid"},
             400: {"description": "question1 and question2 length mismatch"},
+            413: {"description": "request batch exceeds configured maximum"},
             503: {"description": "Model not loaded or variant unavailable"},
         },
     )
@@ -292,6 +341,11 @@ def create_app(
         )
         if len(body.question1) != len(body.question2):
             raise HTTPException(status_code=400, detail="question1 and question2 length mismatch")
+        if len(body.question1) > configured_max_batch_size:
+            raise HTTPException(
+                status_code=413,
+                detail=f"batch size exceeds configured maximum of {configured_max_batch_size}",
+            )
         t0 = time.perf_counter()
         try:
             proba = predict_proba_duplicate(bld, clf, body.question1, body.question2)[:, 1]
