@@ -79,6 +79,40 @@ def test_serve_health_ready_predict(tmp_path):
         assert b"quorabust_predictions_total" in m.content
 
 
+def test_http_metrics_record_success_and_error_routes():
+    app = create_app(api_key="secret")
+
+    with TestClient(app) as client:
+        assert client.get("/health").status_code == 200
+        assert client.get("/models").status_code == 401
+        metrics = client.get("/metrics").text
+
+    assert (
+        'quorabust_http_requests_total{method="GET",path="/health",status_code="200"} 1.0'
+        in metrics
+    )
+    assert (
+        'quorabust_http_requests_total{method="GET",path="/models",status_code="401"} 1.0'
+        in metrics
+    )
+    assert (
+        'quorabust_http_request_duration_seconds_count{method="GET",path="/health"} 1.0'
+        in metrics
+    )
+
+
+def test_http_observability_bounds_unknown_path_labels():
+    app = create_app()
+    unknown_path = "/questions/this-is-user-content"
+
+    with TestClient(app) as client:
+        assert client.get(unknown_path).status_code == 404
+        metrics = client.get("/metrics").text
+
+    assert 'path="<unmatched>"' in metrics
+    assert unknown_path not in metrics
+
+
 def test_ready_without_model_file():
     app = create_app(model_path_a="/nonexistent/quorabust_missing.pkl")
     with TestClient(app) as client:

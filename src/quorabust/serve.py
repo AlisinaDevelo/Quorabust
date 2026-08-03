@@ -67,6 +67,12 @@ def _log_http_event(
         HTTP_LOGGER.info(message)
 
 
+def _route_path(request: Request) -> str:
+    route = request.scope.get("route")
+    path = getattr(route, "path", None)
+    return path if isinstance(path, str) else "<unmatched>"
+
+
 def _dist_version() -> str:
     try:
         return version("Quorabust")
@@ -263,6 +269,27 @@ def create_app(
         ["variant"],
         registry=registry,
     )
+    http_requests = Counter(
+        "quorabust_http_requests_total",
+        "HTTP requests by method, path, and status code",
+        ["method", "path", "status_code"],
+        registry=registry,
+    )
+    http_latency = Histogram(
+        "quorabust_http_request_duration_seconds",
+        "HTTP request latency",
+        ["method", "path"],
+        registry=registry,
+    )
+
+    def observe_http(
+        request: Request,
+        path: str,
+        status_code: int,
+        duration_seconds: float,
+    ) -> None:
+        http_requests.labels(request.method, path, str(status_code)).inc()
+        http_latency.labels(request.method, path).observe(duration_seconds)
 
     state: dict[str, tuple[Any, Any, dict[str, Any]]] = {}
 
@@ -301,21 +328,27 @@ def create_app(
         try:
             response = await call_next(request)
         except Exception:
+            duration_seconds = time.perf_counter() - started
+            path = _route_path(request)
+            observe_http(request, path, 500, duration_seconds)
             _log_http_event(
                 request_id=request_id,
                 method=request.method,
-                path=request.url.path,
+                path=path,
                 status_code=500,
-                duration_ms=(time.perf_counter() - started) * 1000,
+                duration_ms=duration_seconds * 1000,
             )
             raise
+        duration_seconds = time.perf_counter() - started
+        path = _route_path(request)
+        observe_http(request, path, response.status_code, duration_seconds)
         response.headers[REQUEST_ID_HEADER] = request_id
         _log_http_event(
             request_id=request_id,
             method=request.method,
-            path=request.url.path,
+            path=path,
             status_code=response.status_code,
-            duration_ms=(time.perf_counter() - started) * 1000,
+            duration_ms=duration_seconds * 1000,
         )
         return response
 
