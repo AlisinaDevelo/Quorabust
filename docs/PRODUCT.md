@@ -20,6 +20,7 @@ It does this with:
 - Reproducible offline training.
 - A deployable FastAPI scoring service.
 - Thresholded decisions, not only raw probabilities.
+- Optional API-key authentication and bounded scoring batches at the service boundary.
 - Holdout-selected serving thresholds persisted in artifact metadata.
 - Model-card reporting with threshold sweeps.
 - Artifact metadata, JSON sidecars, and safe public model metadata.
@@ -81,6 +82,7 @@ What should be added before a serious production deployment:
 - Probability calibration and recommended threshold persistence.
 - Non-pickle artifact format for untrusted distribution.
 - Authentication and rate limiting at the gateway.
+- Key rotation, quotas, and distributed rate limiting at the gateway before broad exposure.
 - A production model registry such as MLflow or an internal equivalent.
 - Structured request IDs and centralized logs.
 

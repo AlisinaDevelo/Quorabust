@@ -25,6 +25,7 @@
 - Training split, threshold-grid, and command provenance in artifact metadata.
 - Evaluation reproducibility manifests and `--require-manifest` release validation.
 - Connected-component holdouts using `qid1`/`qid2` to prevent question-level leakage.
+- Optional API-key protection for scoring/model metadata and bounded prediction batches.
 
 ### Fixed
 - Docker image now installs serving dependencies via `.[serve]`.

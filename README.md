@@ -122,6 +122,10 @@ quorabust-serve --host 0.0.0.0 --port 8000
 `GET /metrics` exposes Prometheus text; `POST /predict` accepts `{"question1":[...],"question2":[...]}` and optional header `X-Quorabust-Variant: b`. Responses include `proba_duplicate`, thresholded `is_duplicate`, and `decision_threshold`. Add `?threshold=0.7` to override the duplicate cutoff for one request; otherwise serving uses the holdout-selected artifact `decision_threshold` when present, then `QUORABUST_DECISION_THRESHOLD`, then `0.5`. Add `?explain=true` to return per-pair input feature values. Interactive docs: **`/docs`**. Local demo: [docs/DEMO.md](docs/DEMO.md). API snapshots: [docs/demo-assets](docs/demo-assets). Load testing: [docs/LOAD_TESTING.md](docs/LOAD_TESTING.md). Grafana: [docs/GRAFANA.md](docs/GRAFANA.md).
 `GET /models` returns allowlisted metadata for loaded variants without leaking local
 artifact paths or training CSV paths.
+For a deployment-level boundary, set `QUORABUST_API_KEY` to require the
+`X-Quorabust-API-Key` header on `/predict` and `/models`, and use
+`QUORABUST_MAX_BATCH_SIZE` to bound request work (default 256). Keep TLS, rate limiting,
+quotas, and key rotation at the gateway.
 
 ## Project layout
 

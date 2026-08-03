@@ -36,6 +36,10 @@ prefer a non-pickle format such as `skops` or ONNX in a future release.
   `is_duplicate`. Clients can pass `?threshold=0.7`; otherwise serving uses the
   holdout-selected artifact metadata `decision_threshold`, then
   `QUORABUST_DECISION_THRESHOLD`, then `0.5`.
+- **Optional access controls**: set `QUORABUST_API_KEY` to require
+  `X-Quorabust-API-Key` on `/predict` and `/models`. Set
+  `QUORABUST_MAX_BATCH_SIZE` to bound scoring work; the default is 256 pairs. Health,
+  readiness, and metrics remain available for platform probes and should be network-scoped.
 - **Local demo**: `compose.yaml` runs the API, Prometheus, and Grafana together. See
   [DEMO.md](DEMO.md).
 - **Hosted demo**: expose only the smoke model and label it clearly as non-production.
@@ -57,6 +61,9 @@ pointers to distributed XGBoost.
   use `--require-holdout --require-calibration --require-manifest` before promoting a
   benchmarked artifact. The manifest binds the report to model and holdout hashes,
   training lineage, runtime, and the exact evaluation invocation.
+- Put TLS termination, distributed rate limiting, quotas, and key rotation at the ingress
+  or gateway. The application key and batch cap are defense-in-depth controls, not a
+  replacement for a multi-worker gateway policy.
 
 ## Releases
 

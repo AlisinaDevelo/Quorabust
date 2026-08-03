@@ -47,12 +47,15 @@ Optional:
 
 - `QUORABUST_DECISION_THRESHOLD=0.5` for a default decision cutoff.
 - `QUORABUST_MODEL_B=...` only when demonstrating A/B routing.
+- `QUORABUST_API_KEY=...` to require `X-Quorabust-API-Key` on scoring and model metadata.
+- `QUORABUST_MAX_BATCH_SIZE=32` (or another small value) to bound public demo work.
 
 ## Safety boundaries
 
 - Do not expose private or customer-trained artifacts from this demo.
 - Do not accept untrusted uploaded pickle artifacts.
-- Keep authentication/rate limiting at the host or gateway if the URL is broadly shared.
+- Use `QUORABUST_API_KEY` and a small batch cap for a basic public-demo boundary; keep TLS,
+  rate limiting, quotas, and key rotation at the host or gateway.
 - Disable or protect the demo when it is no longer useful; the goal is inspection, not
   production traffic.
 
