@@ -233,13 +233,18 @@ def main(argv: list[str] | None = None) -> int:
     meta["reference_feature_means"] = feature_means_from_matrix(feat_names, X_ref)
 
     save_classifier(args.out, builder, clf, meta=meta)
+    artifact_sha256 = sha256_file(args.out)
     if args.metadata_out is not None:
-        save_metadata_sidecar(args.metadata_out, meta)
+        save_metadata_sidecar(
+            args.metadata_out,
+            {**meta, "artifact_sha256": artifact_sha256},
+        )
     if args.registry_dir is not None:
         append_model_record(
             args.registry_dir,
             {
                 "artifact": str(args.out.resolve()),
+                "artifact_sha256": artifact_sha256,
                 "feature_backend": args.feature_backend,
                 "git_revision": meta.get("git_revision"),
                 "quorabust_version": meta.get("quorabust_version"),

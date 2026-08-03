@@ -230,9 +230,19 @@ def create_app(
     *,
     api_key: str | None = None,
     max_batch_size: int | None = None,
+    model_sha256: str | None = None,
+    model_b_sha256: str | None = None,
 ) -> FastAPI:
     path_a = model_path_a or os.environ.get("QUORABUST_MODEL_PATH", "")
     path_b = model_path_b or os.environ.get("QUORABUST_MODEL_B", "")
+    expected_sha256_a = model_sha256
+    if expected_sha256_a is None:
+        expected_sha256_a = os.environ.get("QUORABUST_MODEL_SHA256")
+    expected_sha256_b = model_b_sha256
+    if expected_sha256_b is None:
+        expected_sha256_b = os.environ.get("QUORABUST_MODEL_B_SHA256")
+    expected_sha256_a = expected_sha256_a.strip() or None if expected_sha256_a else None
+    expected_sha256_b = expected_sha256_b.strip() or None if expected_sha256_b else None
     default_threshold = _env_decision_threshold()
     configured_api_key = api_key if api_key is not None else os.environ.get("QUORABUST_API_KEY")
     configured_api_key = configured_api_key or None
@@ -298,11 +308,11 @@ def create_app(
         if path_a:
             pa = Path(path_a)
             if pa.is_file():
-                state["a"] = load_classifier(pa)
+                state["a"] = load_classifier(pa, expected_sha256=expected_sha256_a)
         if path_b:
             pb = Path(path_b)
             if pb.is_file():
-                state["b"] = load_classifier(pb)
+                state["b"] = load_classifier(pb, expected_sha256=expected_sha256_b)
         yield
 
     app = FastAPI(
@@ -516,6 +526,21 @@ def main() -> None:
         default=os.environ.get("QUORABUST_MODEL_B", ""),
         help="Optional second artifact for A/B; or set QUORABUST_MODEL_B",
     )
+    ap.add_argument(
+        "--model-sha256",
+        default=os.environ.get("QUORABUST_MODEL_SHA256"),
+        help="Optional SHA-256 pin for the primary artifact; or set QUORABUST_MODEL_SHA256",
+    )
+    ap.add_argument(
+        "--model-b-sha256",
+        default=os.environ.get("QUORABUST_MODEL_B_SHA256"),
+        help="Optional SHA-256 pin for the A/B artifact; or set QUORABUST_MODEL_B_SHA256",
+    )
     ns = ap.parse_args()
-    app = create_app(ns.model or None, ns.model_b or None)
+    app = create_app(
+        ns.model or None,
+        ns.model_b or None,
+        model_sha256=ns.model_sha256,
+        model_b_sha256=ns.model_b_sha256,
+    )
     uvicorn.run(app, host=ns.host, port=ns.port)

@@ -3,8 +3,10 @@ import logging
 import uuid
 
 import pandas as pd
+import pytest
 from starlette.testclient import TestClient
 
+from quorabust.lineage import sha256_file
 from quorabust.model import train_duplicate_classifier
 from quorabust.persist import save_classifier
 from quorabust.serve import create_app
@@ -117,6 +119,25 @@ def test_ready_without_model_file():
     app = create_app(model_path_a="/nonexistent/quorabust_missing.pkl")
     with TestClient(app) as client:
         assert client.get("/ready").status_code == 503
+
+
+def test_serve_rejects_model_checksum_mismatch(tmp_path):
+    p = tmp_path / "m.pkl"
+    _tiny_pkl(p)
+    app = create_app(model_path_a=str(p), model_sha256="0" * 64)
+
+    with pytest.raises(ValueError, match="artifact SHA-256 mismatch"):
+        with TestClient(app):
+            pass
+
+
+def test_serve_accepts_pinned_model_checksum(tmp_path):
+    p = tmp_path / "m.pkl"
+    _tiny_pkl(p)
+    app = create_app(model_path_a=str(p), model_sha256=sha256_file(p))
+
+    with TestClient(app) as client:
+        assert client.get("/ready").status_code == 200
 
 
 def test_request_id_is_generated_and_logged_without_request_content(caplog):

@@ -4,6 +4,8 @@ import pandas as pd
 
 import quorabust.cross_encoder_features as cef
 from quorabust.cli import main
+from quorabust.lineage import sha256_file
+from quorabust.registry import load_model_records
 
 
 class _FakeCrossEncoder:
@@ -38,6 +40,7 @@ def test_cli_writes_metadata_sidecar(tmp_path):
     _write_synthetic_csv(csv)
     out = tmp_path / "model.pkl"
     meta = tmp_path / "model.meta.json"
+    registry = tmp_path / "registry"
 
     assert (
         main(
@@ -48,6 +51,8 @@ def test_cli_writes_metadata_sidecar(tmp_path):
                 str(out),
                 "--metadata-out",
                 str(meta),
+                "--registry-dir",
+                str(registry),
                 "--eval-fraction",
                 "0",
             ]
@@ -64,6 +69,8 @@ def test_cli_writes_metadata_sidecar(tmp_path):
     assert payload["threshold_candidates"] == [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
     assert payload["threshold_metric"] == "f1"
     assert payload["training_command"].startswith("quorabust-train ")
+    assert payload["artifact_sha256"] == sha256_file(out)
+    assert load_model_records(registry)[0]["artifact_sha256"] == sha256_file(out)
 
 
 def test_cli_persists_holdout_decision_threshold(tmp_path):

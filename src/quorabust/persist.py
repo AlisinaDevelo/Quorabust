@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import hmac
 import json
 import pickle
 from pathlib import Path
 from typing import Any
+
+from quorabust.lineage import sha256_file
 
 
 def save_classifier(
@@ -20,8 +23,27 @@ def save_classifier(
         pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 
-def load_classifier(path: str | Path) -> tuple[Any, Any, dict[str, Any]]:
-    with Path(path).open("rb") as f:
+def _normalize_expected_sha256(expected_sha256: str | None) -> str | None:
+    if expected_sha256 is None:
+        return None
+    normalized = expected_sha256.strip().lower()
+    if len(normalized) != 64 or any(char not in "0123456789abcdef" for char in normalized):
+        raise ValueError("expected_sha256 must be a 64 hexadecimal character string")
+    return normalized
+
+
+def load_classifier(
+    path: str | Path,
+    *,
+    expected_sha256: str | None = None,
+) -> tuple[Any, Any, dict[str, Any]]:
+    p = Path(path)
+    expected = _normalize_expected_sha256(expected_sha256)
+    if expected is not None:
+        actual = sha256_file(p)
+        if not hmac.compare_digest(actual, expected):
+            raise ValueError(f"artifact SHA-256 mismatch for {p}")
+    with p.open("rb") as f:
         data = pickle.load(f)
     return data["builder"], data["clf"], data.get("meta", {})
 
