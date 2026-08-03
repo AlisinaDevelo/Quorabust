@@ -64,6 +64,7 @@ def test_build_report_payload_is_machine_readable():
         artifact="model.pkl",
         meta={
             "feature_backend": "tfidf",
+            "question_id_columns": ["qid1", "qid2"],
             "eval_accuracy": 0.75,
             "csv": "/private/train.csv",
             "training_command": "quorabust-train --csv /private/train.csv",
@@ -113,7 +114,10 @@ def test_build_report_payload_is_machine_readable():
         ],
     )
     assert payload["artifact"] == "model.pkl"
-    assert payload["training_metadata"] == {"feature_backend": "tfidf"}
+    assert payload["training_metadata"] == {
+        "feature_backend": "tfidf",
+        "question_id_columns": ["qid1", "qid2"],
+    }
     assert payload["persisted_evaluation"]["accuracy"] == 0.75
     assert payload["confusion_matrix"]["actual_1"]["predicted_1"] == 4
     assert payload["calibration"]["expected_calibration_error"] == 0.05
@@ -137,6 +141,7 @@ def test_build_evaluation_manifest_captures_reproducibility_context(tmp_path):
             "quorabust_version": "0.3.2",
             "csv_sha256": "train-dataset-hash",
             "feature_backend": "tfidf",
+            "question_id_columns": ["qid1", "qid2"],
             "n_train": 100,
             "seed": 42,
             "split_strategy": "shuffled_prefix_holdout",
@@ -163,6 +168,7 @@ def test_build_evaluation_manifest_captures_reproducibility_context(tmp_path):
         "calibration_bins": 10,
     }
     assert manifest["training_lineage"]["git_revision"] == "train-commit"
+    assert manifest["training_lineage"]["question_id_columns"] == ["qid1", "qid2"]
     assert manifest["command"] == "quorabust-report --eval-csv holdout.csv"
     assert manifest["runtime"]["report_git_revision"]
     assert manifest["generated_at_utc"].endswith("Z")
