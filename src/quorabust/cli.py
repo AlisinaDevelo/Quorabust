@@ -9,6 +9,7 @@ from typing import Any
 
 import pandas as pd
 
+from quorabust.data_audit import OPTIONAL_QUESTION_ID_COLUMNS
 from quorabust.drift import feature_means_from_matrix
 from quorabust.lineage import git_revision, sha256_file
 from quorabust.model import (
@@ -92,6 +93,11 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Write the exact training holdout CSV used for evaluation and threshold selection",
     )
+    p.add_argument(
+        "--require-question-ids",
+        action="store_true",
+        help="Fail unless qid1 and qid2 are complete; recommended for benchmark runs",
+    )
     p.add_argument("--seed", type=int, default=42)
     p.add_argument(
         "--feature-backend",
@@ -151,6 +157,19 @@ def main(argv: list[str] | None = None) -> int:
     except ValueError as e:
         print(e, file=sys.stderr)
         return 1
+    if args.require_question_ids:
+        missing_or_incomplete = [
+            column
+            for column in OPTIONAL_QUESTION_ID_COLUMNS
+            if column not in df.columns or df[column].isna().any()
+        ]
+        if missing_or_incomplete:
+            print(
+                "--require-question-ids needs complete qid1/qid2 columns; "
+                f"missing or incomplete: {', '.join(missing_or_incomplete)}",
+                file=sys.stderr,
+            )
+            return 1
     try:
         train_df, eval_df, split_strategy = split_train_eval(
             df,
@@ -214,6 +233,7 @@ def main(argv: list[str] | None = None) -> int:
         if split_strategy == "question_component_holdout"
         else [],
         "max_rows": args.max_rows,
+        "require_question_ids": args.require_question_ids,
         "csv": str(args.csv.resolve()),
         "csv_sha256": sha256_file(args.csv),
         "seed": args.seed,

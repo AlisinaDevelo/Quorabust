@@ -171,6 +171,7 @@ def test_cli_uses_question_component_holdout_when_ids_are_available(tmp_path):
                 str(out),
                 "--metadata-out",
                 str(meta),
+                "--require-question-ids",
             ]
         )
         == 0
@@ -178,7 +179,26 @@ def test_cli_uses_question_component_holdout_when_ids_are_available(tmp_path):
 
     payload = json.loads(meta.read_text(encoding="utf-8"))
     assert payload["split_strategy"] == "question_component_holdout"
+    assert payload["require_question_ids"] is True
     assert payload["n_eval"] > 0
+
+
+def test_cli_can_require_question_ids_for_benchmark_runs(tmp_path):
+    csv = tmp_path / "train.csv"
+    _write_synthetic_csv(csv)
+
+    assert (
+        main(
+            [
+                "--csv",
+                str(csv),
+                "--out",
+                str(tmp_path / "model.pkl"),
+                "--require-question-ids",
+            ]
+        )
+        == 1
+    )
 
 
 def test_cli_rejects_bad_threshold_grid(tmp_path):
