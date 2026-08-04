@@ -71,6 +71,7 @@ quorabust-train \
   --csv data/raw/train.csv \
   --out models/quorabust.pkl \
   --metadata-out models/quorabust.meta.json \
+  --eval-out data/processed/holdout.csv \
   --eval-fraction 0.1 \
   --thresholds 0.2,0.3,0.4,0.5,0.6,0.7,0.8 \
   --threshold-metric f1 \
@@ -91,6 +92,11 @@ both training and evaluation through a different pair. The artifact metadata rec
 `split_strategy: question_component_holdout` and the question-ID columns used. Datasets
 without both complete ID columns retain the deterministic shuffled-row fallback and are
 reported as `shuffled_prefix_holdout`.
+
+`--eval-out` exports the exact rows used for early stopping and threshold selection. The
+artifact metadata and registry record the exported holdout SHA-256, so the later
+`quorabust-report --eval-csv` step can be tied to the training run rather than an
+independently reconstructed split.
 
 Record the dataset source, split method, command, commit SHA, and date next to any
 published result. Do not compare artifacts unless they use the same holdout split and

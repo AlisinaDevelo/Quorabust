@@ -30,6 +30,10 @@ The command fails for missing required columns, an empty dataset, or non-binary 
 missing IDs remain an explicit warning because the trainer supports a documented row-level
 fallback.
 
+For benchmark runs, pass `--eval-out` to `quorabust-train` and retain the exported holdout
+CSV with its metadata sidecar. The exact holdout hash is also copied into the lightweight
+registry record for release review.
+
 Use `quorabust-train --metadata-out models/quorabust.meta.json` to write the same
 lineage and metric metadata as JSON. Reviewers and release tooling can inspect that
 sidecar without loading executable pickle content. The sidecar also records the
