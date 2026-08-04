@@ -51,6 +51,7 @@ def test_audit_dataframe_fails_for_schema_and_label_contract_violations():
     assert audit["status"] == "fail"
     assert audit["missing_columns"] == ["question2"]
     assert audit["missing_optional_columns"] == ["qid1", "qid2"]
+    assert audit["question_ids"]["present"] is False
     assert audit["labels"]["invalid_count"] == 1
     assert {check["name"] for check in audit["checks"] if check["status"] == "fail"} == {
         "required_columns",

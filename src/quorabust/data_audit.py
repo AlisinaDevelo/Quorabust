@@ -129,9 +129,13 @@ def audit_dataframe(
     if set(OPTIONAL_QUESTION_ID_COLUMNS).issubset(df.columns):
         question_ids = _question_id_summary(df)
     else:
-        question_ids = _question_id_summary(
-            pd.DataFrame(columns=list(OPTIONAL_QUESTION_ID_COLUMNS))
-        )
+        question_ids = {
+            "present": False,
+            "complete_rows": 0,
+            "unique_count": 0,
+            "repeated_id_count": 0,
+            "component_count": 0,
+        }
 
     checks = [
         _check(
