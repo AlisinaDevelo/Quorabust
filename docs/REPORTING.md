@@ -49,6 +49,20 @@ whether probabilities are fit for thresholding or only useful for ranking.
 
 ## Real Evaluation
 
+Start with a data preflight and keep its JSON output next to the training and evaluation
+manifests:
+
+```bash
+quorabust-audit-data \
+  --csv data/raw/train.csv \
+  --out reports/train-data-audit.json
+```
+
+The audit records a SHA-256 for the source CSV, required-column and binary-label checks,
+empty or repeated pair signals, and whether complete question IDs are available. It does
+not replace the leakage-aware split performed by `quorabust-train`; it makes the input
+contract and any warnings reviewable before training starts.
+
 For comparable numbers, generate the report from a held-out CSV that was not used for
 training:
 

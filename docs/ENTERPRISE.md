@@ -23,6 +23,13 @@ When source data includes complete `qid1`/`qid2` columns, the default holdout is
 question connected components so a question cannot cross the train/eval boundary. The
 chosen strategy is persisted in metadata for review.
 
+Before training, run `quorabust-audit-data --csv ... --out ...` to create a path-light
+dataset preflight manifest. It records the source CSV hash, schema and binary-label
+checks, empty or repeated pair warnings, and whether complete question IDs are available.
+The command fails for missing required columns, an empty dataset, or non-binary labels;
+missing IDs remain an explicit warning because the trainer supports a documented row-level
+fallback.
+
 Use `quorabust-train --metadata-out models/quorabust.meta.json` to write the same
 lineage and metric metadata as JSON. Reviewers and release tooling can inspect that
 sidecar without loading executable pickle content. The sidecar also records the

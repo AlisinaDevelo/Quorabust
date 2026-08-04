@@ -10,8 +10,9 @@ Datasets for Quorabust. See [docs/NOTES.md](../docs/NOTES.md) for download links
 
 ## Raw Data
 
-The `raw/` directory includes:
-- `quora_train.csv`: The original Quora duplicate question dataset.
+Place the original Quora Question Pairs `train.csv` under `raw/` locally. Raw datasets
+are intentionally not committed. Run `quorabust-audit-data` before training and keep the
+generated manifest outside version control with the dataset.
 
 ## Processed Data
 

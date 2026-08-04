@@ -41,6 +41,22 @@ pip install -e ".[dev]"
 
 Optional extras: `pip install -e ".[viz,notebooks]"` for Matplotlib, Seaborn, and Jupyter; `".[nlp]"` for sentence-transformer features; `".[serve]"` matches the API stack (also included in `dev`).
 
+### Audit data before training
+
+Run the dataset preflight before training or comparing artifacts:
+
+```bash
+quorabust-audit-data \
+  --csv data/raw/train.csv \
+  --out reports/train-data-audit.json
+```
+
+The JSON manifest records the input SHA-256, schema and label checks, empty or repeated
+pair signals, and whether complete `qid1`/`qid2` columns are available for leakage-aware
+splitting. It exits non-zero for missing required columns, an empty dataset, or labels
+outside `{0, 1}`. Missing question IDs and duplicate pairs are reported as warnings, not
+silently treated as benchmark evidence.
+
 ## Usage
 
 ```python
