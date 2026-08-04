@@ -113,6 +113,7 @@ def test_cli_exports_the_exact_holdout_and_records_its_hash(tmp_path):
     out = tmp_path / "model.pkl"
     eval_out = tmp_path / "holdout.csv"
     meta = tmp_path / "model.meta.json"
+    registry = tmp_path / "registry"
 
     assert (
         main(
@@ -125,6 +126,8 @@ def test_cli_exports_the_exact_holdout_and_records_its_hash(tmp_path):
                 str(eval_out),
                 "--metadata-out",
                 str(meta),
+                "--registry-dir",
+                str(registry),
                 "--seed",
                 "19",
             ]
@@ -139,6 +142,9 @@ def test_cli_exports_the_exact_holdout_and_records_its_hash(tmp_path):
     payload = json.loads(meta.read_text(encoding="utf-8"))
     assert payload["eval_csv_sha256"] == sha256_file(eval_out)
     assert payload["n_eval"] == len(holdout)
+    record = load_model_records(registry)[0]
+    assert record["eval_csv_sha256"] == sha256_file(eval_out)
+    assert "eval_csv_sha256" not in record["eval_metrics"]
 
 
 def test_cli_uses_question_component_holdout_when_ids_are_available(tmp_path):

@@ -59,6 +59,19 @@ def test_render_model_card_includes_metadata_and_persisted_metrics():
     assert "| log_loss | 0.6100 |" in card
 
 
+def test_report_excludes_lineage_fields_from_persisted_metrics():
+    payload = build_report_payload(
+        artifact="model.pkl",
+        meta={
+            "eval_accuracy": 0.75,
+            "eval_fraction": 0.1,
+            "eval_csv_sha256": "a" * 64,
+        },
+    )
+
+    assert payload["persisted_evaluation"] == {"accuracy": 0.75}
+
+
 def test_build_report_payload_is_machine_readable():
     payload = build_report_payload(
         artifact="model.pkl",

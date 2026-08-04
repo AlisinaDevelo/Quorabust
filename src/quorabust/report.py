@@ -94,7 +94,8 @@ def _persisted_metrics_from_meta(meta: dict[str, Any]) -> dict[str, float]:
     return {
         k.removeprefix("eval_"): float(v)
         for k, v in sorted(meta.items())
-        if k.startswith("eval_") and isinstance(v, int | float)
+        if k in {"eval_accuracy", "eval_log_loss", "eval_roc_auc"}
+        and isinstance(v, int | float)
     }
 
 

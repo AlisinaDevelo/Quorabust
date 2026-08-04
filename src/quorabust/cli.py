@@ -279,7 +279,11 @@ def main(argv: list[str] | None = None) -> int:
                 "decision_threshold": meta.get("decision_threshold"),
                 "decision_threshold_metric": meta.get("decision_threshold_metric"),
                 "eval_csv_sha256": meta.get("eval_csv_sha256"),
-                "eval_metrics": {k: meta[k] for k in meta if k.startswith("eval_")},
+                "eval_metrics": {
+                    k: meta[k]
+                    for k in ("eval_accuracy", "eval_log_loss", "eval_roc_auc")
+                    if k in meta
+                },
             },
         )
     print(f"wrote {args.out.resolve()}")
