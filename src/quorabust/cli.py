@@ -86,6 +86,12 @@ def main(argv: list[str] | None = None) -> int:
         default=0.1,
         help="Holdout fraction for early stopping and log loss (use 0 for no holdout)",
     )
+    p.add_argument(
+        "--eval-out",
+        type=Path,
+        default=None,
+        help="Write the exact training holdout CSV used for evaluation and threshold selection",
+    )
     p.add_argument("--seed", type=int, default=42)
     p.add_argument(
         "--feature-backend",
@@ -156,6 +162,26 @@ def main(argv: list[str] | None = None) -> int:
         print(str(exc), file=sys.stderr)
         return 1
 
+    eval_csv_sha256: str | None = None
+    if args.eval_out is not None:
+        if eval_df is None:
+            print(
+                "--eval-out requires a non-empty holdout; increase --eval-fraction "
+                "and provide at least 20 rows",
+                file=sys.stderr,
+            )
+            return 1
+        if args.eval_out.resolve() == args.csv.resolve():
+            print("--eval-out must be different from --csv", file=sys.stderr)
+            return 1
+        try:
+            args.eval_out.parent.mkdir(parents=True, exist_ok=True)
+            eval_df.to_csv(args.eval_out, index=False)
+            eval_csv_sha256 = sha256_file(args.eval_out)
+        except OSError as exc:
+            print(f"Unable to write holdout CSV {args.eval_out}: {exc}", file=sys.stderr)
+            return 1
+
     feature_builder: Any | None = None
     if args.feature_backend == "embedding":
         from quorabust.embedding_features import PairEmbeddingBuilder
@@ -199,6 +225,8 @@ def main(argv: list[str] | None = None) -> int:
         "feature_backend": args.feature_backend,
         "feature_schema": feat_names,
     }
+    if eval_csv_sha256 is not None:
+        meta["eval_csv_sha256"] = eval_csv_sha256
     eval_target = eval_df if eval_df is not None else train_df
     m = eval_classification_metrics(builder, clf, eval_target)
     for k, v in m.items():
@@ -250,6 +278,7 @@ def main(argv: list[str] | None = None) -> int:
                 "quorabust_version": meta.get("quorabust_version"),
                 "decision_threshold": meta.get("decision_threshold"),
                 "decision_threshold_metric": meta.get("decision_threshold_metric"),
+                "eval_csv_sha256": meta.get("eval_csv_sha256"),
                 "eval_metrics": {k: meta[k] for k in meta if k.startswith("eval_")},
             },
         )

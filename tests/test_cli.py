@@ -6,6 +6,7 @@ import quorabust.cross_encoder_features as cef
 from quorabust.cli import main
 from quorabust.lineage import sha256_file
 from quorabust.registry import load_model_records
+from quorabust.split import split_train_eval
 
 
 class _FakeCrossEncoder:
@@ -104,6 +105,40 @@ def test_cli_persists_holdout_decision_threshold(tmp_path):
     assert "f1" in payload["decision_threshold_metrics"]
     assert payload["eval_fraction"] == 0.1
     assert payload["threshold_candidates"] == [0.3, 0.5, 0.7]
+
+
+def test_cli_exports_the_exact_holdout_and_records_its_hash(tmp_path):
+    csv = tmp_path / "train.csv"
+    _write_synthetic_csv(csv, n=80)
+    out = tmp_path / "model.pkl"
+    eval_out = tmp_path / "holdout.csv"
+    meta = tmp_path / "model.meta.json"
+
+    assert (
+        main(
+            [
+                "--csv",
+                str(csv),
+                "--out",
+                str(out),
+                "--eval-out",
+                str(eval_out),
+                "--metadata-out",
+                str(meta),
+                "--seed",
+                "19",
+            ]
+        )
+        == 0
+    )
+
+    holdout = pd.read_csv(eval_out)
+    _, expected, _ = split_train_eval(pd.read_csv(csv), eval_fraction=0.1, seed=19)
+    assert expected is not None
+    pd.testing.assert_frame_equal(holdout, expected)
+    payload = json.loads(meta.read_text(encoding="utf-8"))
+    assert payload["eval_csv_sha256"] == sha256_file(eval_out)
+    assert payload["n_eval"] == len(holdout)
 
 
 def test_cli_uses_question_component_holdout_when_ids_are_available(tmp_path):
