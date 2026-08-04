@@ -28,6 +28,8 @@ jobs:
         run: pytest -q --cov=quorabust --cov-report=term-missing --cov-fail-under=70
       - name: CLI
         run: quorabust-train --help
+      - name: Data audit CLI
+        run: quorabust-audit-data --help
       - name: Serve CLI
         run: quorabust-serve --help
       - name: Report CLI
@@ -40,6 +42,17 @@ jobs:
           quorabust-demo-assets --out docs/demo-assets --check
       - name: Smoke model report
         run: |
+          quorabust-audit-data \
+            --csv examples/smoke_pairs.csv \
+            --out /tmp/quorabust-smoke-data-audit.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          audit = json.loads(Path("/tmp/quorabust-smoke-data-audit.json").read_text())
+          assert audit["status"] == "pass"
+          assert audit["labels"]["invalid_count"] == 0
+          PY
           quorabust-train \
             --csv examples/smoke_pairs.csv \
             --out /tmp/quorabust-smoke.pkl \
@@ -67,6 +80,7 @@ jobs:
           test -s /tmp/quorabust-smoke-model-card.json
           test -s /tmp/quorabust-smoke-model-card.manifest.json
           test -s /tmp/quorabust-smoke.meta.json
+          test -s /tmp/quorabust-smoke-data-audit.json
       - name: Pinned serving smoke
         run: |
           export QUORABUST_MODEL_PATH=/tmp/quorabust-smoke.pkl
