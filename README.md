@@ -145,6 +145,10 @@ templates, with unknown paths grouped under `<unmatched>` so arbitrary URLs cann
 unbounded Prometheus series.
 `GET /models` returns allowlisted metadata for loaded variants without leaking local
 artifact paths or training CSV paths.
+Client errors use one stable envelope: `{"error":{"code":"...","message":"...","request_id":"..."}}`.
+Codes include `invalid_request`, `validation_error`, `unauthorized`, `batch_too_large`,
+`model_unavailable`, and `not_found`; the `request_id` matches the `X-Request-ID` response
+header.
 For a deployment-level boundary, set `QUORABUST_API_KEY` to require the
 `X-Quorabust-API-Key` header on `/predict` and `/models`, and use
 `QUORABUST_MAX_BATCH_SIZE` to bound request work (default 256). Keep TLS, rate limiting,

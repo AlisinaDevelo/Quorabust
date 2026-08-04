@@ -61,6 +61,16 @@ Decision threshold precedence:
 3. Environment: `QUORABUST_DECISION_THRESHOLD`.
 4. Default: `0.5`.
 
+Client errors use a stable envelope with a machine-readable `code`, safe `message`, and
+the same `request_id` returned in the `X-Request-ID` header:
+
+```json
+{"error":{"code":"batch_too_large","message":"batch size exceeds configured maximum","request_id":"..."}}
+```
+
+This keeps retries, support tracing, and client-side branching independent of FastAPI's
+default validation wording.
+
 ## Enterprise Readiness
 
 What is already in-repo:
@@ -77,6 +87,7 @@ What is already in-repo:
 - Dependency audit workflow.
 - Safe `/models` metadata endpoint.
 - `X-Request-ID` propagation and privacy-safe structured HTTP request events.
+- Stable JSON error envelopes with machine-readable codes and request correlation.
 - Optional SHA-256 artifact pinning before pickle loading, with digests in sidecars and
   the lightweight registry.
 
