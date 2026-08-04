@@ -6,17 +6,19 @@ import logging
 import os
 import time
 import uuid
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response
-from fastapi.responses import PlainTextResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.security import APIKeyHeader
 from prometheus_client import CollectorRegistry, Counter, Histogram, generate_latest
 from pydantic import BaseModel, ConfigDict, Field
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from quorabust.explain import explain_pair_features
 from quorabust.model import predict_proba_duplicate
@@ -27,6 +29,16 @@ DEFAULT_MAX_BATCH_SIZE = 256
 API_KEY_HEADER = "X-Quorabust-API-Key"
 REQUEST_ID_HEADER = "X-Request-ID"
 HTTP_LOGGER = logging.getLogger("quorabust.http")
+_ERROR_CODES = {
+    400: "invalid_request",
+    401: "unauthorized",
+    403: "forbidden",
+    404: "not_found",
+    413: "batch_too_large",
+    422: "validation_error",
+    429: "rate_limited",
+    503: "model_unavailable",
+}
 
 
 def _request_id(raw: str | None) -> str:
@@ -65,6 +77,24 @@ def _log_http_event(
         HTTP_LOGGER.warning(message)
     else:
         HTTP_LOGGER.info(message)
+
+
+def _error_response(
+    request: Request,
+    *,
+    status_code: int,
+    message: str,
+    headers: Mapping[str, str] | None = None,
+) -> JSONResponse:
+    request_id = getattr(request.state, "quorabust_request_id", str(uuid.uuid4()))
+    payload = {
+        "error": {
+            "code": _ERROR_CODES.get(status_code, "http_error"),
+            "message": message,
+            "request_id": request_id,
+        }
+    }
+    return JSONResponse(status_code=status_code, content=payload, headers=headers)
 
 
 def _route_path(request: Request) -> str:
@@ -326,6 +356,30 @@ def create_app(
             },
         ],
     )
+
+    @app.exception_handler(StarletteHTTPException)
+    async def http_exception_handler(
+        request: Request,
+        exc: StarletteHTTPException,
+    ) -> JSONResponse:
+        message = exc.detail if isinstance(exc.detail, str) else "request failed"
+        return _error_response(
+            request,
+            status_code=exc.status_code,
+            message=message,
+            headers=exc.headers,
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(
+        request: Request,
+        _exc: RequestValidationError,
+    ) -> JSONResponse:
+        return _error_response(
+            request,
+            status_code=422,
+            message="request validation failed",
+        )
 
     @app.middleware("http")
     async def request_context(

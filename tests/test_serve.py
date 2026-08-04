@@ -108,7 +108,9 @@ def test_http_observability_bounds_unknown_path_labels():
     unknown_path = "/questions/this-is-user-content"
 
     with TestClient(app) as client:
-        assert client.get(unknown_path).status_code == 404
+        response = client.get(unknown_path)
+        assert response.status_code == 404
+        assert response.json()["error"]["code"] == "not_found"
         metrics = client.get("/metrics").text
 
     assert 'path="<unmatched>"' in metrics
@@ -193,6 +195,11 @@ def test_error_responses_include_request_id(tmp_path):
     assert response.status_code == 401
     request_id = response.headers["X-Request-ID"]
     assert str(uuid.UUID(request_id)) == request_id
+    error = response.json()["error"]
+    assert set(error) == {"code", "message", "request_id"}
+    assert error["code"] == "unauthorized"
+    assert error["message"] == "invalid API key"
+    assert error["request_id"] == request_id
 
 
 def test_openapi_includes_predict_examples(tmp_path):
@@ -293,6 +300,7 @@ def test_predict_rejects_invalid_threshold(tmp_path):
             json={"question1": ["hello"], "question2": ["hello there"]},
         )
     assert r.status_code == 422
+    assert r.json()["error"]["code"] == "validation_error"
 
 
 def test_predict_requires_configured_api_key(tmp_path):
@@ -346,13 +354,32 @@ def test_predict_rejects_batches_over_configured_limit(tmp_path):
         )
 
     assert response.status_code == 413
-    assert "maximum" in response.json()["detail"]
+    assert response.json()["error"]["code"] == "batch_too_large"
+    assert "maximum" in response.json()["error"]["message"]
+
+
+def test_predict_returns_stable_error_for_mismatched_lists(tmp_path):
+    p = tmp_path / "m.pkl"
+    _tiny_pkl(p)
+    app = create_app(model_path_a=str(p))
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/predict",
+            json={"question1": ["hello"], "question2": ["hello", "world"]},
+        )
+
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "invalid_request"
+    assert response.json()["error"]["message"] == "question1 and question2 length mismatch"
 
 
 def test_models_without_loaded_artifacts_is_unavailable():
     app = create_app(model_path_a="/nonexistent/quorabust_missing.pkl")
     with TestClient(app) as client:
-        assert client.get("/models").status_code == 503
+        response = client.get("/models")
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "model_unavailable"
 
 
 def test_serve_ab_variant_header(tmp_path):
