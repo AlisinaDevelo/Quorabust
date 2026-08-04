@@ -33,6 +33,9 @@ fallback.
 For benchmark runs, pass `--eval-out` to `quorabust-train` and retain the exported holdout
 CSV with its metadata sidecar. The exact holdout hash is also copied into the lightweight
 registry record for release review.
+Use `--require-question-ids` on public benchmark runs to fail closed if leakage-safe
+question IDs are missing or incomplete; customer-domain runs can explicitly use the
+documented fallback when those IDs do not exist.
 
 Use `quorabust-train --metadata-out models/quorabust.meta.json` to write the same
 lineage and metric metadata as JSON. Reviewers and release tooling can inspect that

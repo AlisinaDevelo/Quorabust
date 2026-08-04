@@ -72,6 +72,7 @@ quorabust-train \
   --out models/quorabust.pkl \
   --metadata-out models/quorabust.meta.json \
   --eval-out data/processed/holdout.csv \
+  --require-question-ids \
   --eval-fraction 0.1 \
   --thresholds 0.2,0.3,0.4,0.5,0.6,0.7,0.8 \
   --threshold-metric f1 \
@@ -97,6 +98,11 @@ reported as `shuffled_prefix_holdout`.
 artifact metadata and registry record the exported holdout SHA-256, so the later
 `quorabust-report --eval-csv` step can be tied to the training run rather than an
 independently reconstructed split.
+
+Use `--require-question-ids` for public benchmark runs. It fails before training when
+`qid1` or `qid2` is missing or incomplete, preventing an accidental row-level fallback.
+Leave it off for customer datasets that do not provide IDs, but call out the fallback in
+the evaluation manifest and model card.
 
 Record the dataset source, split method, command, commit SHA, and date next to any
 published result. Do not compare artifacts unless they use the same holdout split and
