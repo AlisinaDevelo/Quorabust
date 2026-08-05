@@ -4,6 +4,7 @@ import argparse
 import json
 import shlex
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -163,6 +164,7 @@ def main(argv: list[str] | None = None) -> int:
         catalog_ids = _catalog_ids(catalog_frame, args.id_column)
 
         retriever: CatalogRetriever
+        retriever_start = time.perf_counter()
         if args.retriever == "embedding":
             retriever = SentenceTransformerCatalogRetriever(args.embedding_model).fit_frame(
                 catalog_frame,
@@ -175,12 +177,14 @@ def main(argv: list[str] | None = None) -> int:
                 id_col=args.id_column,
                 text_col=args.text_column,
             )
+        retriever_initialization_ms = (time.perf_counter() - retriever_start) * 1000.0
         cases = load_retrieval_qrels(str(args.qrels_csv), catalog_ids=catalog_ids)
-        reranker = (
-            SentenceTransformerCrossEncoderReranker(args.reranker_model)
-            if args.reranker_model
-            else None
-        )
+        reranker_initialization_ms = 0.0
+        reranker = None
+        if args.reranker_model:
+            reranker_start = time.perf_counter()
+            reranker = SentenceTransformerCrossEncoderReranker(args.reranker_model)
+            reranker_initialization_ms = (time.perf_counter() - reranker_start) * 1000.0
         payload = benchmark_retrieval(
             retriever,
             cases,
@@ -218,6 +222,15 @@ def main(argv: list[str] | None = None) -> int:
             "generated_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         }
     )
+    runtime = payload.get("runtime")
+    if isinstance(runtime, dict):
+        runtime.update(
+            {
+                "retriever_initialization_ms": retriever_initialization_ms,
+                "reranker_initialization_ms": reranker_initialization_ms,
+                "startup_measurement": "retriever_and_reranker_initialization_only",
+            }
+        )
     _write_payload(payload, args.out)
     return 0
 

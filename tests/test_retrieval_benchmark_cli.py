@@ -74,6 +74,11 @@ def test_benchmark_cli_writes_provenance_and_stage_metrics(tmp_path):
     assert payload["measured_query_count"] == 4
     assert payload["latency_ms"]["end_to_end"]["count"] == 4
     assert payload["measurement_policy"]["timeout_seconds"] == 10.0
+    assert payload["runtime"]["retriever_initialization_ms"] >= 0.0
+    assert payload["runtime"]["reranker_initialization_ms"] == 0.0
+    assert payload["runtime"]["startup_measurement"] == (
+        "retriever_and_reranker_initialization_only"
+    )
 
 
 def test_benchmark_cli_rejects_qrels_outside_catalog(tmp_path, capsys):

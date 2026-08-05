@@ -56,9 +56,12 @@ The report records first-stage and final recall/MRR/NDCG, retrieval/rerank/end-t
 latency distributions including p50/p95/p99, throughput, reranker pair count, source hashes,
 model names, runtime, and the exact command. On Unix, runtime also records normalized process
 peak RSS as `peak_rss_bytes`; this is `ru_maxrss` since process start, including model startup,
-not a per-request allocation delta. By default, one complete serial warm-up pass is discarded and three
-complete serial passes contribute latency samples. Quality metrics are calculated once from
-the first measured pass so query count is not overweighted. The optional timeout is a
+not a per-request allocation delta. Runtime also reports retriever and reranker initialization
+times separately; these include model construction/download and catalog encoding for the
+selected backend, but not Python interpreter import time. By default, one complete serial
+warm-up pass is discarded and three complete serial passes contribute latency samples. Quality
+metrics are calculated once from the first measured pass so query count is not overweighted.
+The optional timeout is a
 cooperative wall-clock deadline checked between queries and stages; a process supervisor is
 still required to interrupt a native model call that does not return. Reranker pair count is
 a bounded-work cost proxy, not a cloud billing estimate. The checked-in example catalog and
