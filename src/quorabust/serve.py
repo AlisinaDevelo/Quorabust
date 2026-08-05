@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from quorabust.explain import explain_pair_features
+from quorabust.lineage import sha256_file
 from quorabust.model import predict_proba_duplicate
 from quorabust.persist import load_classifier
 
@@ -226,6 +227,7 @@ class PredictOut(BaseModel):
 
 
 _PUBLIC_META_KEYS = {
+    "artifact_sha256",
     "feature_backend",
     "feature_schema",
     "n_train",
@@ -335,14 +337,21 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        def load_variant(
+            path: Path,
+            expected_sha256: str | None,
+        ) -> tuple[Any, Any, dict[str, Any]]:
+            builder, clf, meta = load_classifier(path, expected_sha256=expected_sha256)
+            return builder, clf, {**meta, "artifact_sha256": sha256_file(path)}
+
         if path_a:
             pa = Path(path_a)
             if pa.is_file():
-                state["a"] = load_classifier(pa, expected_sha256=expected_sha256_a)
+                state["a"] = load_variant(pa, expected_sha256_a)
         if path_b:
             pb = Path(path_b)
             if pb.is_file():
-                state["b"] = load_classifier(pb, expected_sha256=expected_sha256_b)
+                state["b"] = load_variant(pb, expected_sha256_b)
         yield
 
     app = FastAPI(

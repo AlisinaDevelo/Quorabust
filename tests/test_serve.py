@@ -229,6 +229,7 @@ def test_models_returns_safe_public_metadata(tmp_path):
     model = r.json()["variants"]["a"]
     assert model["feature_backend"] == "tfidf"
     assert model["eval_metrics"]["accuracy"] == 0.8
+    assert model["artifact_sha256"] == sha256_file(p)
     assert "csv" not in model
     assert "id" not in model
 
