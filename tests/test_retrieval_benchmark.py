@@ -148,6 +148,7 @@ def test_benchmark_rejects_invalid_measurement_policy(kwargs, message):
 def test_latency_summary_is_json_serializable_and_rejects_bad_values():
     summary = summarize_latencies_ms([1.0, 2.0, 3.0])
     assert summary["p50"] == 2.0
+    assert summary["p99"] == pytest.approx(2.98)
     json.dumps(summary)
 
     with pytest.raises(ValueError, match="at least one"):

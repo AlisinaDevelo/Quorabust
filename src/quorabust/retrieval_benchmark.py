@@ -118,6 +118,7 @@ def summarize_latencies_ms(samples: Sequence[float]) -> dict[str, float | int]:
         "mean": float(np.mean(values)),
         "p50": float(np.percentile(values, 50)),
         "p95": float(np.percentile(values, 95)),
+        "p99": float(np.percentile(values, 99)),
         "max": float(np.max(values)),
     }
 
