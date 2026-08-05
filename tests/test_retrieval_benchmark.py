@@ -124,6 +124,11 @@ def test_benchmark_separates_stage_metrics_latency_and_work():
         "timeout_behavior": "cooperative_deadline_between_queries_and_stages",
     }
     assert result["runtime"]["python_version"]
+    assert result["runtime"]["rss_measurement"] == "process_maxrss_since_process_start"
+    assert (
+        result["runtime"]["peak_rss_bytes"] is None
+        or result["runtime"]["peak_rss_bytes"] > 0
+    )
 
 
 @pytest.mark.parametrize(

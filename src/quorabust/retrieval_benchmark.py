@@ -123,6 +123,21 @@ def summarize_latencies_ms(samples: Sequence[float]) -> dict[str, float | int]:
     }
 
 
+def peak_rss_bytes() -> int | None:
+    """Return process peak RSS in bytes when the Unix resource API is available."""
+    try:
+        import resource
+
+        raw_value = float(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss)
+    except (ImportError, OSError):
+        return None
+    if not math.isfinite(raw_value) or raw_value <= 0.0:
+        return None
+    # macOS reports bytes; Linux and the other supported Unix targets report KiB.
+    multiplier = 1 if platform.system() == "Darwin" else 1024
+    return int(raw_value * multiplier)
+
+
 def load_retrieval_qrels(
     path: str,
     *,
@@ -315,6 +330,8 @@ def benchmark_retrieval(
             "system": platform.system(),
             "machine": platform.machine(),
             "benchmark_git_revision": git_revision(),
+            "peak_rss_bytes": peak_rss_bytes(),
+            "rss_measurement": "process_maxrss_since_process_start",
         },
     }
 
