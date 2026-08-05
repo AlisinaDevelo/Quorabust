@@ -96,7 +96,8 @@ per-backend policy.
 See [SCALING.md](SCALING.md) for chunked CSV I/O, optional **embedding** training
 (`pip install ".[nlp]"`, `quorabust-train --feature-backend embedding`), optional
 **cross-encoder** pair scoring (`quorabust-train --feature-backend cross-encoder`), and
-pointers to distributed XGBoost.
+pointers to distributed XGBoost. Use `quorabust-retrieve-profile` there for fresh-process
+startup and artifact-size evidence before setting deployment budgets.
 
 ## Registry and drift (lightweight)
 

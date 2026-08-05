@@ -42,6 +42,8 @@ jobs:
         run: quorabust-retrieve --help
       - name: Retrieval benchmark CLI
         run: quorabust-retrieve-benchmark --help
+      - name: Retrieval profile CLI
+        run: quorabust-retrieve-profile --help
       - name: Safe artifact CLI
         run: quorabust-export-safe --help
       - name: Tracing helper
@@ -144,4 +146,27 @@ jobs:
           assert report["latency_ms"]["end_to_end"]["count"] == 6
           assert report["runtime"]["retriever_initialization_ms"] >= 0
           assert report["runtime"]["startup_measurement"] == "retriever_and_reranker_initialization_only"
+      - name: Retrieval process profile smoke
+        run: |
+          quorabust-retrieve-profile \
+            --catalog-csv examples/retrieval_catalog.csv \
+            --qrels-csv examples/retrieval_qrels.csv \
+            --ks 1,2 \
+            --candidate-k 2 \
+            --warmup-runs 0 \
+            --repetitions 1 \
+            --cold-start-repetitions 2 \
+            --timeout-seconds 10 \
+            --out /tmp/quorabust-retrieval-profile.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/quorabust-retrieval-profile.json").read_text())
+          assert report["schema_version"] == 1
+          assert report["benchmark"] == "quorabust-retrieve-profile"
+          assert report["evidence_scope"] == "timing_and_size_only_no_quality_claim"
+          assert report["cold_start"]["measurement_count"] == 2
+          assert report["sources"]["catalog"]["bytes"] > 0
+          assert report["warm_benchmark"]["query_count"] == 3
           PY

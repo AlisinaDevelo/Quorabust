@@ -142,9 +142,13 @@ quorabust-retrieve-benchmark \
 ```
 
 The JSON report separates first-stage and final recall/MRR/NDCG, retrieval/rerank/end-to-end
-p50/p95 latency, bounded reranker work, source hashes, model names, runtime, and the exact
+p50/p95/p99 latency, bounded reranker work, source hashes, model names, runtime, and the exact
 command. The checked-in `examples/retrieval_*.csv` files are structural smoke fixtures, not
 real quality evidence; use a permitted frozen dataset before publishing model claims.
+
+For process-level rollout sizing, `quorabust-retrieve-profile` repeats the benchmark in fresh
+subprocesses and records process-to-report startup time, warm metrics, input sizes, and optional
+local artifact hashes. It is an operational profile, not model-quality evidence.
 
 ### Generate a model card
 

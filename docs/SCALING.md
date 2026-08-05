@@ -70,6 +70,29 @@ protocol tracked in
 [#13](https://github.com/AlisinaDevelo/Quorabust/issues/13) and the quality/cost gate in
 [#18](https://github.com/AlisinaDevelo/Quorabust/issues/18).
 
+### Fresh-process profile
+
+Use `quorabust-retrieve-profile` when warm latency is not enough for a rollout decision:
+
+```bash
+quorabust-retrieve-profile \
+  --catalog-csv data/catalog/questions.csv \
+  --qrels-csv data/processed/retrieval-qrels.csv \
+  --candidate-k 50 \
+  --cold-start-repetitions 3 \
+  --warmup-runs 1 \
+  --repetitions 3 \
+  --timeout-seconds 120 \
+  --out reports/retrieval-profile.json
+```
+
+Each cold-start measurement runs the benchmark in a fresh subprocess and records
+process-to-report wall time. The report also carries warm benchmark metrics, input source
+hashes and byte sizes, optional local artifact hashes/sizes from repeated `--artifact` flags,
+and a path-light command. This is timing and packaging evidence only; it makes no quality
+claim and does not upload or commit model weights. The child timeout is a bounded process
+supervisor timeout, while the nested benchmark timeout remains a cooperative stage deadline.
+
 ## Online serving, SLOs, monitoring
 
 - **`quorabust-serve`**: FastAPI app with `/health`, `/ready`, `/predict`, and **Prometheus** `/metrics` (prediction and endpoint RED metrics). Route-level request counters include status codes, latency histograms support p50/p95 SLOs, and unknown paths are grouped to keep label cardinality bounded. Run behind your platform ingress and attach SLO dashboards to those metrics.
