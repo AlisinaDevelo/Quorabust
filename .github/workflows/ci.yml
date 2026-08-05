@@ -141,5 +141,5 @@ jobs:
           assert report["sources"]["catalog"]["sha256"]
           assert report["measurement_policy"]["warmup_runs"] == 1
           assert report["measurement_policy"]["repetitions"] == 2
-          assert report["latency_ms"]["end_to_end"]["count"] == 4
+          assert report["latency_ms"]["end_to_end"]["count"] == 6
           PY
