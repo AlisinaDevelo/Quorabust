@@ -1,5 +1,8 @@
 # Contributing
 
+Quorabust supports Python 3.10 through 3.12. The main CI matrix exercises all three
+versions; the optional NLP smoke uses the newest supported version.
+
 Use a virtual environment, install dev extras, and run checks before opening a PR:
 
 ```bash
