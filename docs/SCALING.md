@@ -46,14 +46,22 @@ quorabust-retrieve-benchmark \
   --qrels-csv data/processed/retrieval-qrels.csv \
   --ks 1,5,10 \
   --candidate-k 50 \
+  --warmup-runs 1 \
+  --repetitions 3 \
+  --timeout-seconds 120 \
   --out reports/retrieval-benchmark.json
 ```
 
 The report records first-stage and final recall/MRR/NDCG, retrieval/rerank/end-to-end
 latency distributions, throughput, reranker pair count, source hashes, model names, runtime,
-and the exact command. Reranker pair count is a bounded-work cost proxy, not a cloud billing
-estimate. The checked-in example catalog and qrels are smoke fixtures only. Real comparisons
-must use the frozen, permitted evaluation protocol tracked in
+and the exact command. By default, one complete serial warm-up pass is discarded and three
+complete serial passes contribute latency samples. Quality metrics are calculated once from
+the first measured pass so query count is not overweighted. The optional timeout is a
+cooperative wall-clock deadline checked between queries and stages; a process supervisor is
+still required to interrupt a native model call that does not return. Reranker pair count is
+a bounded-work cost proxy, not a cloud billing estimate. The checked-in example catalog and
+qrels are smoke fixtures only. Real comparisons must use the frozen, permitted evaluation
+protocol tracked in
 [#13](https://github.com/AlisinaDevelo/Quorabust/issues/13) and the quality/cost gate in
 [#18](https://github.com/AlisinaDevelo/Quorabust/issues/18).
 

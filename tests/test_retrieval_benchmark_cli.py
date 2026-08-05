@@ -43,6 +43,12 @@ def test_benchmark_cli_writes_provenance_and_stage_metrics(tmp_path):
                 "1,2",
                 "--candidate-k",
                 "2",
+                "--warmup-runs",
+                "0",
+                "--repetitions",
+                "2",
+                "--timeout-seconds",
+                "10",
                 "--out",
                 str(output),
             ]
@@ -57,11 +63,17 @@ def test_benchmark_cli_writes_provenance_and_stage_metrics(tmp_path):
         "ks": [1, 2],
         "reranker_model": None,
         "retriever": "tfidf",
+        "warmup_runs": 0,
+        "repetitions": 2,
+        "timeout_seconds": 10.0,
     }
     assert payload["sources"]["catalog"]["sha256"]
     assert payload["first_stage"]["recall_at_k"]["1"] == 1.0
     assert payload["final"]["ndcg_at_k"]["2"] == 1.0
     assert payload["work"]["reranker_enabled"] is False
+    assert payload["measured_query_count"] == 4
+    assert payload["latency_ms"]["end_to_end"]["count"] == 4
+    assert payload["measurement_policy"]["timeout_seconds"] == 10.0
 
 
 def test_benchmark_cli_rejects_qrels_outside_catalog(tmp_path, capsys):

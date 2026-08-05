@@ -101,16 +101,48 @@ def test_benchmark_separates_stage_metrics_latency_and_work():
         ks=[1, 2],
         candidate_k=3,
         score_batch=score_batch,
+        warmup_runs=1,
+        repetitions=2,
     )
 
     assert result["query_count"] == 2
+    assert result["measured_query_count"] == 4
     assert result["first_stage"]["recall_at_k"]["1"] == 0.5
     assert result["final"]["recall_at_k"]["1"] == 1.0
     assert result["work"]["reranker_enabled"] is True
-    assert result["work"]["reranker_pairs"] == 6
+    assert result["work"]["reranker_pairs"] == 12
     assert seen["count"] == 3
-    assert result["latency_ms"]["end_to_end"]["count"] == 2
+    assert result["latency_ms"]["end_to_end"]["count"] == 4
+    assert result["measurement_policy"] == {
+        "warmup_runs": 1,
+        "repetitions": 2,
+        "quality_passes": 1,
+        "latency_samples_per_stage": 4,
+        "timeout_seconds": None,
+        "concurrency": 1,
+        "execution": "serial",
+        "timeout_behavior": "cooperative_deadline_between_queries_and_stages",
+    }
     assert result["runtime"]["python_version"]
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"warmup_runs": -1}, "warmup_runs"),
+        ({"repetitions": 0}, "repetitions"),
+        ({"timeout_seconds": 0.0}, "timeout_seconds"),
+    ],
+)
+def test_benchmark_rejects_invalid_measurement_policy(kwargs, message):
+    with pytest.raises(ValueError, match=message):
+        benchmark_retrieval(
+            _retriever(),
+            [RetrievalCase("python", {"q1": 1})],
+            ks=[1],
+            candidate_k=1,
+            **kwargs,
+        )
 
 
 def test_latency_summary_is_json_serializable_and_rejects_bad_values():

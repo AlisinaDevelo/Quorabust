@@ -179,44 +179,106 @@ def benchmark_retrieval(
     ks: Sequence[int],
     candidate_k: int,
     score_batch: ScoreBatch | None = None,
+    warmup_runs: int = 1,
+    repetitions: int = 3,
+    timeout_seconds: float | None = None,
 ) -> dict[str, object]:
-    """Measure first-stage/final ranking quality and per-stage latency."""
+    """Measure ranking quality and repeated per-stage latency.
+
+    Quality is evaluated once from the first measured pass so repeated latency samples
+    do not overweight any query. Warm-up and measured passes are serial and process-local;
+    the timeout is a cooperative wall-clock deadline checked between queries/stages.
+    """
     normalized_cases = _validated_cases(cases)
     values = _validated_ks(ks)
     if candidate_k < max(values):
         raise ValueError("candidate_k must be greater than or equal to the largest k")
     if candidate_k < 1:
         raise ValueError("candidate_k must be at least 1")
+    if isinstance(warmup_runs, bool) or warmup_runs < 0:
+        raise ValueError("warmup_runs must be a non-negative integer")
+    if isinstance(repetitions, bool) or repetitions < 1:
+        raise ValueError("repetitions must be a positive integer")
+    if timeout_seconds is not None and (
+        not math.isfinite(timeout_seconds) or timeout_seconds <= 0.0
+    ):
+        raise ValueError("timeout_seconds must be finite and positive")
 
-    first_stage_rankings: list[list[str]] = []
-    final_rankings: list[list[str]] = []
+    deadline = time.perf_counter() + timeout_seconds if timeout_seconds is not None else None
+
+    def check_deadline() -> None:
+        if deadline is not None and time.perf_counter() > deadline:
+            raise TimeoutError("retrieval benchmark exceeded timeout_seconds")
+
+    def run_pass() -> tuple[
+        list[list[str]], list[list[str]], list[float], list[float], list[float], int
+    ]:
+        first_stage_rankings: list[list[str]] = []
+        final_rankings: list[list[str]] = []
+        retrieval_latencies: list[float] = []
+        rerank_latencies: list[float] = []
+        end_to_end_latencies: list[float] = []
+        rerank_pair_count = 0
+
+        for case in normalized_cases:
+            check_deadline()
+            end_start = time.perf_counter()
+            retrieval_start = time.perf_counter()
+            candidates = retriever.search(case.query, k=candidate_k)
+            retrieval_latencies.append((time.perf_counter() - retrieval_start) * 1000.0)
+            first_stage_rankings.append([hit.question_id for hit in candidates])
+            check_deadline()
+
+            if score_batch is None:
+                reranked = candidates
+                rerank_latencies.append(0.0)
+            else:
+                rerank_start = time.perf_counter()
+                reranked = rerank_candidates(case.query, candidates, score_batch)
+                rerank_latencies.append((time.perf_counter() - rerank_start) * 1000.0)
+                rerank_pair_count += len(candidates)
+            final_rankings.append([hit.question_id for hit in reranked])
+            end_to_end_latencies.append((time.perf_counter() - end_start) * 1000.0)
+            check_deadline()
+
+        return (
+            first_stage_rankings,
+            final_rankings,
+            retrieval_latencies,
+            rerank_latencies,
+            end_to_end_latencies,
+            rerank_pair_count,
+        )
+
+    for _ in range(warmup_runs):
+        check_deadline()
+        run_pass()
+
+    first_stage_rankings: list[list[str]] | None = None
+    final_rankings: list[list[str]] | None = None
     retrieval_latencies: list[float] = []
     rerank_latencies: list[float] = []
     end_to_end_latencies: list[float] = []
     rerank_pair_count = 0
+    for _ in range(repetitions):
+        check_deadline()
+        measured = run_pass()
+        if first_stage_rankings is None:
+            first_stage_rankings = measured[0]
+            final_rankings = measured[1]
+        retrieval_latencies.extend(measured[2])
+        rerank_latencies.extend(measured[3])
+        end_to_end_latencies.extend(measured[4])
+        rerank_pair_count += measured[5]
 
-    for case in normalized_cases:
-        end_start = time.perf_counter()
-        retrieval_start = time.perf_counter()
-        candidates = retriever.search(case.query, k=candidate_k)
-        retrieval_latencies.append((time.perf_counter() - retrieval_start) * 1000.0)
-        first_stage_rankings.append([hit.question_id for hit in candidates])
-
-        if score_batch is None:
-            reranked = candidates
-            rerank_latencies.append(0.0)
-        else:
-            rerank_start = time.perf_counter()
-            reranked = rerank_candidates(case.query, candidates, score_batch)
-            rerank_latencies.append((time.perf_counter() - rerank_start) * 1000.0)
-            rerank_pair_count += len(candidates)
-        final_rankings.append([hit.question_id for hit in reranked])
-        end_to_end_latencies.append((time.perf_counter() - end_start) * 1000.0)
+    if first_stage_rankings is None or final_rankings is None:
+        raise RuntimeError("benchmark did not produce a measured pass")
 
     total_seconds = sum(end_to_end_latencies) / 1000.0
     return {
         "catalog_size": int(retriever.size),
         "query_count": int(len(normalized_cases)),
+        "measured_query_count": int(len(normalized_cases) * repetitions),
         "candidate_k": int(candidate_k),
         "first_stage": evaluate_rankings(first_stage_rankings, normalized_cases, ks=values),
         "final": evaluate_rankings(final_rankings, normalized_cases, ks=values),
@@ -232,8 +294,20 @@ def benchmark_retrieval(
                 sum(len(ranking) for ranking in first_stage_rankings) / len(first_stage_rankings)
             ),
             "throughput_queries_per_second": (
-                float(len(normalized_cases) / total_seconds) if total_seconds > 0.0 else None
+                float((len(normalized_cases) * repetitions) / total_seconds)
+                if total_seconds > 0.0
+                else None
             ),
+        },
+        "measurement_policy": {
+            "warmup_runs": int(warmup_runs),
+            "repetitions": int(repetitions),
+            "quality_passes": 1,
+            "latency_samples_per_stage": int(len(normalized_cases) * repetitions),
+            "timeout_seconds": timeout_seconds,
+            "concurrency": 1,
+            "execution": "serial",
+            "timeout_behavior": "cooperative_deadline_between_queries_and_stages",
         },
         "runtime": {
             "python_version": platform.python_version(),

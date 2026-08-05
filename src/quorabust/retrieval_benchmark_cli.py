@@ -45,6 +45,26 @@ def _positive_int_list(value: str) -> list[int]:
     return sorted(set(values))
 
 
+def _non_negative_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be an integer") from exc
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("must be zero or greater")
+    return parsed
+
+
+def _positive_float(value: str) -> float:
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be a number") from exc
+    if parsed <= 0.0:
+        raise argparse.ArgumentTypeError("must be greater than zero")
+    return parsed
+
+
 def _write_payload(payload: dict[str, Any], out: Path | None) -> None:
     rendered = json.dumps(payload, indent=2, sort_keys=True) + "\n"
     if out is None:
@@ -92,6 +112,24 @@ def main(argv: list[str] | None = None) -> int:
         type=_positive_int,
         default=50,
         help="Bound the first-stage candidates passed to an optional reranker",
+    )
+    parser.add_argument(
+        "--warmup-runs",
+        type=_non_negative_int,
+        default=1,
+        help="Complete serial passes discarded before measurement (default: 1)",
+    )
+    parser.add_argument(
+        "--repetitions",
+        type=_positive_int,
+        default=3,
+        help="Measured serial passes used for latency (default: 3)",
+    )
+    parser.add_argument(
+        "--timeout-seconds",
+        type=_positive_float,
+        default=None,
+        help="Cooperative wall-clock deadline checked between queries and stages",
     )
     parser.add_argument(
         "--retriever",
@@ -149,8 +187,11 @@ def main(argv: list[str] | None = None) -> int:
             ks=args.ks,
             candidate_k=args.candidate_k,
             score_batch=reranker.score_batch if reranker is not None else None,
+            warmup_runs=args.warmup_runs,
+            repetitions=args.repetitions,
+            timeout_seconds=args.timeout_seconds,
         )
-    except (OSError, KeyError, RuntimeError, ValueError) as exc:
+    except (OSError, KeyError, RuntimeError, TimeoutError, ValueError) as exc:
         print(f"Unable to benchmark retrieval: {exc}", file=sys.stderr)
         return 1
 
@@ -169,6 +210,9 @@ def main(argv: list[str] | None = None) -> int:
                 else None,
                 "reranker_model": args.reranker_model,
                 "ks": args.ks,
+                "warmup_runs": args.warmup_runs,
+                "repetitions": args.repetitions,
+                "timeout_seconds": args.timeout_seconds,
             },
             "command": _command(argv),
             "generated_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
