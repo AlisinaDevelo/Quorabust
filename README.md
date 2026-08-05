@@ -39,7 +39,10 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
 ```
 
-Optional extras: `pip install -e ".[viz,notebooks]"` for Matplotlib, Seaborn, and Jupyter; `".[nlp]"` for sentence-transformer features; `".[serve]"` matches the API stack (also included in `dev`).
+Optional extras: `pip install -e ".[viz,notebooks]"` for Matplotlib, Seaborn, and Jupyter;
+`".[nlp]"` for sentence-transformer features; `".[observability]"` for optional
+OpenTelemetry spans; `".[serve]"` matches the API stack (also included in `dev`). See
+[docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) for collector setup and the privacy contract.
 
 ### Audit data before training
 

@@ -76,6 +76,9 @@ distribution, prefer a non-pickle format such as `skops` or ONNX in a future rel
 - **HTTP RED metrics**: `quorabust_http_requests_total` records method, matched route,
   and status code; `quorabust_http_request_duration_seconds` records endpoint latency.
   Unknown paths use a fixed `<unmatched>` label to prevent metric-cardinality abuse.
+- **Optional traces**: install the `observability` extra and configure a global OpenTelemetry
+  provider to emit privacy-reviewed HTTP, model-load, feature, retrieval, and rerank spans.
+  See [OBSERVABILITY.md](OBSERVABILITY.md); Prometheus behavior is unchanged by default.
 - **Error contract**: client errors return `error.code`, a safe message, and the same
   request ID as the `X-Request-ID` header. Clients can branch on stable codes rather than
   framework-specific validation prose.

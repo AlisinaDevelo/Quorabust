@@ -8,6 +8,7 @@ import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 from quorabust.preprocess import clean_text
+from quorabust.tracing import set_attributes, span
 
 
 @dataclass(frozen=True)
@@ -125,8 +126,17 @@ class TfidfCatalogRetriever:
         if k < 1:
             raise ValueError("k must be at least 1")
 
-        vector = self._vectorizer.transform([clean_text(query)])
-        scores = np.asarray((self._matrix @ vector.T).toarray()).reshape(-1)
+        with span(
+            "quorabust.retrieval",
+            attributes={
+                "quorabust.retriever": "tfidf",
+                "quorabust.catalog_size": self.size,
+                "quorabust.k": k,
+            },
+        ) as current:
+            vector = self._vectorizer.transform([clean_text(query)])
+            scores = np.asarray((self._matrix @ vector.T).toarray()).reshape(-1)
+            set_attributes(current, {"quorabust.returned_count": min(k, self.size)})
         return _rank_hits(self._questions, scores, k)
 
 
@@ -208,8 +218,18 @@ class SentenceTransformerCatalogRetriever:
             raise RuntimeError("fit() or fit_frame() must be called before search()")
         if k < 1:
             raise ValueError("k must be at least 1")
-        query_embedding = self._encode([clean_text(query)])[0]
-        scores = np.asarray(self._matrix @ query_embedding, dtype=np.float64).reshape(-1)
+        with span(
+            "quorabust.retrieval",
+            attributes={
+                "quorabust.retriever": "sentence_transformer",
+                "quorabust.model_name": self.model_name,
+                "quorabust.catalog_size": self.size,
+                "quorabust.k": k,
+            },
+        ) as current:
+            query_embedding = self._encode([clean_text(query)])[0]
+            scores = np.asarray(self._matrix @ query_embedding, dtype=np.float64).reshape(-1)
+            set_attributes(current, {"quorabust.returned_count": min(k, self.size)})
         return _rank_hits(self._questions, scores, k)
 
 
@@ -256,13 +276,18 @@ def rerank_candidates(
     """Apply a batch pair scorer and return candidates ordered by rerank score."""
     if not candidates:
         return []
-    scores = np.asarray(
-        score_batch(
-            [query] * len(candidates),
-            [candidate.text for candidate in candidates],
-        ),
-        dtype=np.float64,
-    ).reshape(-1)
+    with span(
+        "quorabust.rerank",
+        attributes={"quorabust.candidate_count": len(candidates)},
+    ) as current:
+        scores = np.asarray(
+            score_batch(
+                [query] * len(candidates),
+                [candidate.text for candidate in candidates],
+            ),
+            dtype=np.float64,
+        ).reshape(-1)
+        set_attributes(current, {"quorabust.scored_count": len(scores)})
     if len(scores) != len(candidates):
         raise ValueError("reranker must return one score per candidate")
     if not np.isfinite(scores).all():

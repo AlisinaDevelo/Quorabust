@@ -24,6 +24,12 @@ from quorabust.explain import explain_pair_features
 from quorabust.lineage import sha256_file
 from quorabust.model import predict_proba_duplicate
 from quorabust.persist import load_classifier
+from quorabust.tracing import (
+    extracted_trace_context,
+    record_http_response,
+    set_attributes,
+    span,
+)
 
 DEFAULT_DECISION_THRESHOLD = 0.5
 DEFAULT_MAX_BATCH_SIZE = 256
@@ -348,18 +354,36 @@ def create_app(
         def load_variant(
             path: Path,
             expected_sha256: str | None,
+            variant: str,
         ) -> tuple[Any, Any, dict[str, Any]]:
-            builder, clf, meta = load_classifier(path, expected_sha256=expected_sha256)
+            with span(
+                "quorabust.model_load",
+                attributes={
+                    "quorabust.variant": variant,
+                    "quorabust.artifact_pinned": expected_sha256 is not None,
+                },
+            ) as current:
+                builder, clf, meta = load_classifier(path, expected_sha256=expected_sha256)
+                set_attributes(
+                    current,
+                    {
+                        "quorabust.feature_backend": (
+                            meta.get("feature_backend")
+                            if isinstance(meta.get("feature_backend"), str)
+                            else ""
+                        )
+                    },
+                )
             return builder, clf, {**meta, "artifact_sha256": sha256_file(path)}
 
         if path_a:
             pa = Path(path_a)
             if pa.is_file():
-                state["a"] = load_variant(pa, expected_sha256_a)
+                state["a"] = load_variant(pa, expected_sha256_a, "a")
         if path_b:
             pb = Path(path_b)
             if pb.is_file():
-                state["b"] = load_variant(pb, expected_sha256_b)
+                state["b"] = load_variant(pb, expected_sha256_b, "b")
         yield
 
     app = FastAPI(
@@ -406,32 +430,52 @@ def create_app(
         request_id = _request_id(request.headers.get(REQUEST_ID_HEADER))
         request.state.quorabust_request_id = request_id
         started = time.perf_counter()
-        try:
-            response = await call_next(request)
-        except Exception:
-            duration_seconds = time.perf_counter() - started
-            path = _route_path(request)
-            observe_http(request, path, 500, duration_seconds)
-            _log_http_event(
-                request_id=request_id,
-                method=request.method,
-                path=path,
-                status_code=500,
-                duration_ms=duration_seconds * 1000,
-            )
-            raise
-        duration_seconds = time.perf_counter() - started
-        path = _route_path(request)
-        observe_http(request, path, response.status_code, duration_seconds)
-        response.headers[REQUEST_ID_HEADER] = request_id
-        _log_http_event(
-            request_id=request_id,
-            method=request.method,
-            path=path,
-            status_code=response.status_code,
-            duration_ms=duration_seconds * 1000,
-        )
-        return response
+        with extracted_trace_context(request.headers):
+            with span(
+                f"HTTP {request.method}",
+                kind="server",
+                attributes={
+                    "http.request.method": request.method,
+                    "url.scheme": request.url.scheme,
+                    "quorabust.request_id": request_id,
+                },
+            ) as request_span:
+                try:
+                    response = await call_next(request)
+                except Exception:
+                    duration_seconds = time.perf_counter() - started
+                    path = _route_path(request)
+                    observe_http(request, path, 500, duration_seconds)
+                    record_http_response(request_span, route=path, status_code=500)
+                    if request_span is not None:
+                        request_span.update_name(f"{request.method} {path}")
+                    _log_http_event(
+                        request_id=request_id,
+                        method=request.method,
+                        path=path,
+                        status_code=500,
+                        duration_ms=duration_seconds * 1000,
+                    )
+                    raise
+                duration_seconds = time.perf_counter() - started
+                path = _route_path(request)
+                observe_http(request, path, response.status_code, duration_seconds)
+                record_http_response(
+                    request_span,
+                    route=path,
+                    status_code=response.status_code,
+                )
+                if request_span is not None:
+                    request_span.update_name(f"{request.method} {path}")
+                response.headers[REQUEST_ID_HEADER] = request_id
+                _log_http_event(
+                    request_id=request_id,
+                    method=request.method,
+                    path=path,
+                    status_code=response.status_code,
+                    duration_ms=duration_seconds * 1000,
+                )
+                return response
 
     @app.get("/health", tags=["operations"])
     def health() -> dict[str, str]:
@@ -554,19 +598,31 @@ def create_app(
             )
         t0 = time.perf_counter()
         try:
-            proba = predict_proba_duplicate(bld, clf, body.question1, body.question2)[:, 1]
+            with span(
+                "quorabust.feature_build",
+                attributes={
+                    "quorabust.variant": v,
+                    "quorabust.batch_size": len(body.question1),
+                },
+            ) as current:
+                proba = predict_proba_duplicate(bld, clf, body.question1, body.question2)[:, 1]
+                set_attributes(current, {"quorabust.output_count": len(proba)})
         finally:
             latency.labels(v).observe(time.perf_counter() - t0)
         predictions.labels(v).inc()
         features = None
         if explain:
             schema = _meta.get("feature_schema")
-            features = explain_pair_features(
-                bld,
-                body.question1,
-                body.question2,
-                feature_schema=schema if isinstance(schema, list) else None,
-            )
+            with span(
+                "quorabust.feature_explain",
+                attributes={"quorabust.variant": v, "quorabust.batch_size": len(body.question1)},
+            ):
+                features = explain_pair_features(
+                    bld,
+                    body.question1,
+                    body.question2,
+                    feature_schema=schema if isinstance(schema, list) else None,
+                )
         probs = [float(x) for x in proba]
         return PredictOut(
             proba_duplicate=probs,
