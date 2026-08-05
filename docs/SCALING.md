@@ -28,9 +28,10 @@ quorabust-retrieve \
   --k 10
 ```
 
-The retrieval module also exposes a bounded batch reranker contract. Use the first-stage
-results to measure candidate recall@k, then apply a cross-encoder only to those candidates;
-do not interpret an uncalibrated reranker score as `P(duplicate)`. See
+The retrieval module also exposes a bounded batch reranker contract. With the optional NLP
+extra, select `--retriever embedding` and pass `--reranker-model` to apply a cross-encoder
+only to the candidate set. Measure candidate recall@k first, and do not interpret an
+uncalibrated reranker score as `P(duplicate)`. See
 [#15](https://github.com/AlisinaDevelo/Quorabust/issues/15) for the retrieve-and-rerank
 product work.
 

@@ -8,7 +8,13 @@ from typing import Any
 
 import pandas as pd
 
-from quorabust.retrieval import TfidfCatalogRetriever
+from quorabust.retrieval import (
+    CatalogRetriever,
+    SentenceTransformerCatalogRetriever,
+    SentenceTransformerCrossEncoderReranker,
+    TfidfCatalogRetriever,
+    search_and_rerank,
+)
 
 
 def _positive_int(value: str) -> int:
@@ -42,6 +48,28 @@ def main(argv: list[str] | None = None) -> int:
         help="Query text; repeat the flag to score multiple queries in one run",
     )
     parser.add_argument("--k", type=_positive_int, default=10)
+    parser.add_argument(
+        "--candidate-k",
+        type=_positive_int,
+        default=50,
+        help="Bound the first-stage candidates passed to an optional reranker",
+    )
+    parser.add_argument(
+        "--retriever",
+        choices=["tfidf", "embedding"],
+        default="tfidf",
+        help="First-stage retriever; embedding requires the optional nlp extra",
+    )
+    parser.add_argument(
+        "--embedding-model",
+        default="sentence-transformers/all-MiniLM-L6-v2",
+        help="Sentence Transformer model for --retriever embedding",
+    )
+    parser.add_argument(
+        "--reranker-model",
+        default=None,
+        help="Optional CrossEncoder model for bounded candidate reranking",
+    )
     parser.add_argument("--id-column", default="question_id")
     parser.add_argument("--text-column", default="question")
     parser.add_argument("--out", type=Path, default=None, help="Write JSON instead of stdout")
@@ -52,27 +80,54 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     try:
         frame = pd.read_csv(args.catalog_csv)
-        retriever = TfidfCatalogRetriever().fit_frame(
-            frame,
-            id_col=args.id_column,
-            text_col=args.text_column,
+        retriever: CatalogRetriever
+        if args.retriever == "embedding":
+            retriever = SentenceTransformerCatalogRetriever(args.embedding_model).fit_frame(
+                frame,
+                id_col=args.id_column,
+                text_col=args.text_column,
+            )
+        else:
+            retriever = TfidfCatalogRetriever().fit_frame(
+                frame,
+                id_col=args.id_column,
+                text_col=args.text_column,
+            )
+        reranker = (
+            SentenceTransformerCrossEncoderReranker(args.reranker_model)
+            if args.reranker_model
+            else None
         )
         queries = [
             {
                 "query": query,
                 "k": args.k,
-                "hits": [hit.as_dict() for hit in retriever.search(query, k=args.k)],
+                "hits": [
+                    hit.as_dict()
+                    for hit in (
+                        search_and_rerank(
+                            retriever,
+                            query,
+                            k=args.k,
+                            candidate_k=max(args.k, args.candidate_k),
+                            score_batch=reranker.score_batch,
+                        )
+                        if reranker is not None
+                        else retriever.search(query, k=args.k)
+                    )
+                ],
             }
             for query in args.query
         ]
-    except (OSError, KeyError, ValueError) as exc:
+    except (OSError, KeyError, RuntimeError, ValueError) as exc:
         print(f"Unable to retrieve from catalog: {exc}", file=sys.stderr)
         return 1
 
     _write_payload(
         {
             "catalog_size": retriever.size,
-            "retriever": "tfidf",
+            "retriever": args.retriever,
+            "reranker": args.reranker_model,
             "queries": queries,
         },
         args.out,

@@ -119,8 +119,10 @@ quorabust-retrieve \
   --out reports/retrieval.json
 ```
 
-The JSON result contains stable question IDs and retrieval scores. A future embedding
-retriever can feed the same bounded candidate set into the cross-encoder reranker hook.
+The JSON result contains stable question IDs and retrieval scores. With the optional NLP
+extra, `--retriever embedding` adds dense retrieval and `--reranker-model` applies a
+cross-encoder only to the bounded candidate set. Those reranker scores are ranking signals,
+not calibrated duplicate probabilities.
 
 ### Generate a model card
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import Any, Callable, Collection, Sequence
+from typing import Any, Callable, Collection, Protocol, Sequence
 
 import numpy as np
 import pandas as pd
@@ -34,6 +34,42 @@ class CatalogHit:
         return payload
 
 
+def _normalize_questions(questions: Sequence[CatalogQuestion]) -> list[CatalogQuestion]:
+    normalized = [
+        CatalogQuestion(str(question.question_id).strip(), str(question.text).strip())
+        for question in questions
+    ]
+    if not normalized:
+        raise ValueError("catalog must contain at least one question")
+    if any(not question.question_id for question in normalized):
+        raise ValueError("catalog question IDs must not be empty")
+    if any(not question.text for question in normalized):
+        raise ValueError("catalog question text must not be empty")
+    ids = [question.question_id for question in normalized]
+    if len(set(ids)) != len(ids):
+        raise ValueError("catalog question IDs must be unique")
+    return normalized
+
+
+def _rank_hits(
+    questions: Sequence[CatalogQuestion],
+    scores: np.ndarray,
+    k: int,
+) -> list[CatalogHit]:
+    ranked_indices = sorted(
+        range(len(questions)),
+        key=lambda index: (-float(scores[index]), questions[index].question_id),
+    )[:k]
+    return [
+        CatalogHit(
+            question_id=questions[index].question_id,
+            text=questions[index].text,
+            retrieval_score=float(scores[index]),
+        )
+        for index in ranked_indices
+    ]
+
+
 class TfidfCatalogRetriever:
     """Deterministic lexical first-stage retrieval for a question catalog."""
 
@@ -56,20 +92,7 @@ class TfidfCatalogRetriever:
         return len(self._questions)
 
     def fit(self, questions: Sequence[CatalogQuestion]) -> TfidfCatalogRetriever:
-        normalized = [
-            CatalogQuestion(str(question.question_id).strip(), str(question.text).strip())
-            for question in questions
-        ]
-        if not normalized:
-            raise ValueError("catalog must contain at least one question")
-        if any(not question.question_id for question in normalized):
-            raise ValueError("catalog question IDs must not be empty")
-        if any(not question.text for question in normalized):
-            raise ValueError("catalog question text must not be empty")
-        ids = [question.question_id for question in normalized]
-        if len(set(ids)) != len(ids):
-            raise ValueError("catalog question IDs must be unique")
-
+        normalized = _normalize_questions(questions)
         corpus = [clean_text(question.text) or "empty" for question in normalized]
         self._matrix = self._vectorizer.fit_transform(corpus)
         self._questions = normalized
@@ -104,18 +127,122 @@ class TfidfCatalogRetriever:
 
         vector = self._vectorizer.transform([clean_text(query)])
         scores = np.asarray((self._matrix @ vector.T).toarray()).reshape(-1)
-        ranked_indices = sorted(
-            range(self.size),
-            key=lambda index: (-float(scores[index]), self._questions[index].question_id),
-        )[:k]
-        return [
-            CatalogHit(
-                question_id=self._questions[index].question_id,
-                text=self._questions[index].text,
-                retrieval_score=float(scores[index]),
+        return _rank_hits(self._questions, scores, k)
+
+
+def _load_sentence_transformer(model_name: str) -> Any:
+    try:
+        from sentence_transformers import SentenceTransformer
+    except ImportError as exc:
+        raise RuntimeError('Missing dependency: install with pip install "Quorabust[nlp]"') from exc
+    return SentenceTransformer(model_name)
+
+
+def _normalize_embeddings(embeddings: Any) -> np.ndarray:
+    matrix = np.asarray(embeddings, dtype=np.float64)
+    if matrix.ndim != 2 or matrix.shape[0] < 1 or matrix.shape[1] < 1:
+        raise ValueError("embedding model must return a non-empty two-dimensional matrix")
+    norms = np.linalg.norm(matrix, axis=1, keepdims=True)
+    normalized = np.divide(matrix, np.maximum(norms, 1e-12))
+    return np.asarray(normalized, dtype=np.float64)
+
+
+class SentenceTransformerCatalogRetriever:
+    """Optional dense first-stage retriever using normalized sentence embeddings."""
+
+    def __init__(self, model_name: str, model: Any | None = None) -> None:
+        self.model_name = model_name
+        self._model = model if model is not None else _load_sentence_transformer(model_name)
+        self._questions: list[CatalogQuestion] = []
+        self._matrix: np.ndarray | None = None
+
+    @property
+    def size(self) -> int:
+        return len(self._questions)
+
+    def _encode(self, texts: list[str]) -> np.ndarray:
+        try:
+            embeddings = self._model.encode(
+                texts,
+                convert_to_numpy=True,
+                normalize_embeddings=True,
+                show_progress_bar=False,
             )
-            for index in ranked_indices
-        ]
+        except TypeError:
+            embeddings = self._model.encode(
+                texts,
+                convert_to_numpy=True,
+                show_progress_bar=False,
+            )
+        return _normalize_embeddings(embeddings)
+
+    def fit(self, questions: Sequence[CatalogQuestion]) -> SentenceTransformerCatalogRetriever:
+        normalized = _normalize_questions(questions)
+        self._matrix = self._encode([clean_text(question.text) for question in normalized])
+        self._questions = normalized
+        return self
+
+    def fit_frame(
+        self,
+        frame: pd.DataFrame,
+        *,
+        id_col: str = "question_id",
+        text_col: str = "question",
+    ) -> SentenceTransformerCatalogRetriever:
+        for column in (id_col, text_col):
+            if column not in frame.columns:
+                raise KeyError(f"Missing catalog column: {column}")
+        return self.fit(
+            [
+                CatalogQuestion(str(question_id), str(text))
+                for question_id, text in zip(
+                    frame[id_col].tolist(),
+                    frame[text_col].tolist(),
+                    strict=True,
+                )
+            ]
+        )
+
+    def search(self, query: str, *, k: int = 10) -> list[CatalogHit]:
+        if self._matrix is None:
+            raise RuntimeError("fit() or fit_frame() must be called before search()")
+        if k < 1:
+            raise ValueError("k must be at least 1")
+        query_embedding = self._encode([clean_text(query)])[0]
+        scores = np.asarray(self._matrix @ query_embedding, dtype=np.float64).reshape(-1)
+        return _rank_hits(self._questions, scores, k)
+
+
+def _load_cross_encoder(model_name: str) -> Any:
+    try:
+        from sentence_transformers import CrossEncoder
+    except ImportError as exc:
+        raise RuntimeError('Missing dependency: install with pip install "Quorabust[nlp]"') from exc
+    return CrossEncoder(model_name)
+
+
+class SentenceTransformerCrossEncoderReranker:
+    """Optional raw-score adapter for the bounded second retrieval stage."""
+
+    def __init__(self, model_name: str, model: Any | None = None) -> None:
+        self.model_name = model_name
+        self._model = model if model is not None else _load_cross_encoder(model_name)
+
+    def score_batch(self, question1: list[str], question2: list[str]) -> list[float]:
+        if len(question1) != len(question2):
+            raise ValueError("question1 and question2 must have the same length")
+        scores = self._model.predict(
+            list(zip(question1, question2, strict=True)),
+            show_progress_bar=False,
+        )
+        return [float(score) for score in np.asarray(scores, dtype=np.float64).reshape(-1)]
+
+
+class CatalogRetriever(Protocol):
+    @property
+    def size(self) -> int: ...
+
+    def search(self, query: str, *, k: int = 10) -> list[CatalogHit]: ...
 
 
 ScoreBatch = Callable[[list[str], list[str]], Sequence[float]]
@@ -160,7 +287,7 @@ def rerank_candidates(
 
 
 def search_and_rerank(
-    retriever: TfidfCatalogRetriever,
+    retriever: CatalogRetriever,
     query: str,
     *,
     k: int = 10,
@@ -175,7 +302,7 @@ def search_and_rerank(
 
 
 def candidate_recall_at_k(
-    retriever: TfidfCatalogRetriever,
+    retriever: CatalogRetriever,
     cases: Sequence[tuple[str, Collection[str]]],
     *,
     k: int,

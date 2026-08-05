@@ -5,11 +5,27 @@ import pytest
 from quorabust.retrieval import (
     CatalogHit,
     CatalogQuestion,
+    SentenceTransformerCatalogRetriever,
+    SentenceTransformerCrossEncoderReranker,
     TfidfCatalogRetriever,
     candidate_recall_at_k,
     rerank_candidates,
     search_and_rerank,
 )
+
+
+class _FakeEmbeddingModel:
+    def encode(self, texts, **_kwargs):
+        return np.asarray(
+            [[1.0, 0.0] if "python" in text else [0.0, 1.0] for text in texts],
+            dtype=float,
+        )
+
+
+class _FakeCrossEncoder:
+    def predict(self, pairs, show_progress_bar=False):
+        assert show_progress_bar is False
+        return [0.9 if "python" in right else 0.1 for _left, right in pairs]
 
 
 def _retriever() -> TfidfCatalogRetriever:
@@ -49,6 +65,28 @@ def test_retriever_can_fit_a_catalog_frame():
     retriever = TfidfCatalogRetriever().fit_frame(frame)
 
     assert retriever.search("deploy service", k=1)[0].question_id == "a"
+
+
+def test_sentence_transformer_retriever_uses_the_shared_catalog_contract():
+    retriever = SentenceTransformerCatalogRetriever(
+        "fake-embedding",
+        model=_FakeEmbeddingModel(),
+    ).fit(
+        [
+            CatalogQuestion("q1", "python question"),
+            CatalogQuestion("q2", "train question"),
+        ]
+    )
+
+    assert retriever.search("python help", k=1)[0].question_id == "q1"
+
+
+def test_cross_encoder_adapter_returns_raw_batch_scores():
+    reranker = SentenceTransformerCrossEncoderReranker("fake-cross", model=_FakeCrossEncoder())
+
+    scores = reranker.score_batch(["query", "query"], ["python", "tickets"])
+
+    assert scores == [0.9, 0.1]
 
 
 def test_reranker_reorders_candidates_and_preserves_ties_deterministically():
