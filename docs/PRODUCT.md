@@ -54,6 +54,9 @@ dataset or customer-domain labels before making performance claims.
 - `variant`: active model variant, useful during A/B rollout.
 - `features`: optional input feature values when `?explain=true`.
 
+`GET /models` includes each loaded artifact's SHA-256 digest alongside allowlisted model
+metadata. Local artifact paths and source CSV paths are intentionally excluded.
+
 Decision threshold precedence:
 
 1. Request query parameter: `?threshold=0.7`.

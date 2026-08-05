@@ -144,7 +144,8 @@ The same endpoint exposes `quorabust_http_requests_total{method,path,status_code
 templates, with unknown paths grouped under `<unmatched>` so arbitrary URLs cannot create
 unbounded Prometheus series.
 `GET /models` returns allowlisted metadata for loaded variants without leaking local
-artifact paths or training CSV paths.
+artifact paths or training CSV paths. It includes the actual `artifact_sha256` of each
+loaded artifact so deployment checks can confirm which immutable bytes are serving.
 Client errors use one stable envelope: `{"error":{"code":"...","message":"...","request_id":"..."}}`.
 Codes include `invalid_request`, `validation_error`, `unauthorized`, `batch_too_large`,
 `model_unavailable`, and `not_found`; the `request_id` matches the `X-Request-ID` response

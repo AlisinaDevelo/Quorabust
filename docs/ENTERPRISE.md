@@ -64,6 +64,9 @@ distribution, prefer a non-pickle format such as `skops` or ONNX in a future rel
 - **Artifact integrity**: pin `QUORABUST_MODEL_SHA256` and
   `QUORABUST_MODEL_B_SHA256` when promoting artifacts; mismatches fail before pickle
   loading.
+- **Loaded artifact identity**: `GET /models` exposes the computed SHA-256 for each loaded
+  variant, allowing deployment and support checks to verify the serving bytes without
+  exposing local paths.
 - **Request correlation**: every completed response includes a canonical `X-Request-ID`
   UUID. A valid client-provided UUID is reused; malformed values are replaced. The
   `quorabust.http` logger emits one-line JSON events with method, path, status, duration,
