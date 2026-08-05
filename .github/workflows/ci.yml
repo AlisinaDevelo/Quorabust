@@ -42,6 +42,8 @@ jobs:
         run: quorabust-retrieve --help
       - name: Retrieval benchmark CLI
         run: quorabust-retrieve-benchmark --help
+      - name: Safe artifact CLI
+        run: quorabust-export-safe --help
       - name: Tracing helper
         run: python -c "from quorabust.tracing import tracing_available; assert isinstance(tracing_available(), bool)"
       - name: Demo assets CLI
@@ -100,6 +102,22 @@ jobs:
 
           with TestClient(create_app()) as client:
               assert client.get("/ready").status_code == 200
+          PY
+      - name: Safe artifact smoke
+        run: |
+          quorabust-export-safe \
+            --model /tmp/quorabust-smoke.pkl \
+            --out /tmp/quorabust-smoke.qmodel \
+            --metadata-out /tmp/quorabust-smoke.qmodel.meta.json
+          python - <<'PY'
+          from pathlib import Path
+          from quorabust.persist import load_classifier
+
+          model = Path("/tmp/quorabust-smoke.qmodel")
+          builder, classifier, meta = load_classifier(model)
+          assert builder._fitted is True
+          assert classifier.get_booster() is not None
+          assert meta["artifact_format"] == "quorabust.safe.tfidf_xgboost"
           PY
       - name: Retrieval benchmark smoke
         run: |

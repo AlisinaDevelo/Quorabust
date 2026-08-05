@@ -12,6 +12,8 @@ operational shape of an ML-backed backend service.
 overview, training pipeline, train-vs-serve sequence, and the artifact/registry contract.
 **Enterprise positioning:** [docs/PRODUCT.md](docs/PRODUCT.md) — product surface,
 buyer-facing use cases, method strategy, and production gaps.
+**Artifact trust policy:** [docs/ARTIFACTS.md](docs/ARTIFACTS.md) — safe `.qmodel` export,
+pickle boundary, parity checks, and promotion threat model.
 **Local demo stack:** [docs/DEMO.md](docs/DEMO.md) — FastAPI, Prometheus, and Grafana
 via Docker Compose.
 **API snapshots:** [docs/demo-assets](docs/demo-assets) — generated request/response and

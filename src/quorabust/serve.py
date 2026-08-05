@@ -255,6 +255,7 @@ _PUBLIC_META_KEYS = {
     "calibration_git_revision",
     "calibrated_from_artifact_sha256",
     "calibration_metrics",
+    "artifact_format",
 }
 
 

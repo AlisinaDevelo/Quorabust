@@ -14,6 +14,7 @@ from quorabust.retrieval import (
     TfidfCatalogRetriever,
 )
 from quorabust.retrieval_benchmark import RetrievalCase, benchmark_retrieval, evaluate_rankings
+from quorabust.safe_artifact import load_safe_classifier, safe_metadata, save_safe_classifier
 
 try:
     __version__ = version("Quorabust")
@@ -37,4 +38,7 @@ __all__ = [
     "RetrievalCase",
     "benchmark_retrieval",
     "evaluate_rankings",
+    "save_safe_classifier",
+    "load_safe_classifier",
+    "safe_metadata",
 ]

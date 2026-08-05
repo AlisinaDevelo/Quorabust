@@ -17,6 +17,11 @@ def save_classifier(
 ) -> None:
     """Persist vectorizer+model together (same pickle; load before scoring)."""
     p = Path(path)
+    if p.suffix == ".qmodel":
+        from quorabust.safe_artifact import save_safe_classifier
+
+        save_safe_classifier(p, builder, clf, meta=meta)
+        return
     p.parent.mkdir(parents=True, exist_ok=True)
     payload = {"builder": builder, "clf": clf, "meta": meta or {}}
     with p.open("wb") as f:
@@ -43,6 +48,10 @@ def load_classifier(
         actual = sha256_file(p)
         if not hmac.compare_digest(actual, expected):
             raise ValueError(f"artifact SHA-256 mismatch for {p}")
+    if p.suffix == ".qmodel":
+        from quorabust.safe_artifact import load_safe_classifier
+
+        return load_safe_classifier(p)
     with p.open("rb") as f:
         data = pickle.load(f)
     return data["builder"], data["clf"], data.get("meta", {})

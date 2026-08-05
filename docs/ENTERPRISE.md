@@ -47,10 +47,13 @@ post-save `artifact_sha256`, and `--registry-dir` records the same digest in
 inspection path.
 
 For serving, set `QUORABUST_MODEL_SHA256` and optionally `QUORABUST_MODEL_B_SHA256` to
-pin the exact artifact bytes. Quorabust verifies the digest before unpickling and fails
-startup on a mismatch. This is an integrity check, not a cryptographic signature; keep
-the expected digest in trusted deployment configuration. For untrusted artifact
-distribution, prefer a non-pickle format such as `skops` or ONNX in a future release.
+pin the exact artifact bytes. Quorabust verifies the digest before loading and fails startup
+on a mismatch. This is an integrity check, not a cryptographic signature; keep the expected
+digest in trusted deployment configuration. For the current TF-IDF/XGBoost control model,
+`quorabust-export-safe` writes a non-pickle `.qmodel` bundle with explicit TF-IDF state and
+the XGBoost native JSON model. The pickle path remains the compatibility path for optional
+builders and calibrated wrappers; see [ARTIFACTS.md](ARTIFACTS.md) for the threat model and
+per-backend policy.
 
 ## Serving and SLOs
 
