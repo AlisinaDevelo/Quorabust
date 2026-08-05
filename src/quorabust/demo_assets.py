@@ -4,7 +4,6 @@ import argparse
 import json
 import math
 import sys
-import warnings
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
@@ -110,12 +109,7 @@ def _snapshot_models_response(payload: dict[str, Any]) -> dict[str, Any]:
 
 def build_demo_assets(csv_path: Path, out_dir: Path, seed: int = 7) -> list[Path]:
     try:
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                message="Using `httpx` with `starlette.testclient` is deprecated.*",
-            )
-            from starlette.testclient import TestClient
+        from starlette.testclient import TestClient
 
         from quorabust.serve import create_app
     except ImportError as exc:
