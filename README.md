@@ -92,6 +92,22 @@ python -m quorabust --csv data/raw/train.csv --out models/quorabust.pkl   # equi
 
 Options: `--max-rows N`, `--eval-fraction 0.1` (default), `--eval-fraction 0` to train on all rows without a holdout, `--eval-out` to export the exact holdout used by training, `--require-question-ids` to fail if leakage-safe IDs are absent, `--seed`, `--feature-backend {tfidf,embedding,cross-encoder}`, `--embedding-model …`, `--cross-encoder-model …`, `--thresholds`, `--threshold-metric {accuracy,precision,recall,f1}` for holdout-based decision-threshold selection, `--registry-dir` (JSONL registry), `--metadata-out` (JSON sidecar for reviewing artifact lineage without loading the pickle).
 
+To calibrate a trained artifact, keep the calibration and threshold-selection CSVs
+independent from training and from each other:
+
+```bash
+quorabust-calibrate \
+  --model models/quorabust.pkl \
+  --calibration-csv data/processed/calibration.csv \
+  --threshold-csv data/processed/threshold.csv \
+  --calibration-method sigmoid \
+  --out models/quorabust-calibrated.pkl \
+  --metadata-out models/quorabust-calibrated.meta.json
+```
+
+The command stores calibration and threshold-data hashes, calibration diagnostics, and the
+selected calibrated decision threshold. Keep a final untouched holdout for the model card.
+
 ### Generate a model card
 
 ```bash

@@ -36,6 +36,8 @@ jobs:
         run: quorabust-report --help
       - name: Report validator CLI
         run: quorabust-validate-report --help
+      - name: Calibration CLI
+        run: quorabust-calibrate --help
       - name: Demo assets CLI
         run: |
           quorabust-demo-assets --out /tmp/quorabust-demo-assets

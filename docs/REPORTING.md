@@ -163,6 +163,30 @@ artifact metadata. The threshold is chosen from `--thresholds` by maximizing
 `--threshold-metric` (default `f1`). Serving uses that artifact threshold unless the
 request overrides it with `?threshold=...`.
 
+## Separate calibration and threshold selection
+
+For a promoted artifact, fit probability calibration and choose the action threshold on
+independent labeled data rather than reusing the training or final evaluation rows:
+
+```bash
+quorabust-calibrate \
+  --model models/quorabust.pkl \
+  --calibration-csv data/processed/calibration.csv \
+  --threshold-csv data/processed/threshold.csv \
+  --calibration-method sigmoid \
+  --thresholds 0.2,0.3,0.4,0.5,0.6,0.7,0.8 \
+  --threshold-metric f1 \
+  --out models/quorabust-calibrated.pkl \
+  --metadata-out models/quorabust-calibrated.meta.json
+```
+
+Use `--calibration-method isotonic` when the calibration sample is large enough to support
+its more flexible mapping. The command rejects reuse of the source training/evaluation CSV,
+identical calibration and threshold files, and overlapping question IDs when both inputs
+provide complete `qid1`/`qid2` columns. It records both data hashes, the base artifact
+hash, raw and calibrated reliability diagnostics, and the threshold policy. Evaluate the
+result once on a final holdout that was not used by either step.
+
 ## Sample model card
 
 A checked-in example produced from the [`examples/smoke_pairs.csv`](../examples/smoke_pairs.csv)

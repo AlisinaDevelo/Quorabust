@@ -241,6 +241,14 @@ _PUBLIC_META_KEYS = {
     "decision_threshold_source",
     "decision_threshold_metric",
     "decision_threshold_metrics",
+    "calibration_method",
+    "calibration_csv_sha256",
+    "threshold_csv_sha256",
+    "n_calibration",
+    "n_threshold",
+    "calibration_git_revision",
+    "calibrated_from_artifact_sha256",
+    "calibration_metrics",
 }
 
 
