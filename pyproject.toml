@@ -47,6 +47,10 @@ nlp = [
     "sentence-transformers>=3.0",
     "torch>=2.11.0",
 ]
+observability = [
+    "opentelemetry-api>=1.28,<2",
+    "opentelemetry-sdk>=1.28,<2",
+]
 
 [project.urls]
 Homepage = "https://github.com/AliSinaDevelo/Quorabust"
@@ -95,6 +99,7 @@ module = [
     "xgboost",
     "pandas.*",
     "numpy.*",
+    "opentelemetry.*",
     "fastapi.*",
     "uvicorn.*",
     "prometheus_client.*",

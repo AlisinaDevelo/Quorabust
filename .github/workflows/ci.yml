@@ -42,6 +42,8 @@ jobs:
         run: quorabust-retrieve --help
       - name: Retrieval benchmark CLI
         run: quorabust-retrieve-benchmark --help
+      - name: Tracing helper
+        run: python -c "from quorabust.tracing import tracing_available; assert isinstance(tracing_available(), bool)"
       - name: Demo assets CLI
         run: |
           quorabust-demo-assets --out /tmp/quorabust-demo-assets
