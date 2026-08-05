@@ -108,6 +108,20 @@ quorabust-calibrate \
 The command stores calibration and threshold-data hashes, calibration diagnostics, and the
 selected calibrated decision threshold. Keep a final untouched holdout for the model card.
 
+For a catalog lookup, the lexical first stage is available without the optional NLP extra:
+
+```bash
+quorabust-retrieve \
+  --catalog-csv data/catalog/questions.csv \
+  --query "How do I cache API responses?" \
+  --query "Where is the cache configured?" \
+  --k 10 \
+  --out reports/retrieval.json
+```
+
+The JSON result contains stable question IDs and retrieval scores. A future embedding
+retriever can feed the same bounded candidate set into the cross-encoder reranker hook.
+
 ### Generate a model card
 
 ```bash

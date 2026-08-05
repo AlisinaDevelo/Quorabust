@@ -6,6 +6,7 @@ from quorabust.features import PairFeatureBuilder, word_jaccard
 from quorabust.model import eval_classification_metrics, train_duplicate_classifier
 from quorabust.persist import load_classifier, save_classifier
 from quorabust.preprocess import clean_text
+from quorabust.retrieval import CatalogHit, CatalogQuestion, TfidfCatalogRetriever
 
 try:
     __version__ = version("Quorabust")
@@ -21,4 +22,7 @@ __all__ = [
     "eval_classification_metrics",
     "save_classifier",
     "load_classifier",
+    "CatalogQuestion",
+    "CatalogHit",
+    "TfidfCatalogRetriever",
 ]

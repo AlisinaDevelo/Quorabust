@@ -17,6 +17,23 @@ This document maps **ambitions** to what ships in-repo and what stays external.
   for pair scoring, but it is slower than TF-IDF or bi-encoder embeddings because every
   pair must be passed through the transformer jointly.
 
+## Catalog retrieval
+
+The optional catalog path starts with a deterministic TF-IDF first-stage retriever:
+
+```bash
+quorabust-retrieve \
+  --catalog-csv data/catalog/questions.csv \
+  --query "How do I deploy an API?" \
+  --k 10
+```
+
+The retrieval module also exposes a bounded batch reranker contract. Use the first-stage
+results to measure candidate recall@k, then apply a cross-encoder only to those candidates;
+do not interpret an uncalibrated reranker score as `P(duplicate)`. See
+[#15](https://github.com/AlisinaDevelo/Quorabust/issues/15) for the retrieve-and-rerank
+product work.
+
 ## Online serving, SLOs, monitoring
 
 - **`quorabust-serve`**: FastAPI app with `/health`, `/ready`, `/predict`, and **Prometheus** `/metrics` (prediction and endpoint RED metrics). Route-level request counters include status codes, latency histograms support p50/p95 SLOs, and unknown paths are grouped to keep label cardinality bounded. Run behind your platform ingress and attach SLO dashboards to those metrics.
