@@ -97,7 +97,7 @@ What is already in-repo:
 What should be added before a serious production deployment:
 
 - Real domain-specific benchmark and model card.
-- Probability calibration and recommended threshold persistence.
+- Domain-specific calibration validation and policy review on a real holdout.
 - Non-pickle artifact format for untrusted distribution.
 - Authentication and rate limiting at the gateway.
 - Key rotation, quotas, and distributed rate limiting at the gateway before broad exposure.
