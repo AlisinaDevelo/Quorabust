@@ -13,6 +13,7 @@ from quorabust.retrieval import (
     SentenceTransformerCrossEncoderReranker,
     TfidfCatalogRetriever,
 )
+from quorabust.retrieval_benchmark import RetrievalCase, benchmark_retrieval, evaluate_rankings
 
 try:
     __version__ = version("Quorabust")
@@ -33,4 +34,7 @@ __all__ = [
     "TfidfCatalogRetriever",
     "SentenceTransformerCatalogRetriever",
     "SentenceTransformerCrossEncoderReranker",
+    "RetrievalCase",
+    "benchmark_retrieval",
+    "evaluate_rankings",
 ]

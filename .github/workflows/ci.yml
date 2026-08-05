@@ -40,6 +40,8 @@ jobs:
         run: quorabust-calibrate --help
       - name: Retrieval CLI
         run: quorabust-retrieve --help
+      - name: Retrieval benchmark CLI
+        run: quorabust-retrieve-benchmark --help
       - name: Demo assets CLI
         run: |
           quorabust-demo-assets --out /tmp/quorabust-demo-assets
@@ -96,4 +98,22 @@ jobs:
 
           with TestClient(create_app()) as client:
               assert client.get("/ready").status_code == 200
+          PY
+      - name: Retrieval benchmark smoke
+        run: |
+          quorabust-retrieve-benchmark \
+            --catalog-csv examples/retrieval_catalog.csv \
+            --qrels-csv examples/retrieval_qrels.csv \
+            --ks 1,2 \
+            --candidate-k 2 \
+            --out /tmp/quorabust-retrieval-benchmark.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/quorabust-retrieval-benchmark.json").read_text())
+          assert report["schema_version"] == 1
+          assert report["benchmark"] == "quorabust-retrieve-benchmark"
+          assert report["first_stage"]["recall_at_k"]["1"] == 1.0
+          assert report["sources"]["catalog"]["sha256"]
           PY

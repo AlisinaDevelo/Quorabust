@@ -35,6 +35,28 @@ uncalibrated reranker score as `P(duplicate)`. See
 [#15](https://github.com/AlisinaDevelo/Quorabust/issues/15) for the retrieve-and-rerank
 product work.
 
+### Retrieval evaluation and cost proxy
+
+Use `quorabust-retrieve-benchmark` with a qrels CSV containing `query`, `question_id`, and
+optional non-negative `relevance` values:
+
+```bash
+quorabust-retrieve-benchmark \
+  --catalog-csv data/catalog/questions.csv \
+  --qrels-csv data/processed/retrieval-qrels.csv \
+  --ks 1,5,10 \
+  --candidate-k 50 \
+  --out reports/retrieval-benchmark.json
+```
+
+The report records first-stage and final recall/MRR/NDCG, retrieval/rerank/end-to-end
+latency distributions, throughput, reranker pair count, source hashes, model names, runtime,
+and the exact command. Reranker pair count is a bounded-work cost proxy, not a cloud billing
+estimate. The checked-in example catalog and qrels are smoke fixtures only. Real comparisons
+must use the frozen, permitted evaluation protocol tracked in
+[#13](https://github.com/AlisinaDevelo/Quorabust/issues/13) and the quality/cost gate in
+[#18](https://github.com/AlisinaDevelo/Quorabust/issues/18).
+
 ## Online serving, SLOs, monitoring
 
 - **`quorabust-serve`**: FastAPI app with `/health`, `/ready`, `/predict`, and **Prometheus** `/metrics` (prediction and endpoint RED metrics). Route-level request counters include status codes, latency histograms support p50/p95 SLOs, and unknown paths are grouped to keep label cardinality bounded. Run behind your platform ingress and attach SLO dashboards to those metrics.

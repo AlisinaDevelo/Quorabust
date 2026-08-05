@@ -124,6 +124,23 @@ extra, `--retriever embedding` adds dense retrieval and `--reranker-model` appli
 cross-encoder only to the bounded candidate set. Those reranker scores are ranking signals,
 not calibrated duplicate probabilities.
 
+Benchmark a catalog against a qrels-style CSV (`query,question_id,relevance`) with the same
+control or optional NLP stages:
+
+```bash
+quorabust-retrieve-benchmark \
+  --catalog-csv data/catalog/questions.csv \
+  --qrels-csv data/processed/retrieval-qrels.csv \
+  --ks 1,5,10 \
+  --candidate-k 50 \
+  --out reports/retrieval-benchmark.json
+```
+
+The JSON report separates first-stage and final recall/MRR/NDCG, retrieval/rerank/end-to-end
+p50/p95 latency, bounded reranker work, source hashes, model names, runtime, and the exact
+command. The checked-in `examples/retrieval_*.csv` files are structural smoke fixtures, not
+real quality evidence; use a permitted frozen dataset before publishing model claims.
+
 ### Generate a model card
 
 ```bash
