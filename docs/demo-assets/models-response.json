@@ -1,7 +1,7 @@
 {
   "variants": {
     "a": {
-      "artifact_sha256": "525aa7d2efaaf07298c5c9a71a13164d02ab5ac23d92224134a349b8ff30a240",
+      "artifact_sha256": "<runtime-artifact-sha256>",
       "csv_sha256": "0a7b4ad6c6bb12fd038d5d7673eaced0646a8914c52dbdf502d2476b29ad6132",
       "decision_threshold": 0.5,
       "decision_threshold_source": "demo_default",

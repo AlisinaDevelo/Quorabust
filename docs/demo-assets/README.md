@@ -3,6 +3,7 @@
 Generated from `examples/smoke_pairs.csv` with `quorabust-demo-assets`.
 These files demonstrate the serving contract and are not model-quality claims.
 The snapshot uses a deterministic TF-IDF demo scorer so CI stays stable.
+The temporary demo pickle uses <runtime-artifact-sha256>; live deployments expose the exact digest.
 
 - `predict-request.json`: sample batch scoring payload.
 - `predict-response.json`: response shape with a request threshold override and feature values.

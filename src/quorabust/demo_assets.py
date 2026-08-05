@@ -28,6 +28,7 @@ DEMO_REQUEST = {
 }
 
 _JSON_FLOAT_TOLERANCE = 1e-3
+_RUNTIME_ARTIFACT_SHA256 = "<runtime-artifact-sha256>"
 
 
 def _write_json(path: Path, payload: Any) -> None:
@@ -97,6 +98,16 @@ def _openapi_excerpt(spec: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _snapshot_models_response(payload: dict[str, Any]) -> dict[str, Any]:
+    """Keep temporary pickle identity out of committed, cross-process snapshots."""
+    variants = payload.get("variants")
+    if isinstance(variants, dict):
+        for metadata in variants.values():
+            if isinstance(metadata, dict) and "artifact_sha256" in metadata:
+                metadata["artifact_sha256"] = _RUNTIME_ARTIFACT_SHA256
+    return payload
+
+
 def build_demo_assets(csv_path: Path, out_dir: Path, seed: int = 7) -> list[Path]:
     try:
         with warnings.catch_warnings():
@@ -134,7 +145,7 @@ def build_demo_assets(csv_path: Path, out_dir: Path, seed: int = 7) -> list[Path
     assets = {
         "predict-request.json": DEMO_REQUEST,
         "predict-response.json": predict_response.json(),
-        "models-response.json": models_response.json(),
+        "models-response.json": _snapshot_models_response(models_response.json()),
         "openapi-excerpt.json": _openapi_excerpt(openapi_response.json()),
     }
     for filename, payload in assets.items():
@@ -151,6 +162,8 @@ def build_demo_assets(csv_path: Path, out_dir: Path, seed: int = 7) -> list[Path
                 "Generated from `examples/smoke_pairs.csv` with `quorabust-demo-assets`.",
                 "These files demonstrate the serving contract and are not model-quality claims.",
                 "The snapshot uses a deterministic TF-IDF demo scorer so CI stays stable.",
+                "The temporary demo pickle uses <runtime-artifact-sha256>; live deployments "
+                "expose the exact digest.",
                 "",
                 "- `predict-request.json`: sample batch scoring payload.",
                 "- `predict-response.json`: response shape with a request threshold override "

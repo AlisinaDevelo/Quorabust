@@ -26,6 +26,7 @@ def test_build_demo_assets_writes_api_snapshots(tmp_path):
 
     models = json.loads((out / "models-response.json").read_text(encoding="utf-8"))
     assert models["variants"]["a"]["feature_backend"] == "tfidf"
+    assert models["variants"]["a"]["artifact_sha256"] == "<runtime-artifact-sha256>"
 
 
 def test_demo_assets_cli_fails_for_missing_csv(tmp_path, capsys):
