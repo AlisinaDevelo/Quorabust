@@ -58,6 +58,7 @@ _REQUIRED_MANIFEST_SECTIONS = {
     "evaluation_policy": {"threshold", "thresholds", "calibration_bins"},
     "runtime": {"python_version", "system", "machine", "report_git_revision"},
 }
+_REQUIRED_QUESTION_ID_COLUMNS = {"qid1", "qid2"}
 
 
 def _missing_keys(obj: Any, keys: set[str]) -> list[str]:
@@ -66,12 +67,59 @@ def _missing_keys(obj: Any, keys: set[str]) -> list[str]:
     return sorted(keys - set(obj))
 
 
+def _validate_question_component_split(manifest: dict[str, Any], errors: list[str]) -> None:
+    lineage = manifest.get("training_lineage")
+    if not isinstance(lineage, dict):
+        errors.append("evaluation_manifest.training_lineage must be an object")
+    else:
+        if lineage.get("split_strategy") != "question_component_holdout":
+            errors.append(
+                "evaluation_manifest.training_lineage.split_strategy must be "
+                "question_component_holdout"
+            )
+        if lineage.get("require_question_ids") is not True:
+            errors.append(
+                "evaluation_manifest.training_lineage.require_question_ids must be true"
+            )
+        question_id_columns = lineage.get("question_id_columns")
+        if not isinstance(question_id_columns, list) or not all(
+            isinstance(column, str) for column in question_id_columns
+        ):
+            errors.append(
+                "evaluation_manifest.training_lineage.question_id_columns must include qid1/qid2"
+            )
+        else:
+            missing = sorted(_REQUIRED_QUESTION_ID_COLUMNS - set(question_id_columns))
+            if missing:
+                errors.append(
+                    "evaluation_manifest.training_lineage.question_id_columns is missing: "
+                    + ", ".join(missing)
+                )
+
+    evaluation_dataset = manifest.get("evaluation_dataset")
+    if not isinstance(evaluation_dataset, dict):
+        errors.append("evaluation_manifest.evaluation_dataset must be an object")
+        return
+    dataset_columns = evaluation_dataset.get("columns")
+    if not isinstance(dataset_columns, list) or not all(
+        isinstance(column, str) for column in dataset_columns
+    ):
+        errors.append("evaluation_manifest.evaluation_dataset.columns must include qid1/qid2")
+        return
+    missing = sorted(_REQUIRED_QUESTION_ID_COLUMNS - set(dataset_columns))
+    if missing:
+        errors.append(
+            "evaluation_manifest.evaluation_dataset.columns is missing: " + ", ".join(missing)
+        )
+
+
 def validate_report_payload(
     payload: Any,
     *,
     require_holdout: bool = False,
     require_calibration: bool = False,
     require_manifest: bool = False,
+    require_question_component_split: bool = False,
 ) -> list[str]:
     """Return validation errors for a machine-readable Quorabust report payload."""
     if not isinstance(payload, dict):
@@ -110,7 +158,7 @@ def validate_report_payload(
             errors.append("calibration.bins must be a non-empty list")
 
     manifest = payload.get("evaluation_manifest")
-    if require_manifest and manifest is None:
+    if (require_manifest or require_question_component_split) and manifest is None:
         errors.append("missing evaluation_manifest")
     if manifest is not None:
         for key in _missing_keys(manifest, _REQUIRED_MANIFEST):
@@ -123,6 +171,8 @@ def validate_report_payload(
                     continue
                 for key in _missing_keys(value, keys):
                     errors.append(f"missing evaluation_manifest.{section} field: {key}")
+            if require_question_component_split:
+                _validate_question_component_split(manifest, errors)
 
     return errors
 
@@ -147,6 +197,11 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Fail unless holdout reproducibility metadata is present",
     )
+    parser.add_argument(
+        "--require-question-component-split",
+        action="store_true",
+        help="Fail unless the report uses a leakage-safe qid1/qid2 component holdout",
+    )
     args = parser.parse_args(argv)
 
     if not args.report.is_file():
@@ -163,6 +218,7 @@ def main(argv: list[str] | None = None) -> int:
         require_holdout=args.require_holdout,
         require_calibration=args.require_calibration,
         require_manifest=args.require_manifest,
+        require_question_component_split=args.require_question_component_split,
     )
     if errors:
         for error in errors:

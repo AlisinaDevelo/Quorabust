@@ -141,8 +141,15 @@ quorabust-validate-report \
   --report reports/quorabust-tfidf-v1.json \
   --require-holdout \
   --require-calibration \
-  --require-manifest
+  --require-manifest \
+  --require-question-component-split
 ```
+
+`--require-question-component-split` is an opt-in benchmark release policy. It fails closed
+unless the evaluation manifest records `question_component_holdout`, `require_question_ids: true`,
+both `qid1`/`qid2` metadata columns, and those columns in the evaluated CSV. Leave it off for
+an explicitly documented exploratory or customer-domain report that accepts the row-level
+fallback. This policy validates protocol metadata; it does not establish model quality.
 
 Use repeated `--compare-model label=path` arguments when you need to compare trained
 backends against the same holdout split:

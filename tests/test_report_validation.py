@@ -58,7 +58,7 @@ def _payload():
             "evaluation_dataset": {
                 "sha256": "b" * 64,
                 "rows": 10,
-                "columns": ["question1", "question2", "is_duplicate"],
+            "columns": ["question1", "question2", "is_duplicate", "qid1", "qid2"],
                 "positive_count": 5,
                 "positive_rate": 0.5,
             },
@@ -67,7 +67,12 @@ def _payload():
                 "thresholds": [0.3, 0.5, 0.7],
                 "calibration_bins": 5,
             },
-            "training_lineage": {"git_revision": "abc123"},
+            "training_lineage": {
+                "git_revision": "abc123",
+                "split_strategy": "question_component_holdout",
+                "question_id_columns": ["qid1", "qid2"],
+                "require_question_ids": True,
+            },
             "runtime": {
                 "python_version": "3.12.0",
                 "system": "Darwin",
@@ -86,6 +91,7 @@ def test_validate_report_payload_accepts_release_report():
         require_holdout=True,
         require_calibration=True,
         require_manifest=True,
+        require_question_component_split=True,
     ) == []
 
 
@@ -111,6 +117,7 @@ def test_validate_report_cli_passes(tmp_path):
                 "--require-holdout",
                 "--require-calibration",
                 "--require-manifest",
+                "--require-question-component-split",
             ]
         )
         == 0
@@ -133,3 +140,39 @@ def test_validate_report_payload_reports_missing_manifest():
         payload,
         require_manifest=True,
     )
+
+
+def test_validate_report_payload_rejects_row_level_fallback_when_required():
+    payload = _payload()
+    lineage = payload["evaluation_manifest"]["training_lineage"]
+    lineage["split_strategy"] = "shuffled_prefix_holdout"
+    lineage["require_question_ids"] = False
+    payload["evaluation_manifest"]["evaluation_dataset"]["columns"] = [
+        "question1",
+        "question2",
+        "is_duplicate",
+    ]
+
+    errors = validate_report_payload(
+        payload,
+        require_question_component_split=True,
+    )
+
+    assert (
+        "evaluation_manifest.training_lineage.split_strategy must be "
+        "question_component_holdout"
+    ) in errors
+    assert "evaluation_manifest.training_lineage.require_question_ids must be true" in errors
+    assert (
+        "evaluation_manifest.evaluation_dataset.columns is missing: qid1, qid2"
+    ) in errors
+
+
+def test_validate_report_payload_requires_manifest_for_component_policy():
+    payload = _payload()
+    del payload["evaluation_manifest"]
+
+    assert validate_report_payload(
+        payload,
+        require_question_component_split=True,
+    ) == ["missing evaluation_manifest"]

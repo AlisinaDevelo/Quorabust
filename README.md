@@ -178,7 +178,8 @@ label counts, threshold policy, runtime, commit, and exact invocation. Use
 `--manifest-out` for a separate sidecar. Use
 `quorabust-validate-report --require-holdout --require-calibration --require-manifest`
 to fail release jobs when a JSON model card is missing benchmark evidence or its audit
-record.
+record. Add `--require-question-component-split` for a public benchmark release that must
+prove the evaluation holdout used complete question IDs and a leakage-safe component split.
 Use repeated `--compare-model label=path` flags to compare TF-IDF, embedding, and
 cross-encoder artifacts against the same holdout split.
 See [docs/REPORTING.md](docs/REPORTING.md) for the CI smoke workflow and

@@ -107,8 +107,10 @@ startup and artifact-size evidence before setting deployment budgets.
 - **`quorabust.drift`**: compare live batch feature means to `meta["reference_feature_means"]`.
 - **`quorabust-validate-report`**: validate JSON model-card reports in CI/release jobs; use
   `--require-holdout --require-calibration --require-manifest` before promoting a
-  benchmarked artifact. The manifest binds the report to model and holdout hashes,
-  training lineage, runtime, and the exact evaluation invocation.
+  benchmarked artifact. Add `--require-question-component-split` when the release policy
+  requires a complete qid1/qid2 component holdout; the validator checks the manifest and
+  evaluated-column contract without claiming model quality. The manifest binds the report to
+  model and holdout hashes, training lineage, runtime, and the exact evaluation invocation.
 - **`quorabust-validate-retrieval`** applies the same fail-closed discipline to
   retrieval/profile evidence and caller-supplied recall/p95 policies.
 - Put TLS termination, distributed rate limiting, quotas, and key rotation at the ingress
