@@ -44,6 +44,8 @@ jobs:
         run: quorabust-retrieve-benchmark --help
       - name: Retrieval profile CLI
         run: quorabust-retrieve-profile --help
+      - name: Retrieval validator CLI
+        run: quorabust-validate-retrieval --help
       - name: Safe artifact CLI
         run: quorabust-export-safe --help
       - name: Tracing helper
@@ -155,6 +157,11 @@ jobs:
           assert report["query_length_strata"]["medium"]["measured_query_count"] == 6
           assert report["runtime"]["retriever_initialization_ms"] >= 0
           assert report["runtime"]["startup_measurement"] == "retriever_and_reranker_initialization_only"
+          PY
+          quorabust-validate-retrieval \
+            --report /tmp/quorabust-retrieval-benchmark.json \
+            --min-final-recall-at-k 1=1.0 \
+            --max-end-to-end-p95-ms 1000
       - name: Retrieval process profile smoke
         run: |
           quorabust-retrieve-profile \
@@ -180,3 +187,6 @@ jobs:
           assert report["warm_benchmark"]["query_count"] == 4
           assert set(report["warm_benchmark"]["query_length_strata"]) == {"short", "medium"}
           PY
+          quorabust-validate-retrieval \
+            --report /tmp/quorabust-retrieval-profile.json \
+            --max-end-to-end-p95-ms 1000

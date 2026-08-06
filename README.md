@@ -152,6 +152,12 @@ For process-level rollout sizing, `quorabust-retrieve-profile` repeats the bench
 subprocesses and records process-to-report startup time, warm metrics, input sizes, and optional
 local artifact hashes. It is an operational profile, not model-quality evidence.
 
+Use `quorabust-validate-retrieval` in release jobs to validate report provenance, measurement
+counts, latency summaries, and query-length strata, then apply caller-owned policies such as
+`--min-final-recall-at-k 10=0.95` and `--max-end-to-end-p95-ms 100`. The gate compares supplied
+evidence; it does not turn the smoke fixture into a public quality claim or define a universal
+latency target.
+
 ### Generate a model card
 
 ```bash

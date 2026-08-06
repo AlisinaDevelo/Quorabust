@@ -77,6 +77,24 @@ rerank, and end-to-end p50/p95/p99 summaries. Warm-up passes are excluded; repet
 once per case. Empty buckets are omitted. These are performance slices only and do not establish
 quality, language coverage, or production capacity without representative permitted data.
 
+### Retrieval report release gate
+
+Validate a benchmark or fresh-process profile before attaching it to a release decision:
+
+```bash
+quorabust-validate-retrieval \
+  --report reports/retrieval-benchmark.json \
+  --min-final-recall-at-k 10=0.95 \
+  --max-end-to-end-p95-ms 100
+```
+
+The validator checks source hashes and byte counts, runtime provenance, repetition and latency
+sample invariants, and the query-length strata contract. The policy values belong to the target
+deployment and must be chosen from representative measurements; the command does not claim
+that one recall or latency threshold is universally correct. The fresh-process profile is
+accepted through its embedded `warm_benchmark` report and still retains its timing-only evidence
+boundary.
+
 ### Fresh-process profile
 
 Use `quorabust-retrieve-profile` when warm latency is not enough for a rollout decision:
