@@ -359,6 +359,50 @@ def test_predict_rejects_batches_over_configured_limit(tmp_path):
     assert "maximum" in response.json()["error"]["message"]
 
 
+@pytest.mark.parametrize("oversized_field", ["question1", "question2"])
+def test_predict_rejects_text_over_configured_limit_without_echoing_input(
+    tmp_path,
+    oversized_field,
+):
+    p = tmp_path / "m.pkl"
+    _tiny_pkl(p)
+    app = create_app(model_path_a=str(p), max_text_length=5)
+    payload = {"question1": ["hello"], "question2": ["world"]}
+    payload[oversized_field] = ["secret-too-long"]
+
+    with TestClient(app) as client:
+        response = client.post("/predict", json=payload)
+
+    assert response.status_code == 413
+    assert response.json()["error"]["code"] == "batch_too_large"
+    assert response.json()["error"]["message"] == (
+        "question text exceeds configured maximum of 5 characters"
+    )
+    assert response.headers["X-Request-ID"] == response.json()["error"]["request_id"]
+    assert "secret-too-long" not in response.text
+
+
+def test_create_app_rejects_non_positive_text_limit():
+    with pytest.raises(ValueError, match="max_text_length"):
+        create_app(max_text_length=0)
+
+
+def test_predict_uses_text_limit_environment(tmp_path, monkeypatch):
+    p = tmp_path / "m.pkl"
+    _tiny_pkl(p)
+    monkeypatch.setenv("QUORABUST_MAX_TEXT_LENGTH", "4")
+    app = create_app(model_path_a=str(p))
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/predict",
+            json={"question1": ["hello"], "question2": ["world"]},
+        )
+
+    assert response.status_code == 413
+    assert response.json()["error"]["code"] == "batch_too_large"
+
+
 def test_predict_returns_stable_error_for_mismatched_lists(tmp_path):
     p = tmp_path / "m.pkl"
     _tiny_pkl(p)

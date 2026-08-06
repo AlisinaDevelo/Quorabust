@@ -33,6 +33,7 @@ from quorabust.tracing import (
 
 DEFAULT_DECISION_THRESHOLD = 0.5
 DEFAULT_MAX_BATCH_SIZE = 256
+DEFAULT_MAX_TEXT_LENGTH = 8192
 API_KEY_HEADER = "X-Quorabust-API-Key"
 REQUEST_ID_HEADER = "X-Request-ID"
 HTTP_LOGGER = logging.getLogger("quorabust.http")
@@ -146,6 +147,17 @@ def _env_max_batch_size() -> int:
     except ValueError:
         return DEFAULT_MAX_BATCH_SIZE
     return value if value > 0 else DEFAULT_MAX_BATCH_SIZE
+
+
+def _env_max_text_length() -> int:
+    raw = os.environ.get("QUORABUST_MAX_TEXT_LENGTH")
+    if raw is None:
+        return DEFAULT_MAX_TEXT_LENGTH
+    try:
+        value = int(raw)
+    except ValueError:
+        return DEFAULT_MAX_TEXT_LENGTH
+    return value if value > 0 else DEFAULT_MAX_TEXT_LENGTH
 
 
 class PredictBody(BaseModel):
@@ -277,6 +289,7 @@ def create_app(
     *,
     api_key: str | None = None,
     max_batch_size: int | None = None,
+    max_text_length: int | None = None,
     model_sha256: str | None = None,
     model_b_sha256: str | None = None,
 ) -> FastAPI:
@@ -296,8 +309,13 @@ def create_app(
     configured_max_batch_size = (
         max_batch_size if max_batch_size is not None else _env_max_batch_size()
     )
+    configured_max_text_length = (
+        max_text_length if max_text_length is not None else _env_max_text_length()
+    )
     if configured_max_batch_size < 1:
         raise ValueError("max_batch_size must be at least 1")
+    if configured_max_text_length < 1:
+        raise ValueError("max_text_length must be at least 1")
 
     api_key_header = APIKeyHeader(name=API_KEY_HEADER, auto_error=False)
 
@@ -542,8 +560,9 @@ def create_app(
             "Set query parameter `explain=true` to return input feature values. "
             "Set `threshold` to override the duplicate decision cutoff for this request. "
             "Deployments can configure `QUORABUST_API_KEY` and "
-            "`QUORABUST_MAX_BATCH_SIZE` for access control and bounded work. Every response "
-            "includes an `X-Request-ID` UUID for support and log correlation."
+            "`QUORABUST_MAX_BATCH_SIZE` and `QUORABUST_MAX_TEXT_LENGTH` for access control "
+            "and bounded work. Every response includes an `X-Request-ID` UUID for support "
+            "and log correlation."
         ),
         responses={
             200: {
@@ -557,7 +576,7 @@ def create_app(
             },
             401: {"description": "API key required or invalid"},
             400: {"description": "question1 and question2 length mismatch"},
-            413: {"description": "request batch exceeds configured maximum"},
+            413: {"description": "request batch or text exceeds configured maximum"},
             503: {"description": "Model not loaded or variant unavailable"},
         },
     )
@@ -596,6 +615,17 @@ def create_app(
             raise HTTPException(
                 status_code=413,
                 detail=f"batch size exceeds configured maximum of {configured_max_batch_size}",
+            )
+        if any(
+            len(text) > configured_max_text_length
+            for text in (*body.question1, *body.question2)
+        ):
+            raise HTTPException(
+                status_code=413,
+                detail=(
+                    "question text exceeds configured maximum of "
+                    f"{configured_max_text_length} characters"
+                ),
             )
         t0 = time.perf_counter()
         try:
