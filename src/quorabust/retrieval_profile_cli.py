@@ -162,6 +162,8 @@ def _warm_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "first_stage",
         "final",
         "latency_ms",
+        "query_length_policy",
+        "query_length_strata",
         "work",
         "measurement_policy",
         "runtime",

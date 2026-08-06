@@ -21,7 +21,7 @@ def _write_inputs(tmp_path):
     ).to_csv(catalog, index=False)
     pd.DataFrame(
         {
-            "query": ["best way to learn Python", "where to buy train tickets"],
+            "query": ["best way to learn Python", "where to buy train tickets today"],
             "question_id": ["q1", "q2"],
             "relevance": [2, 1],
         }
@@ -69,6 +69,11 @@ def test_profile_cli_reports_fresh_processes_sizes_and_path_light_output(tmp_pat
     assert payload["cold_start"]["measurement_count"] == 2
     assert payload["cold_start"]["process_to_report_ms"]["p99"] > 0.0
     assert payload["warm_benchmark"]["query_count"] == 2
+    assert set(payload["warm_benchmark"]["query_length_strata"]) == {"short", "medium"}
+    assert payload["warm_benchmark"]["query_length_policy"]["buckets"]["long"] == {
+        "min_tokens": 16,
+        "max_tokens": None,
+    }
     assert payload["sources"]["catalog"]["bytes"] == catalog.stat().st_size
     assert payload["artifacts"][0]["bytes"] == artifact.stat().st_size
     assert payload["artifacts"][0]["name"] == artifact.name

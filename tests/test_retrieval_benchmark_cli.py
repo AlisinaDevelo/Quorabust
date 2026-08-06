@@ -20,7 +20,7 @@ def _write_inputs(tmp_path):
     ).to_csv(catalog, index=False)
     pd.DataFrame(
         {
-            "query": ["best way to learn Python", "where to buy train tickets"],
+            "query": ["best way to learn Python", "where to buy train tickets today"],
             "question_id": ["q1", "q2"],
             "relevance": [2, 1],
         }
@@ -79,6 +79,9 @@ def test_benchmark_cli_writes_provenance_and_stage_metrics(tmp_path):
     assert payload["runtime"]["startup_measurement"] == (
         "retriever_and_reranker_initialization_only"
     )
+    assert set(payload["query_length_strata"]) == {"short", "medium"}
+    assert payload["query_length_strata"]["short"]["measured_query_count"] == 2
+    assert payload["query_length_strata"]["medium"]["measured_query_count"] == 2
 
 
 def test_benchmark_cli_rejects_qrels_outside_catalog(tmp_path, capsys):

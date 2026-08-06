@@ -25,6 +25,97 @@ class RetrievalCase:
     relevance: Mapping[str, float]
 
 
+_QUERY_LENGTH_BUCKETS: tuple[tuple[str, int, int | None], ...] = (
+    ("short", 1, 5),
+    ("medium", 6, 15),
+    ("long", 16, None),
+)
+
+
+def _query_token_count(query: str) -> int:
+    return len(query.split())
+
+
+def query_length_bucket(query: str) -> str:
+    """Classify a non-empty query by its number of whitespace-delimited tokens."""
+    token_count = _query_token_count(query)
+    if token_count < 1:
+        raise ValueError("query must contain at least one whitespace token")
+    for name, minimum, maximum in _QUERY_LENGTH_BUCKETS:
+        if token_count >= minimum and (maximum is None or token_count <= maximum):
+            return name
+    raise RuntimeError(f"no query-length bucket covers {token_count} tokens")
+
+
+def _query_length_policy() -> dict[str, object]:
+    return {
+        "tokenization": "python_str_split_whitespace",
+        "buckets": {
+            name: {"min_tokens": minimum, "max_tokens": maximum}
+            for name, minimum, maximum in _QUERY_LENGTH_BUCKETS
+        },
+    }
+
+
+def _query_length_strata(
+    cases: Sequence[RetrievalCase],
+    retrieval_latencies: Sequence[float],
+    rerank_latencies: Sequence[float],
+    end_to_end_latencies: Sequence[float],
+    *,
+    repetitions: int,
+) -> dict[str, object]:
+    """Summarize measured latency by deterministic query-length bucket."""
+    expected_samples = len(cases) * repetitions
+    samples = (retrieval_latencies, rerank_latencies, end_to_end_latencies)
+    if any(len(values) != expected_samples for values in samples):
+        raise ValueError("latency samples must contain every measured query")
+
+    indexes_by_bucket: dict[str, list[int]] = {
+        name: [] for name, _, _ in _QUERY_LENGTH_BUCKETS
+    }
+    for index, case in enumerate(cases):
+        indexes_by_bucket[query_length_bucket(case.query)].append(index)
+
+    strata: dict[str, object] = {}
+    for name, _, _ in _QUERY_LENGTH_BUCKETS:
+        case_indexes = indexes_by_bucket[name]
+        if not case_indexes:
+            continue
+        bucket_samples: list[list[float]] = [[], [], []]
+        for repetition in range(repetitions):
+            offset = repetition * len(cases)
+            for stage_index, stage_values in enumerate(samples):
+                bucket_samples[stage_index].extend(
+                    stage_values[offset + case_index] for case_index in case_indexes
+                )
+
+        end_to_end = bucket_samples[2]
+        total_seconds = sum(end_to_end) / 1000.0
+        token_counts = [_query_token_count(cases[index].query) for index in case_indexes]
+        strata[name] = {
+            "query_count": int(len(case_indexes)),
+            "measured_query_count": int(len(case_indexes) * repetitions),
+            "token_count": {
+                "min": int(min(token_counts)),
+                "max": int(max(token_counts)),
+            },
+            "latency_ms": {
+                "retrieval": summarize_latencies_ms(bucket_samples[0]),
+                "rerank": summarize_latencies_ms(bucket_samples[1]),
+                "end_to_end": summarize_latencies_ms(end_to_end),
+            },
+            "work": {
+                "throughput_queries_per_second": (
+                    float((len(case_indexes) * repetitions) / total_seconds)
+                    if total_seconds > 0.0
+                    else None
+                ),
+            },
+        }
+    return strata
+
+
 def _validated_ks(ks: Sequence[int]) -> list[int]:
     values = sorted(set(ks))
     if not values or any(value < 1 for value in values):
@@ -303,6 +394,14 @@ def benchmark_retrieval(
             "rerank": summarize_latencies_ms(rerank_latencies),
             "end_to_end": summarize_latencies_ms(end_to_end_latencies),
         },
+        "query_length_policy": _query_length_policy(),
+        "query_length_strata": _query_length_strata(
+            normalized_cases,
+            retrieval_latencies,
+            rerank_latencies,
+            end_to_end_latencies,
+            repetitions=repetitions,
+        ),
         "work": {
             "reranker_enabled": score_batch is not None,
             "reranker_pairs": int(rerank_pair_count),

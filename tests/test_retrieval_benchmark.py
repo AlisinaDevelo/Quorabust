@@ -9,6 +9,7 @@ from quorabust.retrieval_benchmark import (
     benchmark_retrieval,
     evaluate_rankings,
     load_retrieval_qrels,
+    query_length_bucket,
     summarize_latencies_ms,
 )
 
@@ -129,6 +130,68 @@ def test_benchmark_separates_stage_metrics_latency_and_work():
         result["runtime"]["peak_rss_bytes"] is None
         or result["runtime"]["peak_rss_bytes"] > 0
     )
+    assert result["query_length_policy"] == {
+        "tokenization": "python_str_split_whitespace",
+        "buckets": {
+            "short": {"min_tokens": 1, "max_tokens": 5},
+            "medium": {"min_tokens": 6, "max_tokens": 15},
+            "long": {"min_tokens": 16, "max_tokens": None},
+        },
+    }
+    assert result["query_length_strata"]["short"]["query_count"] == 2
+    assert result["query_length_strata"]["short"]["measured_query_count"] == 4
+    assert result["query_length_strata"]["short"]["latency_ms"]["end_to_end"]["count"] == 4
+
+
+@pytest.mark.parametrize(
+    ("query", "expected_bucket"),
+    [
+        ("one", "short"),
+        ("one two three four five", "short"),
+        ("one two three four five six", "medium"),
+        (" ".join(["word"] * 15), "medium"),
+        (" ".join(["word"] * 16), "long"),
+    ],
+)
+def test_query_length_bucket_uses_documented_whitespace_boundaries(query, expected_bucket):
+    assert query_length_bucket(query) == expected_bucket
+
+
+def test_benchmark_reports_query_length_strata_and_omits_empty_buckets():
+    cases = [
+        RetrievalCase("python", {"q1": 1}),
+        RetrievalCase("how can I learn python programming effectively today", {"q1": 1}),
+        RetrievalCase(
+            "how can I learn python programming effectively today while building reliable "
+            "production backend services with tests",
+            {"q1": 1},
+        ),
+    ]
+
+    result = benchmark_retrieval(
+        _retriever(),
+        cases,
+        ks=[1],
+        candidate_k=1,
+        warmup_runs=0,
+        repetitions=2,
+    )
+
+    strata = result["query_length_strata"]
+    assert set(strata) == {"short", "medium", "long"}
+    assert strata["short"]["token_count"] == {"min": 1, "max": 1}
+    assert strata["medium"]["token_count"] == {"min": 8, "max": 8}
+    assert strata["long"]["token_count"] == {"min": 16, "max": 16}
+    assert all(
+        strata[name]["latency_ms"]["end_to_end"]["count"] == 2
+        for name in ("short", "medium", "long")
+    )
+    assert sum(item["query_count"] for item in strata.values()) == result["query_count"]
+
+
+def test_query_length_bucket_rejects_empty_query():
+    with pytest.raises(ValueError, match="whitespace token"):
+        query_length_bucket(" \t")
 
 
 @pytest.mark.parametrize(

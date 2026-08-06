@@ -13,7 +13,12 @@ from quorabust.retrieval import (
     SentenceTransformerCrossEncoderReranker,
     TfidfCatalogRetriever,
 )
-from quorabust.retrieval_benchmark import RetrievalCase, benchmark_retrieval, evaluate_rankings
+from quorabust.retrieval_benchmark import (
+    RetrievalCase,
+    benchmark_retrieval,
+    evaluate_rankings,
+    query_length_bucket,
+)
 from quorabust.safe_artifact import load_safe_classifier, safe_metadata, save_safe_classifier
 
 try:
@@ -38,6 +43,7 @@ __all__ = [
     "RetrievalCase",
     "benchmark_retrieval",
     "evaluate_rankings",
+    "query_length_bucket",
     "save_safe_classifier",
     "load_safe_classifier",
     "safe_metadata",
