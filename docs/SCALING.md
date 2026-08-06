@@ -70,6 +70,13 @@ protocol tracked in
 [#13](https://github.com/AlisinaDevelo/Quorabust/issues/13) and the quality/cost gate in
 [#18](https://github.com/AlisinaDevelo/Quorabust/issues/18).
 
+Reports also include `query_length_strata` for measured latency by whitespace-token query
+length: `short` is 1-5 tokens, `medium` is 6-15, and `long` is 16 or more. Each populated
+bucket reports its source-case count, measured sample count, token-count range, and retrieval,
+rerank, and end-to-end p50/p95/p99 summaries. Warm-up passes are excluded; repetitions count
+once per case. Empty buckets are omitted. These are performance slices only and do not establish
+quality, language coverage, or production capacity without representative permitted data.
+
 ### Fresh-process profile
 
 Use `quorabust-retrieve-profile` when warm latency is not enough for a rollout decision:

@@ -1,4 +1,5 @@
 query,question_id,relevance
+Python,q1,2
 What is the best way to learn Python?,q1,2
 Where can I buy train tickets?,q2,1
 Where should I cache API responses?,q3,1

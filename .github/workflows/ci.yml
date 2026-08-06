@@ -143,7 +143,10 @@ jobs:
           assert report["sources"]["catalog"]["sha256"]
           assert report["measurement_policy"]["warmup_runs"] == 1
           assert report["measurement_policy"]["repetitions"] == 2
-          assert report["latency_ms"]["end_to_end"]["count"] == 6
+          assert report["latency_ms"]["end_to_end"]["count"] == 8
+          assert set(report["query_length_strata"]) == {"short", "medium"}
+          assert report["query_length_strata"]["short"]["measured_query_count"] == 2
+          assert report["query_length_strata"]["medium"]["measured_query_count"] == 6
           assert report["runtime"]["retriever_initialization_ms"] >= 0
           assert report["runtime"]["startup_measurement"] == "retriever_and_reranker_initialization_only"
       - name: Retrieval process profile smoke
@@ -168,5 +171,6 @@ jobs:
           assert report["evidence_scope"] == "timing_and_size_only_no_quality_claim"
           assert report["cold_start"]["measurement_count"] == 2
           assert report["sources"]["catalog"]["bytes"] > 0
-          assert report["warm_benchmark"]["query_count"] == 3
+          assert report["warm_benchmark"]["query_count"] == 4
+          assert set(report["warm_benchmark"]["query_length_strata"]) == {"short", "medium"}
           PY
