@@ -52,6 +52,8 @@ Optional:
 - `QUORABUST_MODEL_B_SHA256=...` to pin an A/B artifact when used.
 - `QUORABUST_API_KEY=...` to require `X-Quorabust-API-Key` on scoring and model metadata.
 - `QUORABUST_MAX_BATCH_SIZE=32` (or another small value) to bound public demo work.
+- `QUORABUST_MAX_TEXT_LENGTH=8192` (or a smaller value) to reject oversized question strings
+  before feature construction.
 
 ## Safety boundaries
 
@@ -61,6 +63,8 @@ Optional:
   startup rather than serve an unreviewed file.
 - Use `QUORABUST_API_KEY` and a small batch cap for a basic public-demo boundary; keep TLS,
   rate limiting, quotas, and key rotation at the host or gateway.
+- Keep the per-question text cap enabled; rejected text is neither logged nor echoed in the
+  stable 413 error response.
 - Keep request logs privacy-safe and ship only the structured operational event fields;
   never expose question text or API keys through logs.
 - Disable or protect the demo when it is no longer useful; the goal is inspection, not

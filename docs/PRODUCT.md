@@ -20,7 +20,8 @@ It does this with:
 - Reproducible offline training.
 - A deployable FastAPI scoring service.
 - Thresholded decisions, not only raw probabilities.
-- Optional API-key authentication and bounded scoring batches at the service boundary.
+- Optional API-key authentication, bounded scoring batches, and per-question text limits at
+  the service boundary.
 - Holdout-selected serving thresholds persisted in artifact metadata.
 - Model-card reporting with threshold sweeps.
 - Artifact metadata, JSON sidecars, and safe public model metadata.
@@ -68,11 +69,15 @@ Client errors use a stable envelope with a machine-readable `code`, safe `messag
 the same `request_id` returned in the `X-Request-ID` header:
 
 ```json
-{"error":{"code":"batch_too_large","message":"batch size exceeds configured maximum","request_id":"..."}}
+{"error":{"code":"batch_too_large","message":"question text exceeds configured maximum of 8192 characters","request_id":"..."}}
 ```
 
 This keeps retries, support tracing, and client-side branching independent of FastAPI's
 default validation wording.
+
+`QUORABUST_MAX_BATCH_SIZE` defaults to 256 pairs and `QUORABUST_MAX_TEXT_LENGTH` defaults to
+8192 characters per question. Both limits are checked before model scoring; rejected text is
+not logged or echoed.
 
 ## Enterprise Readiness
 

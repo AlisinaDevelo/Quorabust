@@ -102,8 +102,14 @@ jobs:
 
           from quorabust.serve import create_app
 
-          with TestClient(create_app()) as client:
+          with TestClient(create_app(max_text_length=4)) as client:
               assert client.get("/ready").status_code == 200
+              response = client.post(
+                  "/predict",
+                  json={"question1": ["hello"], "question2": ["world"]},
+              )
+              assert response.status_code == 413
+              assert response.json()["error"]["code"] == "batch_too_large"
           PY
       - name: Safe artifact smoke
         run: |

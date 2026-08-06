@@ -66,6 +66,8 @@ per-backend policy.
   `X-Quorabust-API-Key` on `/predict` and `/models`. Set
   `QUORABUST_MAX_BATCH_SIZE` to bound scoring work; the default is 256 pairs. Health,
   readiness, and metrics remain available for platform probes and should be network-scoped.
+  Set `QUORABUST_MAX_TEXT_LENGTH` to bound each question string before feature construction;
+  the default is 8192 characters and both sides of every pair are checked.
 - **Artifact integrity**: pin `QUORABUST_MODEL_SHA256` and
   `QUORABUST_MODEL_B_SHA256` when promoting artifacts; mismatches fail before pickle
   loading.
