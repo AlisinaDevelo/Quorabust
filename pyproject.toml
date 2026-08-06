@@ -66,6 +66,7 @@ quorabust-audit-data = "quorabust.data_audit:main"
 quorabust-serve = "quorabust.serve:main"
 quorabust-report = "quorabust.report:main"
 quorabust-validate-report = "quorabust.report_validation:main"
+quorabust-validate-retrieval = "quorabust.retrieval_validation:main"
 quorabust-demo-assets = "quorabust.demo_assets:main"
 
 [tool.setuptools.packages.find]
