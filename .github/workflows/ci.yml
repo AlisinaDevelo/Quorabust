@@ -30,6 +30,51 @@ jobs:
         run: quorabust-train --help
       - name: Data audit CLI
         run: quorabust-audit-data --help
+      - name: Strict data audit smoke
+        run: |
+          python - <<'PY'
+          import pandas as pd
+
+          pd.DataFrame(
+              {
+                  "question1": ["a", "b"],
+                  "question2": ["c", "d"],
+                  "is_duplicate": [0, 1],
+                  "qid1": ["q1", "q3"],
+                  "qid2": ["q2", "q4"],
+              }
+          ).to_csv("/tmp/quorabust-strict-audit.csv", index=False)
+          PY
+          quorabust-audit-data \
+            --csv /tmp/quorabust-strict-audit.csv \
+            --out /tmp/quorabust-strict-audit.json \
+            --require-question-ids
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          payload = json.loads(Path("/tmp/quorabust-strict-audit.json").read_text())
+          assert payload["status"] == "pass"
+          assert payload["question_ids"]["present"] is True
+          PY
+          if quorabust-audit-data \
+            --csv examples/smoke_pairs.csv \
+            --out /tmp/quorabust-strict-audit-failure.json \
+            --require-question-ids; then
+            echo "strict audit unexpectedly accepted a dataset without question IDs"
+            exit 1
+          fi
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          payload = json.loads(Path("/tmp/quorabust-strict-audit-failure.json").read_text())
+          question_id_check = next(
+              check for check in payload["checks"] if check["name"] == "question_ids"
+          )
+          assert payload["status"] == "fail"
+          assert question_id_check["status"] == "fail"
+          PY
       - name: Serve CLI
         run: quorabust-serve --help
       - name: Report CLI

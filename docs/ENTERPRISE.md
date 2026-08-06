@@ -25,12 +25,12 @@ When source data includes complete `qid1`/`qid2` columns, the default holdout is
 question connected components so a question cannot cross the train/eval boundary. The
 chosen strategy is persisted in metadata for review.
 
-Before training, run `quorabust-audit-data --csv ... --out ...` to create a path-light
+Before training, run `quorabust-audit-data --csv ... --out ... --require-question-ids` to create a path-light
 dataset preflight manifest. It records the source CSV hash, schema and binary-label
 checks, empty or repeated pair warnings, and whether complete question IDs are available.
-The command fails for missing required columns, an empty dataset, or non-binary labels;
-missing IDs remain an explicit warning because the trainer supports a documented row-level
-fallback.
+The command fails for missing required columns, an empty dataset, non-binary labels, or
+missing/incomplete IDs when the strict benchmark flag is present. Without that flag, missing
+IDs remain an explicit warning because the trainer supports a documented row-level fallback.
 
 For benchmark runs, pass `--eval-out` to `quorabust-train` and retain the exported holdout
 CSV with its metadata sidecar. The exact holdout hash is also copied into the lightweight

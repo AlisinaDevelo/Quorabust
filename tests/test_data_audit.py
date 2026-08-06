@@ -17,7 +17,12 @@ def test_audit_dataframe_reports_quality_and_question_id_signals():
         }
     )
 
-    audit = audit_dataframe(df, source_name="train.csv", source_sha256="a" * 64)
+    audit = audit_dataframe(
+        df,
+        source_name="train.csv",
+        source_sha256="a" * 64,
+        require_question_ids=True,
+    )
 
     assert audit["status"] == "pass"
     assert audit["source"] == {
@@ -36,6 +41,27 @@ def test_audit_dataframe_reports_quality_and_question_id_signals():
     assert audit["question_ids"]["present"] is True
     assert audit["question_ids"]["unique_count"] == 4
     assert audit["checks"][0]["status"] == "pass"
+    assert audit["checks"][-1]["observed"]["required"] is True
+
+
+def test_audit_dataframe_can_fail_closed_when_question_ids_are_missing_or_blank():
+    df = pd.DataFrame(
+        {
+            "question1": ["a", "b"],
+            "question2": ["c", "d"],
+            "is_duplicate": [0, 1],
+            "qid1": ["q1", ""],
+            "qid2": ["q2", "q4"],
+        }
+    )
+
+    audit = audit_dataframe(df, require_question_ids=True)
+
+    assert audit["status"] == "fail"
+    question_id_check = next(check for check in audit["checks"] if check["name"] == "question_ids")
+    assert question_id_check["status"] == "fail"
+    assert question_id_check["observed"]["required"] is True
+    assert "required for this benchmark protocol" in question_id_check["message"]
 
 
 def test_audit_dataframe_fails_for_schema_and_label_contract_violations():
@@ -76,3 +102,32 @@ def test_audit_cli_writes_json_and_returns_nonzero_for_invalid_data(tmp_path):
     payload = json.loads(report_path.read_text(encoding="utf-8"))
     assert payload["status"] == "fail"
     assert payload["source"]["sha256"]
+
+
+def test_audit_cli_strict_question_ids_fails_without_complete_ids(tmp_path):
+    csv_path = tmp_path / "pairs.csv"
+    report_path = tmp_path / "audit.json"
+    pd.DataFrame(
+        {
+            "question1": ["a"],
+            "question2": ["b"],
+            "is_duplicate": [0],
+        }
+    ).to_csv(csv_path, index=False)
+
+    result = main(
+        [
+            "--csv",
+            str(csv_path),
+            "--out",
+            str(report_path),
+            "--require-question-ids",
+        ]
+    )
+
+    assert result == 1
+    payload = json.loads(report_path.read_text(encoding="utf-8"))
+    question_id_check = next(
+        check for check in payload["checks"] if check["name"] == "question_ids"
+    )
+    assert question_id_check["status"] == "fail"

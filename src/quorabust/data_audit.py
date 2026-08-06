@@ -62,7 +62,10 @@ def _question_id_summary(df: pd.DataFrame) -> dict[str, Any]:
 
     ids = df[list(OPTIONAL_QUESTION_ID_COLUMNS)]
     complete = ids.notna().all(axis=1)
-    values = pd.Series(ids.to_numpy().reshape(-1)).dropna().astype(str)
+    for column in OPTIONAL_QUESTION_ID_COLUMNS:
+        complete &= ids[column].astype("string").str.strip().ne("").fillna(False)
+    values = pd.Series(ids.to_numpy().reshape(-1)).dropna().astype(str).str.strip()
+    values = values[values != ""]
     value_counts = values.value_counts()
 
     parent: dict[str, str] = {}
@@ -99,6 +102,7 @@ def audit_dataframe(
     *,
     source_name: str | None = None,
     source_sha256: str | None = None,
+    require_question_ids: bool = False,
 ) -> dict[str, Any]:
     """Build a path-light quality and leakage preflight manifest for a pair dataset."""
     columns = [str(column).strip() for column in df.columns]
@@ -181,11 +185,18 @@ def audit_dataframe(
         ),
         _check(
             "question_ids",
-            "pass" if question_ids["present"] else "warn",
+            "pass"
+            if question_ids["present"]
+            else "fail"
+            if require_question_ids
+            else "warn",
             "complete question IDs support leakage-aware splitting"
             if question_ids["present"]
+            else "complete qid1 and qid2 are required for this benchmark protocol"
+            if require_question_ids
             else "qid1 and qid2 are absent or incomplete; row-level split may leak questions",
             missing=missing_optional_columns,
+            required=require_question_ids,
         ),
     ]
     status = "fail" if any(item["status"] == "fail" for item in checks) else "pass"
@@ -202,7 +213,11 @@ def audit_dataframe(
     }
 
 
-def audit_csv(path: str | Path) -> dict[str, Any]:
+def audit_csv(
+    path: str | Path,
+    *,
+    require_question_ids: bool = False,
+) -> dict[str, Any]:
     """Read a CSV and return its dataset audit manifest."""
     csv_path = Path(path)
     df = pd.read_csv(csv_path)
@@ -211,6 +226,7 @@ def audit_csv(path: str | Path) -> dict[str, Any]:
         df,
         source_name=csv_path.name,
         source_sha256=sha256_file(csv_path),
+        require_question_ids=require_question_ids,
     )
 
 
@@ -220,13 +236,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--csv", type=Path, required=True, help="Input question-pair CSV")
     parser.add_argument("--out", type=Path, required=True, help="Output JSON audit manifest")
+    parser.add_argument(
+        "--require-question-ids",
+        action="store_true",
+        help="Fail unless qid1 and qid2 are complete and non-blank",
+    )
     args = parser.parse_args(argv)
 
     if not args.csv.is_file():
         print(f"File not found: {args.csv}", file=sys.stderr)
         return 1
     try:
-        audit = audit_csv(args.csv)
+        audit = audit_csv(args.csv, require_question_ids=args.require_question_ids)
     except (OSError, ValueError) as exc:
         print(f"Unable to audit {args.csv}: {exc}", file=sys.stderr)
         return 1

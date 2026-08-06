@@ -55,13 +55,17 @@ manifests:
 ```bash
 quorabust-audit-data \
   --csv data/raw/train.csv \
-  --out reports/train-data-audit.json
+  --out reports/train-data-audit.json \
+  --require-question-ids
 ```
 
 The audit records a SHA-256 for the source CSV, required-column and binary-label checks,
 empty or repeated pair signals, and whether complete question IDs are available. It does
 not replace the leakage-aware split performed by `quorabust-train`; it makes the input
-contract and any warnings reviewable before training starts.
+contract and any warnings reviewable before training starts. `--require-question-ids` makes
+missing or blank `qid1`/`qid2` a failed audit for the public benchmark protocol. Omit it only
+for an explicitly documented exploratory or customer-domain run where the row-level fallback
+is an accepted limitation.
 
 For comparable numbers, generate the report from a held-out CSV that was not used for
 training:
