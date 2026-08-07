@@ -28,6 +28,21 @@ from quorabust.model import predict_proba_duplicate
 from quorabust.persist import load_classifier
 
 _REQUIRED_COLUMNS = {"question1", "question2", "is_duplicate"}
+_DEFAULT_MAX_SLICES = 50
+_SLICE_HEADERS = [
+    "slice_column",
+    "slice",
+    "n",
+    "positive_rate",
+    "threshold",
+    "accuracy",
+    "precision",
+    "recall",
+    "f1",
+    "log_loss",
+    "brier_score",
+    "expected_calibration_error",
+]
 _METADATA_KEYS = [
     "feature_backend",
     "feature_schema",
@@ -87,6 +102,32 @@ def _markdown_table(headers: list[str], rows: list[list[Any]]) -> str:
     return "\n".join(out)
 
 
+def _slice_table_rows(
+    evaluation_slices: dict[str, list[dict[str, Any]]],
+) -> list[list[Any]]:
+    rows: list[list[Any]] = []
+    for column in sorted(evaluation_slices):
+        for metrics in evaluation_slices[column]:
+            calibration = metrics.get("calibration", {})
+            rows.append(
+                [
+                    column,
+                    metrics["value"],
+                    metrics["n"],
+                    metrics["positive_rate"],
+                    metrics["threshold"],
+                    metrics["accuracy"],
+                    metrics["precision"],
+                    metrics["recall"],
+                    metrics["f1"],
+                    metrics["log_loss"],
+                    calibration.get("brier_score"),
+                    calibration.get("expected_calibration_error"),
+                ]
+            )
+    return rows
+
+
 def _metadata_from_meta(meta: dict[str, Any]) -> dict[str, Any]:
     return {k: meta[k] for k in _METADATA_KEYS if k in meta}
 
@@ -134,6 +175,7 @@ def build_evaluation_manifest(
     thresholds: list[float],
     calibration_bins: int,
     command: str,
+    slice_columns: list[str] | None = None,
 ) -> dict[str, Any]:
     """Build an auditable, path-light record for a holdout evaluation run."""
     labels = eval_df["is_duplicate"].astype(int)
@@ -159,6 +201,15 @@ def build_evaluation_manifest(
         "decision_threshold_metric",
     ]
     training_lineage = {key: meta[key] for key in lineage_keys if key in meta}
+    evaluation_policy: dict[str, Any] = {
+        "threshold": float(threshold),
+        "thresholds": [float(value) for value in thresholds],
+        "calibration_bins": int(calibration_bins),
+    }
+    normalized_slice_columns = [column.strip() for column in slice_columns or []]
+    if normalized_slice_columns:
+        evaluation_policy["slice_columns"] = normalized_slice_columns
+
     return {
         "schema_version": 1,
         "artifact": {
@@ -172,11 +223,7 @@ def build_evaluation_manifest(
             "positive_count": int(labels.sum()),
             "positive_rate": float(labels.mean()),
         },
-        "evaluation_policy": {
-            "threshold": float(threshold),
-            "thresholds": [float(value) for value in thresholds],
-            "calibration_bins": int(calibration_bins),
-        },
+        "evaluation_policy": evaluation_policy,
         "training_lineage": training_lineage,
         "runtime": {
             "python_version": platform.python_version(),
@@ -304,6 +351,59 @@ def threshold_sweep(
     return [_metrics_at_threshold(y, proba, threshold) for threshold in thresholds]
 
 
+def evaluate_slices(
+    builder: Any,
+    clf: Any,
+    df: pd.DataFrame,
+    *,
+    slice_columns: list[str],
+    threshold: float,
+    calibration_bins: int,
+    max_slices: int = _DEFAULT_MAX_SLICES,
+) -> dict[str, list[dict[str, Any]]]:
+    """Evaluate explicitly supplied, bounded dataset slices."""
+    if max_slices < 1:
+        raise ValueError("max_slices must be at least 1")
+    normalized_columns = [column.strip() for column in slice_columns]
+    if len(set(normalized_columns)) != len(normalized_columns):
+        raise ValueError("--slice-column values must be unique")
+
+    output: dict[str, list[dict[str, Any]]] = {}
+    for normalized_column in normalized_columns:
+        if not normalized_column:
+            raise ValueError("--slice-column cannot be empty")
+        if normalized_column not in df.columns:
+            raise ValueError(
+                f"Unknown slice column {normalized_column!r}; found {list(df.columns)}"
+            )
+        values = df[normalized_column]
+        if values.isna().any():
+            raise ValueError(f"slice column {normalized_column!r} contains missing labels")
+        labels = values.astype(str).str.strip()
+        if (labels == "").any():
+            raise ValueError(f"slice column {normalized_column!r} contains blank labels")
+        unique_labels = sorted(set(labels.tolist()))
+        if len(unique_labels) > max_slices:
+            raise ValueError(
+                f"slice column {normalized_column!r} has {len(unique_labels)} labels; "
+                f"maximum is {max_slices}"
+            )
+
+        rows: list[dict[str, Any]] = []
+        for label in unique_labels:
+            subset = df.loc[labels == label]
+            metrics = evaluate_holdout(
+                builder,
+                clf,
+                subset,
+                threshold=threshold,
+                calibration_bins=calibration_bins,
+            )
+            rows.append({"value": label, **metrics})
+        output[normalized_column] = rows
+    return output
+
+
 def render_model_card(
     *,
     artifact: str,
@@ -311,6 +411,7 @@ def render_model_card(
     holdout_metrics: dict[str, Any] | None = None,
     sweep_metrics: list[dict[str, Any]] | None = None,
     evaluation_manifest: dict[str, Any] | None = None,
+    evaluation_slices: dict[str, list[dict[str, Any]]] | None = None,
 ) -> str:
     """Render artifact metadata and optional holdout metrics as Markdown."""
     artifact_rows = [
@@ -454,6 +555,16 @@ def render_model_card(
                 ]
             )
 
+    if evaluation_slices:
+        parts.extend(
+            [
+                "",
+                "## Evaluation Slices",
+                "",
+                _markdown_table(_SLICE_HEADERS, _slice_table_rows(evaluation_slices)),
+            ]
+        )
+
     if evaluation_manifest is not None:
         parts.extend(
             [
@@ -498,6 +609,7 @@ def render_comparison_report(
     rows: list[dict[str, Any]],
     *,
     evaluation_manifest: dict[str, Any] | None = None,
+    evaluation_slices: dict[str, list[dict[str, Any]]] | None = None,
 ) -> str:
     """Render comparable artifact metrics as a Markdown table."""
     metric_rows = [
@@ -553,6 +665,15 @@ def render_comparison_report(
                 "",
             ]
         )
+    if evaluation_slices:
+        parts.extend(
+            [
+                "## Reference Model Evaluation Slices",
+                "",
+                _markdown_table(_SLICE_HEADERS, _slice_table_rows(evaluation_slices)),
+                "",
+            ]
+        )
     return "\n".join(parts)
 
 
@@ -563,6 +684,7 @@ def build_report_payload(
     holdout_metrics: dict[str, Any] | None = None,
     sweep_metrics: list[dict[str, Any]] | None = None,
     evaluation_manifest: dict[str, Any] | None = None,
+    evaluation_slices: dict[str, list[dict[str, Any]]] | None = None,
 ) -> dict[str, Any]:
     """Build a machine-readable report payload for CI and model comparisons."""
     payload: dict[str, Any] = {
@@ -611,6 +733,8 @@ def build_report_payload(
         }
         if sweep_metrics:
             payload["threshold_sweep"] = sweep_metrics
+    if evaluation_slices:
+        payload["evaluation_slices"] = evaluation_slices
     if evaluation_manifest is not None:
         payload["evaluation_manifest"] = evaluation_manifest
     return payload
@@ -689,6 +813,18 @@ def main(argv: list[str] | None = None) -> int:
         help="Number of probability bins for the optional calibration report",
     )
     parser.add_argument(
+        "--slice-column",
+        action="append",
+        default=[],
+        help="Optional evaluation slice column; repeat for language/domain/category slices",
+    )
+    parser.add_argument(
+        "--max-slices",
+        type=int,
+        default=_DEFAULT_MAX_SLICES,
+        help="Maximum distinct labels allowed per requested slice column",
+    )
+    parser.add_argument(
         "--artifact-label",
         default=None,
         help="Public artifact label to print instead of the local model path",
@@ -723,6 +859,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.calibration_bins < 1:
         print("--calibration-bins must be at least 1", file=sys.stderr)
         return 1
+    if args.max_slices < 1:
+        print("--max-slices must be at least 1", file=sys.stderr)
+        return 1
     try:
         thresholds = _parse_thresholds(args.thresholds)
     except ValueError as exc:
@@ -732,6 +871,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.manifest_out is not None and args.eval_csv is None:
         print("--manifest-out requires --eval-csv", file=sys.stderr)
         return 1
+    if args.slice_column and args.eval_csv is None:
+        print("--slice-column requires --eval-csv", file=sys.stderr)
+        return 1
 
     builder, clf, meta = load_classifier(args.model)
     artifact = args.artifact_label or str(args.model.resolve())
@@ -740,6 +882,7 @@ def main(argv: list[str] | None = None) -> int:
     sweep_metrics = None
     comparison_metrics = None
     evaluation_manifest = None
+    evaluation_slices = None
     if args.eval_csv is not None:
         if not args.eval_csv.is_file():
             print(f"File not found: {args.eval_csv}", file=sys.stderr)
@@ -759,6 +902,16 @@ def main(argv: list[str] | None = None) -> int:
                 eval_df,
                 thresholds=thresholds,
             )
+            if args.slice_column:
+                evaluation_slices = evaluate_slices(
+                    builder,
+                    clf,
+                    eval_df,
+                    slice_columns=args.slice_column,
+                    threshold=args.threshold,
+                    calibration_bins=args.calibration_bins,
+                    max_slices=args.max_slices,
+                )
             if args.compare_model:
                 comparison_metrics = [
                     _comparison_metrics(
@@ -788,6 +941,7 @@ def main(argv: list[str] | None = None) -> int:
             thresholds=thresholds,
             calibration_bins=args.calibration_bins,
             command=_report_command(argv),
+            slice_columns=args.slice_column,
         )
 
     if args.format == "json":
@@ -797,6 +951,7 @@ def main(argv: list[str] | None = None) -> int:
             holdout_metrics=holdout_metrics,
             sweep_metrics=sweep_metrics,
             evaluation_manifest=evaluation_manifest,
+            evaluation_slices=evaluation_slices,
         )
         if comparison_metrics is not None:
             payload["comparison"] = _comparison_rows(comparison_metrics)
@@ -805,6 +960,7 @@ def main(argv: list[str] | None = None) -> int:
         report = render_comparison_report(
             comparison_metrics,
             evaluation_manifest=evaluation_manifest,
+            evaluation_slices=evaluation_slices,
         )
     else:
         report = render_model_card(
@@ -813,6 +969,7 @@ def main(argv: list[str] | None = None) -> int:
             holdout_metrics=holdout_metrics,
             sweep_metrics=sweep_metrics,
             evaluation_manifest=evaluation_manifest,
+            evaluation_slices=evaluation_slices,
         )
     if args.out is None:
         print(report)

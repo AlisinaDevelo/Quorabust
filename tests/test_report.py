@@ -1,6 +1,7 @@
 import json
 
 import pandas as pd
+import pytest
 
 from quorabust.lineage import sha256_file
 from quorabust.model import train_duplicate_classifier
@@ -10,6 +11,7 @@ from quorabust.report import (
     build_report_payload,
     calibration_summary,
     evaluate_holdout,
+    evaluate_slices,
     main,
     render_comparison_report,
     render_model_card,
@@ -25,6 +27,10 @@ def _df():
             "is_duplicate": [i % 2 for i in range(30)],
         }
     )
+
+
+def _slice_df():
+    return _df().assign(language=["en" if i < 15 else "it" for i in range(30)])
 
 
 def _artifact(tmp_path):
@@ -219,6 +225,74 @@ def test_threshold_sweep_returns_tradeoff_rows(tmp_path):
     assert all(0.0 <= row["recall"] <= 1.0 for row in rows)
 
 
+def test_evaluate_slices_returns_sorted_metrics(tmp_path):
+    _, builder, clf = _artifact(tmp_path)
+
+    slices = evaluate_slices(
+        builder,
+        clf,
+        _slice_df(),
+        slice_columns=["language"],
+        threshold=0.5,
+        calibration_bins=5,
+    )
+
+    assert list(slices) == ["language"]
+    assert [row["value"] for row in slices["language"]] == ["en", "it"]
+    assert [row["n"] for row in slices["language"]] == [15, 15]
+    assert all(0.0 <= row["positive_rate"] <= 1.0 for row in slices["language"])
+    assert all(row["threshold"] == 0.5 for row in slices["language"])
+    assert all("log_loss" in row for row in slices["language"])
+    assert all("brier_score" in row["calibration"] for row in slices["language"])
+    assert all(
+        "expected_calibration_error" in row["calibration"] for row in slices["language"]
+    )
+
+
+def test_evaluate_slices_rejects_unsafe_labels_and_cardinality(tmp_path):
+    _, builder, clf = _artifact(tmp_path)
+    common = {
+        "threshold": 0.5,
+        "calibration_bins": 5,
+    }
+
+    with pytest.raises(ValueError, match="Unknown slice column"):
+        evaluate_slices(builder, clf, _df(), slice_columns=["language"], **common)
+    with pytest.raises(ValueError, match="missing labels"):
+        evaluate_slices(
+            builder,
+            clf,
+            _slice_df().assign(language=[None] + ["en"] * 14 + ["it"] * 15),
+            slice_columns=["language"],
+            **common,
+        )
+    with pytest.raises(ValueError, match="blank labels"):
+        evaluate_slices(
+            builder,
+            clf,
+            _slice_df().assign(language=[" "] + ["en"] * 14 + ["it"] * 15),
+            slice_columns=["language"],
+            **common,
+        )
+    with pytest.raises(ValueError, match="maximum is 1"):
+        evaluate_slices(
+            builder,
+            clf,
+            _slice_df(),
+            slice_columns=["language"],
+            max_slices=1,
+            **common,
+        )
+    with pytest.raises(ValueError, match="must be unique"):
+        evaluate_slices(
+            builder,
+            clf,
+            _slice_df(),
+            slice_columns=["language", " language "],
+            **common,
+        )
+
+
 def test_render_comparison_report_sorts_by_f1():
     report = render_comparison_report(
         [
@@ -316,6 +390,61 @@ def test_report_cli_writes_json_payload(tmp_path):
     assert len(payload["threshold_sweep"]) == 3
     assert payload["evaluation_manifest"]["evaluation_dataset"]["rows"] == 30
     assert json.loads(manifest_out.read_text(encoding="utf-8")) == payload["evaluation_manifest"]
+
+
+def test_report_cli_writes_evaluation_slices_to_json_and_markdown(tmp_path):
+    model, _, _ = _artifact(tmp_path)
+    eval_csv = tmp_path / "eval.csv"
+    _slice_df().to_csv(eval_csv, index=False)
+    json_out = tmp_path / "MODEL_CARD.json"
+    markdown_out = tmp_path / "MODEL_CARD.md"
+
+    assert (
+        main(
+            [
+                "--model",
+                str(model),
+                "--eval-csv",
+                str(eval_csv),
+                "--slice-column",
+                "language",
+                "--max-slices",
+                "2",
+                "--format",
+                "json",
+                "--out",
+                str(json_out),
+            ]
+        )
+        == 0
+    )
+
+    payload = json.loads(json_out.read_text(encoding="utf-8"))
+    assert [row["value"] for row in payload["evaluation_slices"]["language"]] == ["en", "it"]
+    assert sum(row["n"] for row in payload["evaluation_slices"]["language"]) == 30
+    assert payload["evaluation_slices"]["language"][0]["calibration"]["brier_score"] >= 0
+    assert payload["evaluation_manifest"]["evaluation_policy"]["slice_columns"] == [
+        "language"
+    ]
+
+    assert (
+        main(
+            [
+                "--model",
+                str(model),
+                "--eval-csv",
+                str(eval_csv),
+                "--slice-column",
+                "language",
+                "--out",
+                str(markdown_out),
+            ]
+        )
+        == 0
+    )
+    card = markdown_out.read_text(encoding="utf-8")
+    assert "## Evaluation Slices" in card
+    assert "| language | en |" in card
 
 
 def test_report_cli_writes_comparison_json(tmp_path):
