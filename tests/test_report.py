@@ -247,6 +247,35 @@ def test_evaluate_slices_returns_sorted_metrics(tmp_path):
     assert all(
         "expected_calibration_error" in row["calibration"] for row in slices["language"]
     )
+    for row in slices["language"]:
+        uncertainty = row["uncertainty"]
+        assert uncertainty["confidence_level"] == 0.95
+        assert uncertainty["method"] == "wilson_binomial_interval"
+        for metric in ("positive_rate", "accuracy", "precision", "recall"):
+            interval = uncertainty["confidence_intervals"][metric]
+            assert interval[0] <= row[metric] <= interval[1]
+            assert 0.0 <= interval[0] <= interval[1] <= 1.0
+        assert "remain point estimates" in uncertainty["caveat"]
+
+
+def test_evaluate_slices_marks_degenerate_rate_intervals_unavailable(tmp_path):
+    _, builder, clf = _artifact(tmp_path)
+    df = _df().assign(language=["negative" if i % 2 == 0 else "positive" for i in range(30)])
+
+    slices = evaluate_slices(
+        builder,
+        clf,
+        df,
+        slice_columns=["language"],
+        threshold=0.5,
+        calibration_bins=5,
+    )
+
+    negative = slices["language"][0]
+    assert negative["value"] == "negative"
+    assert negative["uncertainty"]["confidence_intervals"]["positive_rate"][0] == 0.0
+    assert negative["uncertainty"]["confidence_intervals"]["positive_rate"][1] > 0.0
+    assert negative["uncertainty"]["confidence_intervals"]["recall"] is None
 
 
 def test_evaluate_slices_rejects_unsafe_labels_and_cardinality(tmp_path):
@@ -444,6 +473,7 @@ def test_report_cli_writes_evaluation_slices_to_json_and_markdown(tmp_path):
     )
     card = markdown_out.read_text(encoding="utf-8")
     assert "## Evaluation Slices" in card
+    assert "Wilson 95% confidence intervals" in card
     assert "| language | en |" in card
 
 

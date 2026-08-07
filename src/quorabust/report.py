@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import platform
 import shlex
 import sys
 from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+from statistics import NormalDist
 from typing import Any
 
 import numpy as np
@@ -42,7 +44,15 @@ _SLICE_HEADERS = [
     "log_loss",
     "brier_score",
     "expected_calibration_error",
+    "positive_rate_ci95",
+    "accuracy_ci95",
+    "precision_ci95",
+    "recall_ci95",
 ]
+_SLICE_UNCERTAINTY_NOTE = (
+    "Wilson 95% confidence intervals cover positive rate, accuracy, precision, and recall. "
+    "Log loss, F1, ROC-AUC, Brier score, and ECE remain point estimates."
+)
 _METADATA_KEYS = [
     "feature_backend",
     "feature_schema",
@@ -102,6 +112,56 @@ def _markdown_table(headers: list[str], rows: list[list[Any]]) -> str:
     return "\n".join(out)
 
 
+def _wilson_interval(
+    successes: int,
+    trials: int,
+    *,
+    confidence_level: float = 0.95,
+) -> list[float] | None:
+    """Return a Wilson interval for a binomial rate or None if undefined."""
+    if trials < 1 or successes < 0 or successes > trials:
+        return None
+    z = NormalDist().inv_cdf(0.5 + confidence_level / 2)
+    proportion = successes / trials
+    denominator = 1 + (z * z / trials)
+    center = (proportion + (z * z / (2 * trials))) / denominator
+    margin = (
+        z
+        * math.sqrt(
+            (proportion * (1 - proportion) / trials)
+            + (z * z / (4 * trials * trials))
+        )
+        / denominator
+    )
+    lower = max(0.0, center - margin)
+    upper = min(1.0, center + margin)
+    if successes == 0:
+        lower = 0.0
+    if successes == trials:
+        upper = 1.0
+    return [lower, upper]
+
+
+def _slice_uncertainty(metrics: dict[str, Any]) -> dict[str, Any]:
+    """Summarize uncertainty for rate metrics derived from a confusion matrix."""
+    n = int(metrics["n"])
+    tn = int(metrics["tn"])
+    fp = int(metrics["fp"])
+    fn = int(metrics["fn"])
+    tp = int(metrics["tp"])
+    return {
+        "confidence_level": 0.95,
+        "method": "wilson_binomial_interval",
+        "confidence_intervals": {
+            "positive_rate": _wilson_interval(tp + fn, n),
+            "accuracy": _wilson_interval(tn + tp, n),
+            "precision": _wilson_interval(tp, tp + fp),
+            "recall": _wilson_interval(tp, tp + fn),
+        },
+        "caveat": _SLICE_UNCERTAINTY_NOTE,
+    }
+
+
 def _slice_table_rows(
     evaluation_slices: dict[str, list[dict[str, Any]]],
 ) -> list[list[Any]]:
@@ -109,6 +169,8 @@ def _slice_table_rows(
     for column in sorted(evaluation_slices):
         for metrics in evaluation_slices[column]:
             calibration = metrics.get("calibration", {})
+            uncertainty = metrics.get("uncertainty", {})
+            intervals = uncertainty.get("confidence_intervals", {})
             rows.append(
                 [
                     column,
@@ -123,6 +185,10 @@ def _slice_table_rows(
                     metrics["log_loss"],
                     calibration.get("brier_score"),
                     calibration.get("expected_calibration_error"),
+                    intervals.get("positive_rate"),
+                    intervals.get("accuracy"),
+                    intervals.get("precision"),
+                    intervals.get("recall"),
                 ]
             )
     return rows
@@ -399,6 +465,7 @@ def evaluate_slices(
                 threshold=threshold,
                 calibration_bins=calibration_bins,
             )
+            metrics["uncertainty"] = _slice_uncertainty(metrics)
             rows.append({"value": label, **metrics})
         output[normalized_column] = rows
     return output
@@ -561,6 +628,8 @@ def render_model_card(
                 "",
                 "## Evaluation Slices",
                 "",
+                _SLICE_UNCERTAINTY_NOTE,
+                "",
                 _markdown_table(_SLICE_HEADERS, _slice_table_rows(evaluation_slices)),
             ]
         )
@@ -669,6 +738,8 @@ def render_comparison_report(
         parts.extend(
             [
                 "## Reference Model Evaluation Slices",
+                "",
+                _SLICE_UNCERTAINTY_NOTE,
                 "",
                 _markdown_table(_SLICE_HEADERS, _slice_table_rows(evaluation_slices)),
                 "",
