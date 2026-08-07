@@ -111,6 +111,8 @@ startup and artifact-size evidence before setting deployment budgets.
   requires a complete qid1/qid2 component holdout; the validator checks the manifest and
   evaluated-column contract without claiming model quality. The manifest binds the report to
   model and holdout hashes, training lineage, runtime, and the exact evaluation invocation.
+  Repeat `--slice-column` on `quorabust-report` for caller-owned, bounded cohort diagnostics;
+  those labels are recorded in the manifest and are not inferred by the service.
 - **`quorabust-validate-retrieval`** applies the same fail-closed discipline to
   retrieval/profile evidence and caller-supplied recall/p95 policies.
 - Put TLS termination, distributed rate limiting, quotas, and key rotation at the ingress

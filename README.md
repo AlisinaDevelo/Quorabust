@@ -182,6 +182,12 @@ record. Add `--require-question-component-split` for a public benchmark release 
 prove the evaluation holdout used complete question IDs and a leakage-safe component split.
 Use repeated `--compare-model label=path` flags to compare TF-IDF, embedding, and
 cross-encoder artifacts against the same holdout split.
+For caller-supplied evaluation slices, repeat `--slice-column` (for example,
+`--slice-column language --slice-column domain`). The report emits bounded per-label
+counts, rates, threshold metrics, log loss, and calibration diagnostics in JSON or
+Markdown, and records the requested columns in the evaluation manifest. Slice labels are
+provided by the dataset owner; Quorabust does not infer language or domain membership and
+slice output is not a quality claim without permitted, representative data.
 See [docs/REPORTING.md](docs/REPORTING.md) for the CI smoke workflow and
 real-evaluation checklist.
 

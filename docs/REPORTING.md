@@ -47,6 +47,31 @@ mean predicted probability, mean observed rate, and probability-bin rows. Use
 `--calibration-bins` to control how many bins are printed. Calibration helps decide
 whether probabilities are fit for thresholding or only useful for ranking.
 
+## Evaluation slices
+
+When a permitted holdout includes caller-owned labels such as language, product area, or
+traffic cohort, request bounded per-label diagnostics without changing the model or
+benchmark protocol:
+
+```bash
+quorabust-report \
+  --model models/quorabust.pkl \
+  --eval-csv data/processed/holdout.csv \
+  --slice-column language \
+  --slice-column domain \
+  --max-slices 20 \
+  --format json \
+  --out reports/quorabust-slices.json
+```
+
+Each requested column is validated for existence, missing or blank labels, and bounded
+cardinality. The JSON and Markdown report contains one row per label with its sample count,
+positive rate, selected-threshold metrics, log loss, and calibration diagnostics. Labels are
+sorted for deterministic output, and the evaluation manifest records the requested slice
+columns. Quorabust does not infer language or domain membership; slice rows are descriptive
+evidence only and do not establish model quality without a permitted, representative
+dataset.
+
 ## Real Evaluation
 
 Start with a data preflight and keep its JSON output next to the training and evaluation
