@@ -251,8 +251,13 @@ def test_evaluate_slices_returns_sorted_metrics(tmp_path):
         uncertainty = row["uncertainty"]
         assert uncertainty["confidence_level"] == 0.95
         assert uncertainty["method"] == "wilson_binomial_interval"
+        assert uncertainty["confidence_intervals"]["positive_rate"] is not None
+        assert uncertainty["confidence_intervals"]["accuracy"] is not None
         for metric in ("positive_rate", "accuracy", "precision", "recall"):
             interval = uncertainty["confidence_intervals"][metric]
+            if interval is None:
+                assert metric in {"precision", "recall"}
+                continue
             assert interval[0] <= row[metric] <= interval[1]
             assert 0.0 <= interval[0] <= interval[1] <= 1.0
         assert "remain point estimates" in uncertainty["caveat"]
