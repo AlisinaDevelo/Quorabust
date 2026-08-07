@@ -72,6 +72,13 @@ columns. Quorabust does not infer language or domain membership; slice rows are 
 evidence only and do not establish model quality without a permitted, representative
 dataset.
 
+Each slice also carries a 95% Wilson binomial interval for positive rate, accuracy,
+precision, and recall. The JSON object records the method and confidence level; Markdown
+prints the intervals and the same caveat. Undefined denominators, such as recall for a
+slice with no positive labels, are reported as unavailable rather than fabricated. Log
+loss, F1, ROC-AUC, Brier score, and expected calibration error remain point estimates
+unless a permitted resampling protocol is supplied.
+
 ## Real Evaluation
 
 Start with a data preflight and keep its JSON output next to the training and evaluation

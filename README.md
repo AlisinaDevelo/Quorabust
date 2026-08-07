@@ -188,6 +188,9 @@ counts, rates, threshold metrics, log loss, and calibration diagnostics in JSON 
 Markdown, and records the requested columns in the evaluation manifest. Slice labels are
 provided by the dataset owner; Quorabust does not infer language or domain membership and
 slice output is not a quality claim without permitted, representative data.
+Slice rows also include 95% Wilson intervals for rate metrics; undefined rates are null,
+and log loss, F1, ROC-AUC, Brier score, and ECE remain point estimates unless a permitted
+resampling protocol is supplied.
 See [docs/REPORTING.md](docs/REPORTING.md) for the CI smoke workflow and
 real-evaluation checklist.
 
