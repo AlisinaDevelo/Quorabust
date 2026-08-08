@@ -17,6 +17,7 @@ from quorabust.model import (
     predict_proba_duplicate,
     select_decision_threshold,
     train_duplicate_classifier,
+    validate_threshold_costs,
 )
 from quorabust.persist import save_classifier, save_metadata_sidecar
 from quorabust.registry import append_model_record
@@ -137,9 +138,21 @@ def main(argv: list[str] | None = None) -> int:
     )
     p.add_argument(
         "--threshold-metric",
-        choices=["accuracy", "precision", "recall", "f1"],
+        choices=["accuracy", "precision", "recall", "f1", "expected_cost"],
         default="f1",
         help="Metric to optimize when selecting a decision threshold from the holdout",
+    )
+    p.add_argument(
+        "--false-positive-cost",
+        type=float,
+        default=1.0,
+        help="Cost assigned to a false-positive decision",
+    )
+    p.add_argument(
+        "--false-negative-cost",
+        type=float,
+        default=1.0,
+        help="Cost assigned to a false-negative decision",
     )
     args = p.parse_args(argv)
 
@@ -148,6 +161,10 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     try:
         threshold_candidates = _parse_thresholds(args.thresholds)
+        threshold_costs = validate_threshold_costs(
+            args.false_positive_cost,
+            args.false_negative_cost,
+        )
     except ValueError as e:
         print(e, file=sys.stderr)
         return 1
@@ -264,6 +281,8 @@ def main(argv: list[str] | None = None) -> int:
             p_eval,
             thresholds=threshold_candidates,
             optimize_for=args.threshold_metric,
+            false_positive_cost=threshold_costs["false_positive_cost"],
+            false_negative_cost=threshold_costs["false_negative_cost"],
         )
         meta["decision_threshold"] = selected_threshold["threshold"]
         meta["decision_threshold_source"] = "eval_holdout"
@@ -271,6 +290,8 @@ def main(argv: list[str] | None = None) -> int:
         meta["decision_threshold_metrics"] = {
             k: v for k, v in selected_threshold.items() if k != "threshold"
         }
+        if args.threshold_metric == "expected_cost":
+            meta["decision_threshold_costs"] = threshold_costs
     print(
         "metrics: "
         + ", ".join(f"{k}={v:.4f}" for k, v in sorted(m.items())),
@@ -288,23 +309,26 @@ def main(argv: list[str] | None = None) -> int:
             {**meta, "artifact_sha256": artifact_sha256},
         )
     if args.registry_dir is not None:
+        registry_record = {
+            "artifact": str(args.out.resolve()),
+            "artifact_sha256": artifact_sha256,
+            "feature_backend": args.feature_backend,
+            "git_revision": meta.get("git_revision"),
+            "quorabust_version": meta.get("quorabust_version"),
+            "decision_threshold": meta.get("decision_threshold"),
+            "decision_threshold_metric": meta.get("decision_threshold_metric"),
+            "eval_csv_sha256": meta.get("eval_csv_sha256"),
+            "eval_metrics": {
+                k: meta[k]
+                for k in ("eval_accuracy", "eval_log_loss", "eval_roc_auc")
+                if k in meta
+            },
+        }
+        if "decision_threshold_costs" in meta:
+            registry_record["decision_threshold_costs"] = meta["decision_threshold_costs"]
         append_model_record(
             args.registry_dir,
-            {
-                "artifact": str(args.out.resolve()),
-                "artifact_sha256": artifact_sha256,
-                "feature_backend": args.feature_backend,
-                "git_revision": meta.get("git_revision"),
-                "quorabust_version": meta.get("quorabust_version"),
-                "decision_threshold": meta.get("decision_threshold"),
-                "decision_threshold_metric": meta.get("decision_threshold_metric"),
-                "eval_csv_sha256": meta.get("eval_csv_sha256"),
-                "eval_metrics": {
-                    k: meta[k]
-                    for k in ("eval_accuracy", "eval_log_loss", "eval_roc_auc")
-                    if k in meta
-                },
-            },
+            registry_record,
         )
     print(f"wrote {args.out.resolve()}")
     return 0

@@ -99,6 +99,36 @@ def test_validate_protocol_payload_accepts_complete_contract():
     assert validate_protocol_payload(_payload()) == []
 
 
+def test_validate_protocol_payload_accepts_expected_cost_policy():
+    payload = _payload()
+    payload["decision_policy"].update(
+        {
+            "threshold_metric": "expected_cost",
+            "false_positive_cost": 10.0,
+            "false_negative_cost": 1.0,
+        }
+    )
+
+    assert validate_protocol_payload(payload) == []
+
+
+def test_validate_protocol_payload_rejects_incomplete_expected_cost_policy():
+    payload = _payload()
+    payload["decision_policy"]["threshold_metric"] = "expected_cost"
+    payload["decision_policy"]["false_positive_cost"] = 10.0
+
+    errors = validate_protocol_payload(payload)
+
+    assert (
+        "decision_policy expected_cost requires: false_negative_cost" in errors
+    )
+
+    payload["decision_policy"]["false_negative_cost"] = 0.0
+    payload["decision_policy"]["false_positive_cost"] = 0.0
+    errors = validate_protocol_payload(payload)
+    assert "decision_policy requires at least one positive threshold cost" in errors
+
+
 def test_validate_protocol_payload_rejects_leakage_and_provenance_breaks():
     payload = _payload()
     payload["dataset"]["audit"]["require_question_ids"] = False

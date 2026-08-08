@@ -107,6 +107,50 @@ def test_cli_persists_holdout_decision_threshold(tmp_path):
     assert payload["threshold_candidates"] == [0.3, 0.5, 0.7]
 
 
+def test_cli_persists_expected_cost_policy(tmp_path):
+    csv = tmp_path / "train.csv"
+    _write_synthetic_csv(csv, n=80)
+    out = tmp_path / "model.pkl"
+    meta = tmp_path / "model.meta.json"
+    registry = tmp_path / "registry"
+
+    assert (
+        main(
+            [
+                "--csv",
+                str(csv),
+                "--out",
+                str(out),
+                "--metadata-out",
+                str(meta),
+                "--registry-dir",
+                str(registry),
+                "--thresholds",
+                "0.3,0.5,0.7",
+                "--threshold-metric",
+                "expected_cost",
+                "--false-positive-cost",
+                "10",
+                "--false-negative-cost",
+                "1",
+            ]
+        )
+        == 0
+    )
+
+    payload = json.loads(meta.read_text(encoding="utf-8"))
+    assert payload["decision_threshold_metric"] == "expected_cost"
+    assert payload["decision_threshold_costs"] == {
+        "false_positive_cost": 10.0,
+        "false_negative_cost": 1.0,
+    }
+    assert {"expected_cost", "false_positives", "false_negatives"}.issubset(
+        payload["decision_threshold_metrics"]
+    )
+    record = load_model_records(registry)[0]
+    assert record["decision_threshold_costs"] == payload["decision_threshold_costs"]
+
+
 def test_cli_exports_the_exact_holdout_and_records_its_hash(tmp_path):
     csv = tmp_path / "train.csv"
     _write_synthetic_csv(csv, n=80)

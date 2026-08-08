@@ -36,7 +36,7 @@ def _tiny_pkl(path):
     )
 
 
-def _tiny_pkl_with_threshold(path, threshold: float) -> None:
+def _tiny_pkl_with_threshold(path, threshold: float, costs: dict | None = None) -> None:
     df = pd.DataFrame(
         {
             "question1": ["hello world", "foo bar", "what is python"],
@@ -45,15 +45,18 @@ def _tiny_pkl_with_threshold(path, threshold: float) -> None:
         }
     )
     b, clf = train_duplicate_classifier(df, xgb_params={"n_estimators": 12, "max_depth": 3})
+    meta = {
+        "feature_backend": "tfidf",
+        "feature_schema": ["cos", "jaccard", "len_ratio", "abs_len_diff", "len_sum"],
+        "decision_threshold": threshold,
+    }
+    if costs is not None:
+        meta["decision_threshold_costs"] = costs
     save_classifier(
         path,
         b,
         clf,
-        meta={
-            "feature_backend": "tfidf",
-            "feature_schema": ["cos", "jaccard", "len_ratio", "abs_len_diff", "len_sum"],
-            "decision_threshold": threshold,
-        },
+        meta=meta,
     )
 
 
@@ -276,6 +279,25 @@ def test_models_exposes_public_decision_threshold_metadata(tmp_path):
     assert r.status_code == 200
     model = r.json()["variants"]["a"]
     assert model["decision_threshold"] == 0.91
+
+
+def test_models_exposes_public_decision_cost_policy(tmp_path):
+    p = tmp_path / "m.pkl"
+    _tiny_pkl_with_threshold(
+        p,
+        0.7,
+        {"false_positive_cost": 10.0, "false_negative_cost": 1.0},
+    )
+    app = create_app(model_path_a=str(p))
+    with TestClient(app) as client:
+        r = client.get("/models")
+
+    assert r.status_code == 200
+    model = r.json()["variants"]["a"]
+    assert model["decision_threshold_costs"] == {
+        "false_positive_cost": 10.0,
+        "false_negative_cost": 1.0,
+    }
 
 
 def test_predict_threshold_query_overrides_artifact_threshold(tmp_path):

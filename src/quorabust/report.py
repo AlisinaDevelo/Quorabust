@@ -74,6 +74,7 @@ _METADATA_KEYS = [
     "decision_threshold",
     "decision_threshold_source",
     "decision_threshold_metric",
+    "decision_threshold_costs",
 ]
 
 
@@ -267,6 +268,7 @@ def build_evaluation_manifest(
         "decision_threshold",
         "decision_threshold_source",
         "decision_threshold_metric",
+        "decision_threshold_costs",
     ]
     training_lineage = {key: meta[key] for key in lineage_keys if key in meta}
     evaluation_policy: dict[str, Any] = {

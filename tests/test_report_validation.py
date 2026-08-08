@@ -297,6 +297,29 @@ def test_validate_report_payload_binds_to_protocol():
     ) == []
 
 
+def test_validate_report_payload_binds_expected_cost_policy():
+    report = _payload()
+    protocol = _protocol_payload()
+    report["evaluation_manifest"]["training_lineage"].update(
+        {
+            "threshold_metric": "expected_cost",
+            "decision_threshold_costs": {
+                "false_positive_cost": 10.0,
+                "false_negative_cost": 1.0,
+            },
+        }
+    )
+    protocol["decision_policy"].update(
+        {
+            "threshold_metric": "expected_cost",
+            "false_positive_cost": 10.0,
+            "false_negative_cost": 1.0,
+        }
+    )
+
+    assert validate_report_payload(report, protocol_payload=protocol) == []
+
+
 def test_protocol_binding_requires_holdout_and_calibration():
     report = _payload()
     del report["holdout_evaluation"]

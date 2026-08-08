@@ -99,6 +99,24 @@ def test_build_protocol_payload_hashes_audited_artifacts(tmp_path):
     assert len(payload["provenance"]["git_revision"]) == 40
 
 
+def test_build_protocol_preserves_expected_cost_policy(tmp_path):
+    config_path, config, _ = _fixture(tmp_path)
+    config["decision_policy"].update(
+        {
+            "threshold_metric": "expected_cost",
+            "false_positive_cost": 10.0,
+            "false_negative_cost": 1.0,
+        }
+    )
+
+    payload = build_protocol_payload(config, base_dir=config_path.parent)
+
+    assert payload["decision_policy"]["threshold_metric"] == "expected_cost"
+    assert payload["decision_policy"]["false_positive_cost"] == 10.0
+    assert payload["decision_policy"]["false_negative_cost"] == 1.0
+    assert validate_protocol_payload(payload) == []
+
+
 def test_build_protocol_writes_canonical_manifest_and_cli_output(tmp_path, capsys):
     config_path, _, _ = _fixture(tmp_path)
     output_path = tmp_path / "reports" / "protocol.json"

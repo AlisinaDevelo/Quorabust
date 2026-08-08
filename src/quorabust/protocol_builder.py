@@ -80,6 +80,17 @@ def _require_fraction(value: Any, label: str) -> float:
     return float(value)
 
 
+def _require_cost(value: Any, label: str) -> float:
+    if (
+        not isinstance(value, (int, float))
+        or isinstance(value, bool)
+        or not math.isfinite(float(value))
+        or float(value) < 0.0
+    ):
+        raise ValueError(f"{label} must be finite and non-negative")
+    return float(value)
+
+
 def _require_question_id_columns(value: Any, label: str) -> list[str]:
     if not isinstance(value, list) or not value or not all(isinstance(item, str) for item in value):
         raise ValueError(f"{label} must be a non-empty list of strings")
@@ -179,7 +190,25 @@ def _validate_config_contract(config: dict[str, Any]) -> dict[str, Any]:
         policy["threshold_candidates"],
         "config.decision_policy.threshold_candidates",
     )
-    return {
+    threshold_costs: dict[str, float] = {}
+    cost_keys = ("false_positive_cost", "false_negative_cost")
+    present_cost_keys = [key for key in cost_keys if key in policy]
+    if present_cost_keys or threshold_metric == "expected_cost":
+        missing_cost_keys = [key for key in cost_keys if key not in policy]
+        if missing_cost_keys:
+            raise ValueError(
+                "config.decision_policy expected_cost requires: "
+                + ", ".join(missing_cost_keys)
+            )
+        threshold_costs = {
+            key: _require_cost(policy[key], f"config.decision_policy.{key}")
+            for key in cost_keys
+        }
+        if sum(threshold_costs.values()) == 0.0:
+            raise ValueError(
+                "config.decision_policy requires at least one positive threshold cost"
+            )
+    normalized = {
         "question_id_columns": question_id_columns,
         "seed": seed,
         "eval_fraction": eval_fraction,
@@ -187,6 +216,9 @@ def _validate_config_contract(config: dict[str, Any]) -> dict[str, Any]:
         "threshold_candidates": threshold_candidates,
         "calibration_method": calibration_method,
     }
+    if threshold_costs:
+        normalized["threshold_costs"] = threshold_costs
+    return normalized
 
 
 def _resolve_file(value: Any, label: str, base_dir: Path) -> Path:
@@ -322,6 +354,8 @@ def build_protocol_payload(
         "calibration_source_role": "calibration",
         "final_holdout_role": "final_holdout",
     }
+    if normalized.get("threshold_costs"):
+        decision_policy.update(normalized["threshold_costs"])
 
     dependency_lock_path = _resolve_file(
         config["dependency_lock_path"],

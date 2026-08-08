@@ -11,7 +11,7 @@ import numpy as np
 from quorabust.calibration import calibrate_classifier
 from quorabust.cli import _load_quora_csv, _parse_thresholds
 from quorabust.lineage import git_revision, sha256_file
-from quorabust.model import select_decision_threshold
+from quorabust.model import select_decision_threshold, validate_threshold_costs
 from quorabust.persist import load_classifier, save_classifier, save_metadata_sidecar
 from quorabust.registry import append_model_record
 from quorabust.report import calibration_summary
@@ -77,9 +77,21 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--threshold-metric",
-        choices=["accuracy", "precision", "recall", "f1"],
+        choices=["accuracy", "precision", "recall", "f1", "expected_cost"],
         default="f1",
         help="Metric to optimize on the threshold CSV",
+    )
+    parser.add_argument(
+        "--false-positive-cost",
+        type=float,
+        default=1.0,
+        help="Cost assigned to a false-positive decision",
+    )
+    parser.add_argument(
+        "--false-negative-cost",
+        type=float,
+        default=1.0,
+        help="Cost assigned to a false-negative decision",
     )
     parser.add_argument(
         "--metadata-out",
@@ -107,6 +119,10 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     try:
         thresholds = _parse_thresholds(args.thresholds)
+        threshold_costs = validate_threshold_costs(
+            args.false_positive_cost,
+            args.false_negative_cost,
+        )
     except ValueError as exc:
         print(exc, file=sys.stderr)
         return 1
@@ -169,6 +185,8 @@ def main(argv: list[str] | None = None) -> int:
             calibrated_threshold,
             thresholds=thresholds,
             optimize_for=args.threshold_metric,
+            false_positive_cost=threshold_costs["false_positive_cost"],
+            false_negative_cost=threshold_costs["false_negative_cost"],
         )
     except (RuntimeError, ValueError) as exc:
         print(f"Unable to fit calibration: {exc}", file=sys.stderr)
@@ -196,6 +214,8 @@ def main(argv: list[str] | None = None) -> int:
             key: value for key, value in selected_threshold.items() if key != "threshold"
         },
     }
+    if args.threshold_metric == "expected_cost":
+        calibrated_meta["decision_threshold_costs"] = threshold_costs
 
     save_classifier(args.out, builder, calibrated_classifier, meta=calibrated_meta)
     artifact_sha256 = sha256_file(args.out)
@@ -205,20 +225,25 @@ def main(argv: list[str] | None = None) -> int:
             {**calibrated_meta, "artifact_sha256": artifact_sha256},
         )
     if args.registry_dir is not None:
+        registry_record = {
+            "artifact": str(args.out.resolve()),
+            "artifact_sha256": artifact_sha256,
+            "feature_backend": calibrated_meta.get("feature_backend"),
+            "git_revision": calibrated_meta.get("git_revision"),
+            "calibration_method": args.calibration_method,
+            "calibration_csv_sha256": calibration_sha256,
+            "threshold_csv_sha256": threshold_sha256,
+            "decision_threshold": selected_threshold["threshold"],
+            "decision_threshold_metric": args.threshold_metric,
+            "calibrated_from_artifact_sha256": input_artifact_sha256,
+        }
+        if "decision_threshold_costs" in calibrated_meta:
+            registry_record["decision_threshold_costs"] = calibrated_meta[
+                "decision_threshold_costs"
+            ]
         append_model_record(
             args.registry_dir,
-            {
-                "artifact": str(args.out.resolve()),
-                "artifact_sha256": artifact_sha256,
-                "feature_backend": calibrated_meta.get("feature_backend"),
-                "git_revision": calibrated_meta.get("git_revision"),
-                "calibration_method": args.calibration_method,
-                "calibration_csv_sha256": calibration_sha256,
-                "threshold_csv_sha256": threshold_sha256,
-                "decision_threshold": selected_threshold["threshold"],
-                "decision_threshold_metric": args.threshold_metric,
-                "calibrated_from_artifact_sha256": input_artifact_sha256,
-            },
+            registry_record,
         )
 
     raw_ece = calibrated_meta["calibration_metrics"]["raw"]["expected_calibration_error"]

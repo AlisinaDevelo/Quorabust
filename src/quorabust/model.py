@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import numpy as np
@@ -127,13 +128,26 @@ def select_decision_threshold(
     *,
     thresholds: list[float] | None = None,
     optimize_for: str = "f1",
+    false_positive_cost: float = 1.0,
+    false_negative_cost: float = 1.0,
 ) -> dict[str, float]:
-    """Choose a probability threshold from labeled probabilities."""
+    """Choose a probability threshold from labeled probabilities.
+
+    ``expected_cost`` minimizes the normalized cost of false positives and false
+    negatives on the supplied tuning data. It is a policy-selection metric, not a
+    claim about production currency or business impact.
+    """
     candidates = thresholds or [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
-    if optimize_for not in {"accuracy", "precision", "recall", "f1"}:
-        raise ValueError("optimize_for must be one of: accuracy, precision, recall, f1")
+    allowed_metrics = {"accuracy", "precision", "recall", "f1", "expected_cost"}
+    if optimize_for not in allowed_metrics:
+        raise ValueError(
+            "optimize_for must be one of: accuracy, precision, recall, f1, expected_cost"
+        )
     if not candidates:
         raise ValueError("at least one threshold is required")
+    if len(y) == 0 or len(proba) != len(y):
+        raise ValueError("y and proba must have the same non-zero length")
+    costs = validate_threshold_costs(false_positive_cost, false_negative_cost)
 
     best: dict[str, float] | None = None
     for threshold in candidates:
@@ -147,19 +161,79 @@ def select_decision_threshold(
             "recall": float(recall_score(y, pred, zero_division=0)),
             "f1": float(f1_score(y, pred, zero_division=0)),
         }
+        if optimize_for == "expected_cost":
+            false_positives = int(((y == 0) & (pred == 1)).sum())
+            false_negatives = int(((y == 1) & (pred == 0)).sum())
+            row.update(
+                {
+                    "false_positive_cost": costs["false_positive_cost"],
+                    "false_negative_cost": costs["false_negative_cost"],
+                    "false_positives": float(false_positives),
+                    "false_negatives": float(false_negatives),
+                    "expected_cost": float(
+                        (
+                            false_positives * costs["false_positive_cost"]
+                            + false_negatives * costs["false_negative_cost"]
+                        )
+                        / len(y)
+                    ),
+                }
+            )
         if best is None:
             best = row
             continue
-        current_key = (row[optimize_for], row["f1"], row["accuracy"], -abs(row["threshold"] - 0.5))
-        best_key = (
-            best[optimize_for],
-            best["f1"],
-            best["accuracy"],
-            -abs(best["threshold"] - 0.5),
-        )
+        if optimize_for == "expected_cost":
+            current_key = (
+                -row["expected_cost"],
+                row["f1"],
+                row["accuracy"],
+                -abs(row["threshold"] - 0.5),
+            )
+            best_key = (
+                -best["expected_cost"],
+                best["f1"],
+                best["accuracy"],
+                -abs(best["threshold"] - 0.5),
+            )
+        else:
+            current_key = (
+                row[optimize_for],
+                row["f1"],
+                row["accuracy"],
+                -abs(row["threshold"] - 0.5),
+            )
+            best_key = (
+                best[optimize_for],
+                best["f1"],
+                best["accuracy"],
+                -abs(best["threshold"] - 0.5),
+            )
         if current_key > best_key:
             best = row
 
     if best is None:
         raise ValueError("at least one threshold is required")
     return best
+
+
+def validate_threshold_costs(
+    false_positive_cost: float,
+    false_negative_cost: float,
+) -> dict[str, float]:
+    """Validate and normalize the cost matrix used by threshold policy selection."""
+    costs = {
+        "false_positive_cost": false_positive_cost,
+        "false_negative_cost": false_negative_cost,
+    }
+    for label, value in costs.items():
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(float(value))
+            or float(value) < 0.0
+        ):
+            raise ValueError(f"{label} must be finite and non-negative")
+        costs[label] = float(value)
+    if costs["false_positive_cost"] == 0.0 and costs["false_negative_cost"] == 0.0:
+        raise ValueError("at least one threshold cost must be greater than zero")
+    return costs

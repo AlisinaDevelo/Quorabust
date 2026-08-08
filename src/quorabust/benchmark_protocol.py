@@ -20,7 +20,7 @@ _ROLE_ACTIVITIES = {
     "calibration": {"probability_calibration"},
     "final_holdout": {"final_evaluation"},
 }
-_THRESHOLD_METRICS = {"accuracy", "precision", "recall", "f1"}
+_THRESHOLD_METRICS = {"accuracy", "precision", "recall", "f1", "expected_cost"}
 _CALIBRATION_METHODS = {"sigmoid", "isotonic"}
 _REQUIRED_TOP_LEVEL = {
     "schema_version",
@@ -241,6 +241,32 @@ def _validate_decision_policy(policy: Any, errors: list[str]) -> None:
             "decision_policy.threshold_metric must be one of: "
             + ", ".join(sorted(_THRESHOLD_METRICS))
         )
+    cost_keys = ("false_positive_cost", "false_negative_cost")
+    present_cost_keys = [key for key in cost_keys if key in policy]
+    if present_cost_keys or policy.get("threshold_metric") == "expected_cost":
+        missing_cost_keys = [key for key in cost_keys if key not in policy]
+        if missing_cost_keys:
+            errors.append(
+                "decision_policy expected_cost requires: " + ", ".join(missing_cost_keys)
+            )
+        costs: list[float] = []
+        for key in cost_keys:
+            if key not in policy:
+                continue
+            value = policy[key]
+            if (
+                not isinstance(value, (int, float))
+                or isinstance(value, bool)
+                or not math.isfinite(float(value))
+                or float(value) < 0.0
+            ):
+                errors.append(
+                    f"decision_policy.{key} must be finite and non-negative"
+                )
+            else:
+                costs.append(float(value))
+        if len(costs) == 2 and sum(costs) == 0.0:
+            errors.append("decision_policy requires at least one positive threshold cost")
     candidates = policy.get("threshold_candidates")
     if not isinstance(candidates, list) or not candidates:
         errors.append("decision_policy.threshold_candidates must be a non-empty list")

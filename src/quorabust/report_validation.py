@@ -204,6 +204,19 @@ def _validate_protocol_binding(
             "evaluation_manifest.training_lineage.threshold_metric must match "
             "protocol.decision_policy.threshold_metric"
         )
+    if protocol_policy["threshold_metric"] == "expected_cost":
+        expected_costs = {
+            key: protocol_policy.get(key)
+            for key in ("false_positive_cost", "false_negative_cost")
+        }
+        report_costs = lineage.get("decision_threshold_costs")
+        if not isinstance(report_costs, dict) or any(
+            report_costs.get(key) != expected_costs[key] for key in expected_costs
+        ):
+            errors.append(
+                "evaluation_manifest.training_lineage.decision_threshold_costs must match "
+                "protocol decision policy costs"
+            )
 
     report_policy = manifest.get("evaluation_policy")
     if not isinstance(report_policy, dict):

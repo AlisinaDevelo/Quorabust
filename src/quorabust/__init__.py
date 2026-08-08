@@ -5,7 +5,12 @@ from importlib.metadata import PackageNotFoundError, version
 from quorabust.benchmark_freeze import ROLE_NAMES, freeze_protocol
 from quorabust.features import PairFeatureBuilder, word_jaccard
 from quorabust.hard_negatives import HardNegativeMiningResult, mine_hard_negatives
-from quorabust.model import eval_classification_metrics, train_duplicate_classifier
+from quorabust.model import (
+    eval_classification_metrics,
+    select_decision_threshold,
+    train_duplicate_classifier,
+    validate_threshold_costs,
+)
 from quorabust.persist import load_classifier, save_classifier
 from quorabust.preprocess import clean_text
 from quorabust.protocol_builder import build_protocol, build_protocol_payload
@@ -38,6 +43,8 @@ __all__ = [
     "mine_hard_negatives",
     "train_duplicate_classifier",
     "eval_classification_metrics",
+    "select_decision_threshold",
+    "validate_threshold_costs",
     "save_classifier",
     "load_classifier",
     "CatalogQuestion",
