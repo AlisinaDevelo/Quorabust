@@ -86,14 +86,22 @@ quorabust-validate-retrieval \
   --report reports/retrieval-benchmark.json \
   --min-final-recall-at-k 10=0.95 \
   --max-end-to-end-p95-ms 100
+
+quorabust-validate-retrieval \
+  --report reports/retrieval-profile.json \
+  --max-cold-start-p95-ms 5000 \
+  --max-peak-rss-bytes 2147483648 \
+  --max-total-artifact-bytes 1073741824
 ```
 
 The validator checks source hashes and byte counts, runtime provenance, repetition and latency
 sample invariants, and the query-length strata contract. The policy values belong to the target
 deployment and must be chosen from representative measurements; the command does not claim
-that one recall or latency threshold is universally correct. The fresh-process profile is
-accepted through its embedded `warm_benchmark` report and still retains its timing-only evidence
-boundary.
+that any displayed recall, latency, memory, or size threshold is universally correct. Cold-start
+and artifact-size policies require a fresh-process profile; artifact-size enforcement also
+requires at least one repeated `--artifact` input when generating that profile. RSS policy works
+with either report and fails closed where peak RSS is unavailable. The profile is accepted
+through its embedded `warm_benchmark` report and still retains its timing-only evidence boundary.
 
 ### Fresh-process profile
 

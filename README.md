@@ -161,9 +161,12 @@ local artifact hashes. It is an operational profile, not model-quality evidence.
 
 Use `quorabust-validate-retrieval` in release jobs to validate report provenance, measurement
 counts, latency summaries, and query-length strata, then apply caller-owned policies such as
-`--min-final-recall-at-k 10=0.95` and `--max-end-to-end-p95-ms 100`. The gate compares supplied
-evidence; it does not turn the smoke fixture into a public quality claim or define a universal
-latency target.
+`--min-final-recall-at-k 10=0.95`, `--max-end-to-end-p95-ms 100`,
+`--max-cold-start-p95-ms`, `--max-peak-rss-bytes`, and
+`--max-total-artifact-bytes`. Cold-start and artifact-size policies require a profile, and the
+artifact-size policy requires at least one profiled `--artifact`. The gate compares supplied
+evidence; it does not turn the smoke fixture into a public quality claim or define universal
+quality, latency, memory, or packaging targets.
 
 ### Generate a model card
 

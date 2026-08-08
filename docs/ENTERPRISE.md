@@ -126,7 +126,10 @@ startup and artifact-size evidence before setting deployment budgets.
   include Wilson intervals for rate metrics and mark log loss, F1, ROC-AUC, Brier score, and
   ECE as point estimates unless a permitted resampling protocol is supplied.
 - **`quorabust-validate-retrieval`** applies the same fail-closed discipline to
-  retrieval/profile evidence and caller-supplied recall/p95 policies.
+  retrieval/profile evidence and caller-supplied recall, warm/cold p95, peak-RSS, and declared
+  artifact-size policies. Cold-start and artifact-size budgets require profile evidence; the
+  validator does not choose deployment limits or convert synthetic smoke data into a capacity
+  claim.
 - Put TLS termination, distributed rate limiting, quotas, and key rotation at the ingress
   or gateway. The application key and batch cap are defense-in-depth controls, not a
   replacement for a multi-worker gateway policy. Ship the JSON request events to the
