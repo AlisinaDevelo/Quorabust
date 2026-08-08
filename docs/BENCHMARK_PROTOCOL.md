@@ -65,10 +65,28 @@ unordered configs produce the same policy ordering.
 
 For a permitted Quora release, keep the licensed source outside Git:
 
-1. Run `quorabust-audit-data --require-question-ids` and retain its JSON output outside
-   the repository with the source hash.
-2. Generate the deterministic question-component split and export the exact role files,
-   including the untouched final holdout. Hash each role artifact and the split manifest.
+1. Run the freezer against the permitted source. It always performs the strict audit first,
+   refuses existing output files, and writes all four role CSVs outside the repository:
+
+   ```bash
+   quorabust-freeze-protocol \
+     --csv /external/quora/question_pairs.csv \
+     --out-dir /external/quora/quorabust-roles \
+     --audit-out /external/quora/quorabust-audit.json \
+     --split-out /external/quora/quorabust-split.json \
+     --seed 42 \
+     --tuning-fraction 0.1 \
+     --calibration-fraction 0.1 \
+     --final-holdout-fraction 0.1
+   ```
+
+   The command writes `train.csv`, `tuning.csv`, `calibration.csv`, and
+   `final_holdout.csv` from whole question components. Its split manifest records source,
+   audit, role, and provenance hashes; repeat the command in a fresh output directory to
+   reproduce the same bytes from the same source bytes and seed.
+2. Review the passing audit and role counts, including the untouched final holdout. The
+   freezer fails closed for missing or incomplete IDs, invalid labels, insufficient
+   components, invalid fractions, and output collisions.
 3. Record the calibration method and threshold candidates, then point each decision to
    its owning role. Never tune or calibrate against the final holdout.
 4. Hash the dependency lock and record the exact training/report commands and commit.

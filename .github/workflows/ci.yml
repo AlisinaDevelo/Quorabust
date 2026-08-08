@@ -92,6 +92,56 @@ jobs:
           assert payload["status"] == "fail"
           assert question_id_check["status"] == "fail"
           PY
+      - name: Benchmark role freezer smoke
+        run: |
+          export FREEZE_DIR="$(mktemp -d)"
+          python - <<'PY'
+          import os
+          from pathlib import Path
+
+          import pandas as pd
+
+          root = Path(os.environ["FREEZE_DIR"])
+          rows = 24
+          pd.DataFrame(
+              {
+                  "question1": [f"question one {index}" for index in range(rows)],
+                  "question2": [f"question two {index}" for index in range(rows)],
+                  "is_duplicate": [index % 2 for index in range(rows)],
+                  "qid1": [f"q{index * 2}" for index in range(rows)],
+                  "qid2": [f"q{index * 2 + 1}" for index in range(rows)],
+              }
+          ).to_csv(root / "source.csv", index=False)
+          PY
+          quorabust-freeze-protocol \
+            --csv "$FREEZE_DIR/source.csv" \
+            --out-dir "$FREEZE_DIR/roles" \
+            --audit-out "$FREEZE_DIR/audit.json" \
+            --split-out "$FREEZE_DIR/split.json" \
+            --seed 42
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          import pandas as pd
+
+          root = Path(os.environ["FREEZE_DIR"])
+          manifest = json.loads((root / "split.json").read_text())
+          assert manifest["roles_are_disjoint"] is True
+          assert json.loads((root / "audit.json").read_text())["status"] == "pass"
+          question_ids = []
+          for role, record in manifest["roles"].items():
+              path = root / "roles" / f"{role}.csv"
+              digest = hashlib.sha256(path.read_bytes()).hexdigest()
+              assert digest == record["sha256"]
+              frame = pd.read_csv(path, dtype={"qid1": "string", "qid2": "string"})
+              question_ids.append(set(frame["qid1"]) | set(frame["qid2"]))
+          for index, current in enumerate(question_ids):
+              for other in question_ids[index + 1 :]:
+                  assert current.isdisjoint(other)
+          PY
       - name: Benchmark protocol smoke
         run: |
           python - <<'PY'
