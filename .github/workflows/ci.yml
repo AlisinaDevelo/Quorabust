@@ -208,6 +208,24 @@ jobs:
         run: quorabust-report --help
       - name: Report validator CLI
         run: quorabust-validate-report --help
+      - name: Protocol-bound report validator smoke
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          from tests.test_report_validation import _payload, _protocol_payload
+
+          Path("/tmp/quorabust-protocol-report.json").write_text(
+              json.dumps(_payload(), sort_keys=True) + "\n"
+          )
+          Path("/tmp/quorabust-protocol-report-protocol.json").write_text(
+              json.dumps(_protocol_payload(), sort_keys=True) + "\n"
+          )
+          PY
+          quorabust-validate-report \
+            --report /tmp/quorabust-protocol-report.json \
+            --protocol /tmp/quorabust-protocol-report-protocol.json
       - name: Calibration CLI
         run: quorabust-calibrate --help
       - name: Retrieval CLI

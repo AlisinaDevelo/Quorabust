@@ -48,3 +48,19 @@ This gate does not download data, inspect a license, prove row-level disjointnes
 establish model quality by itself. The audit and split artifacts remain the evidence that
 must be reviewed alongside any eventual model card. See [REPORTING.md](REPORTING.md) for
 the training, calibration, and report commands.
+
+## Bind a model card
+
+After generating a report, bind it to the protocol during release validation:
+
+```bash
+quorabust-validate-report \
+  --report reports/quorabust-model-card.json \
+  --protocol reports/quorabust-benchmark-protocol.json
+```
+
+Protocol-bound validation automatically requires holdout metrics, calibration diagnostics,
+the reproducibility manifest, and qid-component evidence. It also checks that the report's
+training source and final evaluation CSV hashes, split seed and fraction, threshold metric
+and candidate grid match the protocol. The report-only validator remains available for
+exploratory or customer-domain runs with an explicitly documented fallback policy.

@@ -187,6 +187,10 @@ label counts, threshold policy, runtime, commit, and exact invocation. Use
 to fail release jobs when a JSON model card is missing benchmark evidence or its audit
 record. Add `--require-question-component-split` for a public benchmark release that must
 prove the evaluation holdout used complete question IDs and a leakage-safe component split.
+For a protocol-bound release, add
+`--protocol reports/quorabust-benchmark-protocol.json`; this also requires the holdout,
+calibration, manifest, and component-split checks and binds the report to the declared
+source/final-holdout hashes, seed, threshold grid, and metric.
 Use repeated `--compare-model label=path` flags to compare TF-IDF, embedding, and
 cross-encoder artifacts against the same holdout split.
 For caller-supplied evaluation slices, repeat `--slice-column` (for example,

@@ -38,6 +38,9 @@ The manifest binds the audited source hash, distinct train/tuning/calibration/fi
 role artifacts, question-component split policy, threshold/calibration ownership, and
 runtime/dependency provenance. It also records that raw data is external and that the final
 holdout is not used for selection. See [BENCHMARK_PROTOCOL.md](BENCHMARK_PROTOCOL.md).
+Pass the same file to `quorabust-validate-report --protocol ...` when promoting a model card;
+the report validator then checks the report's source/final-holdout hashes and decision policy
+against the protocol.
 
 For benchmark runs, pass `--eval-out` to `quorabust-train` and retain the exported holdout
 CSV with its metadata sidecar. The exact holdout hash is also copied into the lightweight
