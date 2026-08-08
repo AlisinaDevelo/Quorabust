@@ -56,6 +56,13 @@ def _profile_report(payload: dict) -> dict:
         "benchmark": "quorabust-retrieve-profile",
         "evidence_scope": "timing_and_size_only_no_quality_claim",
         "sources": payload["sources"],
+        "artifacts": [
+            {
+                "name": "retriever.bin",
+                "sha256": "c" * 64,
+                "bytes": 25,
+            }
+        ],
         "configuration": payload["configuration"],
         "cold_start": {
             "measurement_count": 2,
@@ -77,13 +84,67 @@ def _profile_report(payload: dict) -> dict:
 
 def test_validate_retrieval_payload_accepts_benchmark_and_profile(tmp_path):
     _, payload = _benchmark_report(tmp_path)
+    profile = _profile_report(payload)
+    profile["warm_benchmark"]["runtime"]["peak_rss_bytes"] = 4096
 
     assert validate_retrieval_payload(
         payload,
         min_final_recall_at_k={1: 1.0},
         max_end_to_end_p95_ms=1000.0,
     ) == []
-    assert validate_retrieval_payload(_profile_report(payload)) == []
+    assert validate_retrieval_payload(
+        profile,
+        max_cold_start_p95_ms=2.0,
+        max_peak_rss_bytes=4096,
+        max_total_artifact_bytes=25,
+    ) == []
+
+
+def test_validate_retrieval_payload_enforces_profile_resource_budgets(tmp_path):
+    _, payload = _benchmark_report(tmp_path)
+    profile = _profile_report(payload)
+    profile["warm_benchmark"]["runtime"]["peak_rss_bytes"] = 4096
+
+    errors = validate_retrieval_payload(
+        profile,
+        max_cold_start_p95_ms=1.0,
+        max_peak_rss_bytes=4095,
+        max_total_artifact_bytes=24,
+    )
+
+    assert any("cold_start.process_to_report_ms.p95" in error for error in errors)
+    assert any("runtime.peak_rss_bytes" in error for error in errors)
+    assert any("total artifact bytes" in error for error in errors)
+
+
+def test_validate_retrieval_payload_fails_closed_without_profile_evidence(tmp_path):
+    _, payload = _benchmark_report(tmp_path)
+
+    errors = validate_retrieval_payload(
+        payload,
+        max_cold_start_p95_ms=1000.0,
+        max_total_artifact_bytes=1000,
+    )
+
+    assert "cold-start policy requires a retrieval profile report" in errors
+    assert "artifact-size policy requires a retrieval profile report" in errors
+
+    profile = _profile_report(payload)
+    profile["artifacts"] = []
+    errors = validate_retrieval_payload(profile, max_total_artifact_bytes=1000)
+    assert "artifact-size policy requires at least one declared artifact" in errors
+
+
+def test_validate_retrieval_payload_requires_profile_provenance(tmp_path):
+    _, payload = _benchmark_report(tmp_path)
+    profile = _profile_report(payload)
+    del profile["runtime"]["profile_git_revision"]
+    profile["artifacts"][0]["sha256"] = "not-a-digest"
+
+    errors = validate_retrieval_payload(profile)
+
+    assert "runtime.profile_git_revision must be a non-empty string" in errors
+    assert "artifacts.0.sha256 must be a 64-character hex digest" in errors
 
 
 def test_validate_retrieval_payload_requires_core_fields():
@@ -117,7 +178,7 @@ def test_validate_retrieval_payload_reports_invariants_and_missing_provenance(tm
 
 
 def test_validate_retrieval_cli_passes_and_fails_policy(tmp_path, capsys):
-    report, _ = _benchmark_report(tmp_path)
+    report, payload = _benchmark_report(tmp_path)
 
     assert (
         main(
@@ -136,3 +197,23 @@ def test_validate_retrieval_cli_passes_and_fails_policy(tmp_path, capsys):
 
     assert main(["--report", str(report), "--max-end-to-end-p95-ms", "0"]) == 1
     assert "exceeds policy maximum" in capsys.readouterr().err
+
+    profile = _profile_report(payload)
+    profile["warm_benchmark"]["runtime"]["peak_rss_bytes"] = 4096
+    profile_report = tmp_path / "retrieval-profile.json"
+    profile_report.write_text(json.dumps(profile), encoding="utf-8")
+    assert (
+        main(
+            [
+                "--report",
+                str(profile_report),
+                "--max-cold-start-p95-ms",
+                "2",
+                "--max-peak-rss-bytes",
+                "4096",
+                "--max-total-artifact-bytes",
+                "25",
+            ]
+        )
+        == 0
+    )

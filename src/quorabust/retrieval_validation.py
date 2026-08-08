@@ -46,27 +46,37 @@ def _non_negative_integer(value: Any, field: str, errors: list[str]) -> None:
         errors.append(f"{field} must be a non-negative integer")
 
 
+def _validate_file_manifest(manifest: Any, field: str, errors: list[str]) -> None:
+    for key in _missing_keys(manifest, {"name", "sha256", "bytes"}):
+        errors.append(f"missing {field} field: {key}")
+    if not isinstance(manifest, dict):
+        return
+    if not isinstance(manifest.get("name"), str) or not manifest["name"].strip():
+        errors.append(f"{field}.name must be a non-empty string")
+    digest = manifest.get("sha256")
+    if (
+        not isinstance(digest, str)
+        or len(digest) != 64
+        or any(character not in "0123456789abcdef" for character in digest.lower())
+    ):
+        errors.append(f"{field}.sha256 must be a 64-character hex digest")
+    _non_negative_integer(manifest.get("bytes"), f"{field}.bytes", errors)
+
+
 def _validate_source_manifests(sources: Any, errors: list[str]) -> None:
     if not isinstance(sources, dict):
         errors.append("sources must be an object")
         return
     for name in ("catalog", "qrels"):
-        manifest = sources.get(name)
-        missing = _missing_keys(manifest, {"name", "sha256", "bytes"})
-        for key in missing:
-            errors.append(f"missing sources.{name} field: {key}")
-        if not isinstance(manifest, dict):
-            continue
-        if not isinstance(manifest.get("name"), str) or not manifest["name"].strip():
-            errors.append(f"sources.{name}.name must be a non-empty string")
-        digest = manifest.get("sha256")
-        if (
-            not isinstance(digest, str)
-            or len(digest) != 64
-            or any(character not in "0123456789abcdef" for character in digest.lower())
-        ):
-            errors.append(f"sources.{name}.sha256 must be a 64-character hex digest")
-        _non_negative_integer(manifest.get("bytes"), f"sources.{name}.bytes", errors)
+        _validate_file_manifest(sources.get(name), f"sources.{name}", errors)
+
+
+def _validate_artifact_manifests(artifacts: Any, errors: list[str]) -> None:
+    if not isinstance(artifacts, list):
+        errors.append("artifacts must be an array")
+        return
+    for index, manifest in enumerate(artifacts):
+        _validate_file_manifest(manifest, f"artifacts.{index}", errors)
 
 
 def _validate_latency_summary(
@@ -342,6 +352,17 @@ def _validate_outer_payload(payload: Any, errors: list[str]) -> dict[str, Any] |
     if benchmark == _PROFILE_NAME:
         if payload.get("evidence_scope") != _EVIDENCE_SCOPE:
             errors.append(f"evidence_scope must equal {_EVIDENCE_SCOPE!r}")
+        if "artifacts" not in payload:
+            errors.append("missing top-level field: artifacts")
+        _validate_artifact_manifests(payload.get("artifacts"), errors)
+        profile_runtime = payload.get("runtime")
+        for key in {"python_version", "system", "machine", "profile_git_revision"}:
+            if (
+                not isinstance(profile_runtime, dict)
+                or not isinstance(profile_runtime.get(key), str)
+                or not profile_runtime[key]
+            ):
+                errors.append(f"runtime.{key} must be a non-empty string")
         cold_start = payload.get("cold_start")
         for key in {"measurement_count", "process_to_report_ms", "isolation", "timeout_seconds"}:
             if not isinstance(cold_start, dict) or key not in cold_start:
@@ -376,6 +397,9 @@ def validate_retrieval_payload(
     *,
     min_final_recall_at_k: Mapping[int, float] | None = None,
     max_end_to_end_p95_ms: float | None = None,
+    max_cold_start_p95_ms: float | None = None,
+    max_peak_rss_bytes: int | None = None,
+    max_total_artifact_bytes: int | None = None,
 ) -> list[str]:
     """Return structural and caller-supplied policy errors for a retrieval report."""
     errors: list[str] = []
@@ -410,6 +434,63 @@ def validate_retrieval_payload(
                 f"latency_ms.end_to_end.p95={float(observed):g} exceeds policy maximum "
                 f"{max_end_to_end_p95_ms:g}"
             )
+
+    is_profile = isinstance(payload, dict) and payload.get("benchmark") == _PROFILE_NAME
+    if max_cold_start_p95_ms is not None:
+        if not is_profile:
+            errors.append("cold-start policy requires a retrieval profile report")
+        else:
+            cold_start = payload.get("cold_start")
+            latency = (
+                cold_start.get("process_to_report_ms")
+                if isinstance(cold_start, dict)
+                else None
+            )
+            observed = latency.get("p95") if isinstance(latency, dict) else None
+            if not isinstance(observed, int | float) or isinstance(observed, bool):
+                errors.append(
+                    "cold_start.process_to_report_ms.p95 must be numeric for the "
+                    "cold-start policy"
+                )
+            elif float(observed) > max_cold_start_p95_ms:
+                errors.append(
+                    "cold_start.process_to_report_ms.p95="
+                    f"{float(observed):g} exceeds policy maximum "
+                    f"{max_cold_start_p95_ms:g}"
+                )
+
+    if max_peak_rss_bytes is not None:
+        runtime = core.get("runtime") if isinstance(core, dict) else None
+        observed = runtime.get("peak_rss_bytes") if isinstance(runtime, dict) else None
+        if not isinstance(observed, int) or isinstance(observed, bool):
+            errors.append("runtime.peak_rss_bytes must be an integer for the RSS policy")
+        elif observed > max_peak_rss_bytes:
+            errors.append(
+                f"runtime.peak_rss_bytes={observed} exceeds policy maximum "
+                f"{max_peak_rss_bytes}"
+            )
+
+    if max_total_artifact_bytes is not None:
+        if not is_profile:
+            errors.append("artifact-size policy requires a retrieval profile report")
+        else:
+            artifacts = payload.get("artifacts")
+            if not isinstance(artifacts, list) or not artifacts:
+                errors.append("artifact-size policy requires at least one declared artifact")
+            else:
+                sizes: list[int] = []
+                for artifact in artifacts:
+                    size = artifact.get("bytes") if isinstance(artifact, dict) else None
+                    if not isinstance(size, int) or isinstance(size, bool) or size < 0:
+                        break
+                    sizes.append(size)
+                if len(sizes) == len(artifacts):
+                    total_bytes = sum(sizes)
+                    if total_bytes > max_total_artifact_bytes:
+                        errors.append(
+                            f"total artifact bytes={total_bytes} exceeds policy maximum "
+                            f"{max_total_artifact_bytes}"
+                        )
     return errors
 
 
@@ -437,6 +518,16 @@ def _non_negative_float(value: str) -> float:
     return parsed
 
 
+def _non_negative_int(value: str) -> int:
+    try:
+        parsed = int(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be an integer") from exc
+    if parsed < 0:
+        raise argparse.ArgumentTypeError("must be non-negative")
+    return parsed
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Validate retrieval benchmark evidence and optional release policies.",
@@ -456,6 +547,24 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Require aggregate end-to-end p95 latency to stay at or below VALUE milliseconds",
     )
+    parser.add_argument(
+        "--max-cold-start-p95-ms",
+        type=_non_negative_float,
+        default=None,
+        help="Require profile process-to-report p95 to stay at or below VALUE milliseconds",
+    )
+    parser.add_argument(
+        "--max-peak-rss-bytes",
+        type=_non_negative_int,
+        default=None,
+        help="Require warm benchmark process peak RSS to stay at or below VALUE bytes",
+    )
+    parser.add_argument(
+        "--max-total-artifact-bytes",
+        type=_non_negative_int,
+        default=None,
+        help="Require total declared profile artifact size to stay at or below VALUE bytes",
+    )
     args = parser.parse_args(argv)
 
     if not args.report.is_file():
@@ -471,6 +580,9 @@ def main(argv: list[str] | None = None) -> int:
         payload,
         min_final_recall_at_k=dict(args.min_final_recall_at_k),
         max_end_to_end_p95_ms=args.max_end_to_end_p95_ms,
+        max_cold_start_p95_ms=args.max_cold_start_p95_ms,
+        max_peak_rss_bytes=args.max_peak_rss_bytes,
+        max_total_artifact_bytes=args.max_total_artifact_bytes,
     )
     if errors:
         for error in errors:
