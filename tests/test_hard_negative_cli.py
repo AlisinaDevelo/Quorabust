@@ -71,3 +71,56 @@ def test_cli_refuses_to_overwrite_generated_artifacts(tmp_path, capsys):
     assert main(arguments) == 0
     assert main(arguments) == 1
     assert "refusing to overwrite" in capsys.readouterr().err
+
+
+def test_cli_accepts_embedding_backend_configuration(tmp_path, monkeypatch):
+    source = tmp_path / "train.csv"
+    output = tmp_path / "hard-negatives.csv"
+    metadata = tmp_path / "hard-negatives.meta.json"
+    _write_input(source)
+
+    import quorabust.hard_negatives as hard_negatives
+
+    class FakeDenseRetriever:
+        def __init__(self, model_name):
+            assert model_name == "fake-dense"
+            self._questions = []
+
+        @property
+        def size(self):
+            return len(self._questions)
+
+        def fit(self, questions):
+            self._questions = list(questions)
+            return self
+
+        def search(self, _query, *, k):
+            from quorabust.retrieval import CatalogHit
+
+            return [
+                CatalogHit("q1", "How do I deploy Python services?", 0.99),
+                CatalogHit("q4", "How do I deploy Python applications cheaply?", 0.88),
+            ][:k]
+
+    monkeypatch.setattr(hard_negatives, "SentenceTransformerCatalogRetriever", FakeDenseRetriever)
+    assert (
+        main(
+            [
+                "--csv",
+                str(source),
+                "--out",
+                str(output),
+                "--metadata-out",
+                str(metadata),
+                "--retriever",
+                "embedding",
+                "--embedding-model",
+                "fake-dense",
+            ]
+        )
+        == 0
+    )
+
+    payload = json.loads(metadata.read_text(encoding="utf-8"))
+    assert payload["config"]["retriever"] == "embedding"
+    assert payload["config"]["model_name"] == "fake-dense"

@@ -26,7 +26,7 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Mine leakage-safe lexical hard negatives from a labeled pair CSV.",
+        description="Mine leakage-safe retrieval hard negatives from a labeled pair CSV.",
     )
     parser.add_argument("--csv", type=Path, required=True, help="Training/tuning pair CSV")
     parser.add_argument("--out", type=Path, required=True, help="Generated negative-pair CSV")
@@ -40,7 +40,7 @@ def main(argv: list[str] | None = None) -> int:
         "--candidate-k",
         type=int,
         default=50,
-        help="Number of lexical candidates considered per anchor",
+        help="Number of retrieval candidates considered per anchor",
     )
     parser.add_argument(
         "--negatives-per-positive",
@@ -53,6 +53,17 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=None,
         help="Optional deterministic sample of positive rows to mine",
+    )
+    parser.add_argument(
+        "--retriever",
+        choices=["tfidf", "embedding"],
+        default="tfidf",
+        help="Candidate generator; embedding requires the optional nlp extra",
+    )
+    parser.add_argument(
+        "--embedding-model",
+        default="sentence-transformers/all-MiniLM-L6-v2",
+        help="Sentence Transformer model for --retriever embedding",
     )
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args(argv)
@@ -83,6 +94,8 @@ def main(argv: list[str] | None = None) -> int:
             negatives_per_positive=args.negatives_per_positive,
             max_positive_rows=args.max_positive_rows,
             seed=args.seed,
+            retriever_backend=args.retriever,
+            embedding_model=args.embedding_model,
         )
         args.out.parent.mkdir(parents=True, exist_ok=True)
         result.pairs.to_csv(args.out, index=False, lineterminator="\n")
@@ -107,7 +120,7 @@ def main(argv: list[str] | None = None) -> int:
             },
         }
         _write_json(metadata_out, payload)
-    except (OSError, ValueError, TypeError) as exc:
+    except (OSError, RuntimeError, ValueError, TypeError) as exc:
         print(f"Unable to mine hard negatives: {exc}", file=sys.stderr)
         if args.out.is_file():
             args.out.unlink()

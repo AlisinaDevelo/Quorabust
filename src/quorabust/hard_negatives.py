@@ -9,7 +9,12 @@ import numpy as np
 import pandas as pd
 
 from quorabust.preprocess import clean_text
-from quorabust.retrieval import CatalogQuestion, TfidfCatalogRetriever
+from quorabust.retrieval import (
+    CatalogQuestion,
+    CatalogRetriever,
+    SentenceTransformerCatalogRetriever,
+    TfidfCatalogRetriever,
+)
 
 HARD_NEGATIVE_SCHEMA_VERSION = 1
 _REQUIRED_COLUMNS = ("question1", "question2", "is_duplicate", "qid1", "qid2")
@@ -145,7 +150,7 @@ def _candidate_rows(
     anchor_qid: str,
     anchor_text: str,
     component_ids: frozenset[str],
-    retriever: TfidfCatalogRetriever,
+    retriever: CatalogRetriever,
     candidate_k: int,
 ) -> list[dict[str, Any]]:
     candidates: list[dict[str, Any]] = []
@@ -180,8 +185,10 @@ def mine_hard_negatives(
     negatives_per_positive: int = 1,
     max_positive_rows: int | None = None,
     seed: int = 42,
+    retriever_backend: str = "tfidf",
+    embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
 ) -> HardNegativeMiningResult:
-    """Mine lexical near-neighbour negatives while excluding known-positive components.
+    """Mine retrieval near-neighbour negatives while excluding known-positive components.
 
     The input must contain only material that is allowed to influence training or tuning.
     In particular, callers must keep the final evaluation holdout out of this frame.
@@ -192,6 +199,10 @@ def mine_hard_negatives(
         "negatives_per_positive",
     )
     seed = _require_seed(seed)
+    if retriever_backend not in {"tfidf", "embedding"}:
+        raise ValueError("retriever_backend must be one of: tfidf, embedding")
+    if not isinstance(embedding_model, str) or not embedding_model.strip():
+        raise ValueError("embedding_model must be a non-empty string")
     if max_positive_rows is not None:
         max_positive_rows = _require_positive_integer(max_positive_rows, "max_positive_rows")
 
@@ -209,7 +220,12 @@ def mine_hard_negatives(
             int(index) for index in rng.choice(positive_rows, size=max_positive_rows, replace=False)
         )
 
-    retriever = TfidfCatalogRetriever().fit(catalog)
+    if retriever_backend == "embedding":
+        retriever: CatalogRetriever = SentenceTransformerCatalogRetriever(
+            embedding_model.strip()
+        ).fit(catalog)
+    else:
+        retriever = TfidfCatalogRetriever().fit(catalog)
     generated: list[dict[str, Any]] = []
     emitted_pairs: set[tuple[str, str]] = set()
     for positive_row in positive_rows:
@@ -266,7 +282,8 @@ def mine_hard_negatives(
         "schema_version": HARD_NEGATIVE_SCHEMA_VERSION,
         "manifest": "quorabust.hard_negative_mining",
         "config": {
-            "retriever": "tfidf",
+            "retriever": retriever_backend,
+            "model_name": embedding_model.strip() if retriever_backend == "embedding" else None,
             "candidate_k": candidate_k,
             "negatives_per_positive": negatives_per_positive,
             "max_positive_rows": max_positive_rows,
