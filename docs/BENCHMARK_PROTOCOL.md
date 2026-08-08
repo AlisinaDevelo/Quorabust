@@ -37,6 +37,11 @@ Use the builder when the source, audit, role, and split artifacts are available.
 the bytes on disk, verifies that the audit is passing and bound to the current source, and
 records the repository commit and dependency lock before running the protocol validator:
 
+Start with the path-light template at
+[`examples/protocol-builder.config.example.json`](../examples/protocol-builder.config.example.json).
+Replace every `/absolute/path` and `REPLACE_WITH_...` value after reviewing the dataset
+license and terms; the template contains no benchmark data.
+
 ```bash
 quorabust-build-protocol \
   --config reports/quorabust-protocol-builder.json \
@@ -49,6 +54,12 @@ role entries point to external files; `split.manifest_path` points to the exact 
 manifest. Relative paths resolve from the config file, while `repository_path` is an
 explicit checkout path used for the commit provenance. References and license/terms text
 are recorded in the output, but raw data remains outside Git.
+
+Config policy is checked before any artifact is opened. Seeds must be non-negative integers;
+fractions and threshold candidates must be finite and strictly between zero and one; IDs
+must include `qid1` and `qid2` without duplicates; and the threshold grid must not repeat a
+value. ID columns and threshold candidates are sorted in the emitted manifest, so equivalent
+unordered configs produce the same policy ordering.
 
 ## Real-data handoff
 

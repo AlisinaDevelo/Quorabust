@@ -34,6 +34,19 @@ jobs:
         run: quorabust-validate-protocol --help
       - name: Benchmark protocol builder CLI
         run: quorabust-build-protocol --help
+      - name: Benchmark protocol builder template
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          template = json.loads(
+              Path("examples/protocol-builder.config.example.json").read_text()
+          )
+          assert template["split"]["question_id_columns"] == ["qid1", "qid2"]
+          assert "sha256" not in json.dumps(template)
+          assert template["dataset"]["license"].startswith("REPLACE_WITH_")
+          PY
       - name: Strict data audit smoke
         run: |
           python - <<'PY'
