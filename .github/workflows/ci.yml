@@ -376,6 +376,7 @@ jobs:
             --repetitions 1 \
             --cold-start-repetitions 2 \
             --timeout-seconds 10 \
+            --artifact /tmp/quorabust-smoke.qmodel \
             --out /tmp/quorabust-retrieval-profile.json
           python - <<'PY'
           import json
@@ -387,9 +388,13 @@ jobs:
           assert report["evidence_scope"] == "timing_and_size_only_no_quality_claim"
           assert report["cold_start"]["measurement_count"] == 2
           assert report["sources"]["catalog"]["bytes"] > 0
+          assert report["artifacts"][0]["bytes"] > 0
           assert report["warm_benchmark"]["query_count"] == 4
           assert set(report["warm_benchmark"]["query_length_strata"]) == {"short", "medium"}
           PY
           quorabust-validate-retrieval \
             --report /tmp/quorabust-retrieval-profile.json \
-            --max-end-to-end-p95-ms 1000
+            --max-end-to-end-p95-ms 1000 \
+            --max-cold-start-p95-ms 20000 \
+            --max-peak-rss-bytes 8589934592 \
+            --max-total-artifact-bytes 10485760
