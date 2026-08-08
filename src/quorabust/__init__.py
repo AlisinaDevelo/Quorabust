@@ -4,6 +4,7 @@ from importlib.metadata import PackageNotFoundError, version
 
 from quorabust.benchmark_freeze import ROLE_NAMES, freeze_protocol
 from quorabust.features import PairFeatureBuilder, word_jaccard
+from quorabust.hard_negatives import HardNegativeMiningResult, mine_hard_negatives
 from quorabust.model import eval_classification_metrics, train_duplicate_classifier
 from quorabust.persist import load_classifier, save_classifier
 from quorabust.preprocess import clean_text
@@ -33,6 +34,8 @@ __all__ = [
     "clean_text",
     "word_jaccard",
     "PairFeatureBuilder",
+    "HardNegativeMiningResult",
+    "mine_hard_negatives",
     "train_duplicate_classifier",
     "eval_classification_metrics",
     "save_classifier",
