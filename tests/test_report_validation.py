@@ -1,3 +1,4 @@
+import hashlib
 import json
 
 from quorabust.report_validation import main, validate_report_payload
@@ -58,7 +59,7 @@ def _payload():
             "evaluation_dataset": {
                 "sha256": "b" * 64,
                 "rows": 10,
-            "columns": ["question1", "question2", "is_duplicate", "qid1", "qid2"],
+                "columns": ["question1", "question2", "is_duplicate", "qid1", "qid2"],
                 "positive_count": 5,
                 "positive_rate": 0.5,
             },
@@ -69,9 +70,13 @@ def _payload():
             },
             "training_lineage": {
                 "git_revision": "abc123",
+                "csv_sha256": "c" * 64,
                 "split_strategy": "question_component_holdout",
                 "question_id_columns": ["qid1", "qid2"],
                 "require_question_ids": True,
+                "seed": 42,
+                "eval_fraction": 0.1,
+                "threshold_metric": "f1",
             },
             "runtime": {
                 "python_version": "3.12.0",
@@ -81,6 +86,90 @@ def _payload():
             },
             "command": "quorabust-report --eval-csv holdout.csv",
             "generated_at_utc": "2026-08-02T12:00:00Z",
+        },
+    }
+
+
+def _protocol_payload():
+    def digest(value):
+        return hashlib.sha256(value.encode()).hexdigest()
+
+    return {
+        "schema_version": 1,
+        "protocol_name": "quorabust-synthetic-report-binding-v1",
+        "evidence_scope": "protocol_only_no_quality_claim",
+        "dataset": {
+            "name": "synthetic report fixture",
+            "source_reference": "synthetic://source.csv",
+            "sha256": "c" * 64,
+            "license": "synthetic fixture",
+            "terms": "no external benchmark claim",
+            "raw_data_policy": "external_not_committed",
+            "audit": {
+                "reference": "synthetic://audit.json",
+                "sha256": digest("audit"),
+                "status": "pass",
+                "source_sha256": "c" * 64,
+                "require_question_ids": True,
+            },
+        },
+        "roles": {
+            "train": {
+                "purpose": "fit model parameters",
+                "allowed_activities": ["fit"],
+                "artifact": {"reference": "synthetic://train.csv", "sha256": digest("train")},
+            },
+            "tuning": {
+                "purpose": "select model and threshold policy",
+                "allowed_activities": ["model_selection", "threshold_selection"],
+                "artifact": {"reference": "synthetic://tuning.csv", "sha256": digest("tuning")},
+            },
+            "calibration": {
+                "purpose": "fit probability calibration",
+                "allowed_activities": ["probability_calibration"],
+                "artifact": {
+                    "reference": "synthetic://calibration.csv",
+                    "sha256": digest("calibration"),
+                },
+            },
+            "final_holdout": {
+                "purpose": "evaluate the frozen release once",
+                "allowed_activities": ["final_evaluation"],
+                "artifact": {"reference": "synthetic://holdout.csv", "sha256": "b" * 64},
+            },
+        },
+        "split": {
+            "strategy": "question_component_holdout",
+            "question_id_columns": ["qid1", "qid2"],
+            "seed": 42,
+            "eval_fraction": 0.1,
+            "manifest": {"reference": "synthetic://split.json", "sha256": digest("split")},
+        },
+        "decision_policy": {
+            "threshold_metric": "f1",
+            "threshold_candidates": [0.3, 0.5, 0.7],
+            "threshold_source_role": "tuning",
+            "calibration_method": "sigmoid",
+            "calibration_source_role": "calibration",
+            "final_holdout_role": "final_holdout",
+        },
+        "provenance": {
+            "git_revision": "d" * 40,
+            "python_version": "3.12.0",
+            "dependency_lock": {
+                "reference": "requirements.txt",
+                "sha256": digest("requirements"),
+            },
+            "command": "synthetic report binding",
+            "machine": "ci/linux-x86_64",
+        },
+        "safeguards": {
+            "roles_are_disjoint": True,
+            "final_holdout_used_for_tuning": False,
+            "final_holdout_used_for_calibration": False,
+            "final_holdout_used_for_model_selection": False,
+            "raw_data_committed": False,
+            "public_quality_claims_allowed": False,
         },
     }
 
@@ -176,3 +265,61 @@ def test_validate_report_payload_requires_manifest_for_component_policy():
         payload,
         require_question_component_split=True,
     ) == ["missing evaluation_manifest"]
+
+
+def test_validate_report_payload_binds_to_protocol():
+    assert validate_report_payload(
+        _payload(),
+        protocol_payload=_protocol_payload(),
+    ) == []
+
+
+def test_protocol_binding_requires_holdout_and_calibration():
+    report = _payload()
+    del report["holdout_evaluation"]
+    del report["calibration"]
+
+    errors = validate_report_payload(report, protocol_payload=_protocol_payload())
+
+    assert "missing holdout_evaluation" in errors
+    assert "missing calibration" in errors
+
+
+def test_validate_report_payload_rejects_protocol_mismatches():
+    report = _payload()
+    protocol = _protocol_payload()
+    report["evaluation_manifest"]["evaluation_dataset"]["sha256"] = "e" * 64
+    report["evaluation_manifest"]["training_lineage"]["seed"] = 7
+    report["evaluation_manifest"]["evaluation_policy"]["thresholds"] = [0.2, 0.5, 0.8]
+
+    errors = validate_report_payload(report, protocol_payload=protocol)
+
+    assert (
+        "evaluation_manifest.evaluation_dataset.sha256 must match "
+        "protocol.roles.final_holdout.artifact.sha256"
+    ) in errors
+    assert "evaluation_manifest.training_lineage.seed must match protocol.split.seed" in errors
+    assert (
+        "evaluation_manifest.evaluation_policy.thresholds must match "
+        "protocol.decision_policy.threshold_candidates"
+    ) in errors
+
+
+def test_validate_report_cli_binds_to_protocol(tmp_path, capsys):
+    report = tmp_path / "report.json"
+    protocol = tmp_path / "protocol.json"
+    report.write_text(json.dumps(_payload()), encoding="utf-8")
+    protocol.write_text(json.dumps(_protocol_payload()), encoding="utf-8")
+
+    assert main(["--report", str(report), "--protocol", str(protocol)]) == 0
+    assert "validated" in capsys.readouterr().out
+
+
+def test_validate_report_cli_rejects_invalid_protocol_json(tmp_path, capsys):
+    report = tmp_path / "report.json"
+    protocol = tmp_path / "protocol.json"
+    report.write_text(json.dumps(_payload()), encoding="utf-8")
+    protocol.write_text("{", encoding="utf-8")
+
+    assert main(["--report", str(report), "--protocol", str(protocol)]) == 1
+    assert "Invalid protocol JSON" in capsys.readouterr().err
