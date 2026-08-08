@@ -102,14 +102,15 @@ jobs:
           import pandas as pd
 
           root = Path(os.environ["FREEZE_DIR"])
-          rows = 24
+          components = 12
+          rows = components * 2
           pd.DataFrame(
               {
                   "question1": [f"question one {index}" for index in range(rows)],
-                  "question2": [f"question two {index}" for index in range(rows)],
+                  "question2": [f"question two {index // 2}" for index in range(rows)],
                   "is_duplicate": [index % 2 for index in range(rows)],
-                  "qid1": [f"q{index * 2}" for index in range(rows)],
-                  "qid2": [f"q{index * 2 + 1}" for index in range(rows)],
+                  "qid1": [f"q{index // 2 * 3}" for index in range(rows)],
+                  "qid2": [f"q{index // 2 * 3 + index % 2 + 1}" for index in range(rows)],
               }
           ).to_csv(root / "source.csv", index=False)
           PY
@@ -136,6 +137,10 @@ jobs:
               path = root / "roles" / f"{role}.csv"
               digest = hashlib.sha256(path.read_bytes()).hexdigest()
               assert digest == record["sha256"]
+              assert record["label_counts"] == {
+                  "0": record["rows"] // 2,
+                  "1": record["rows"] // 2,
+              }
               frame = pd.read_csv(path, dtype={"qid1": "string", "qid2": "string"})
               question_ids.append(set(frame["qid1"]) | set(frame["qid2"]))
           for index, current in enumerate(question_ids):

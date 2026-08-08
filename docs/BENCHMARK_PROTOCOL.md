@@ -82,8 +82,10 @@ For a permitted Quora release, keep the licensed source outside Git:
 
    The command writes `train.csv`, `tuning.csv`, `calibration.csv`, and
    `final_holdout.csv` from whole question components. Its split manifest records source,
-   audit, role, and provenance hashes; repeat the command in a fresh output directory to
-   reproduce the same bytes from the same source bytes and seed.
+   audit, role, and provenance hashes plus per-role label counts; repeat the command in a
+   fresh output directory to reproduce the same bytes from the same source bytes and seed.
+   Each role must contain both label classes so calibration and final evaluation fail before
+   artifact generation rather than later in the release pipeline.
 2. Review the passing audit and role counts, including the untouched final holdout. The
    freezer fails closed for missing or incomplete IDs, invalid labels, insufficient
    components, invalid fractions, and output collisions.
