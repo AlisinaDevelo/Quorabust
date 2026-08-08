@@ -4,12 +4,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import platform
 import sys
 from pathlib import Path
 from typing import Any
 
-from quorabust.benchmark_protocol import _ROLE_ACTIVITIES, validate_protocol_payload
+from quorabust.benchmark_protocol import (
+    _CALIBRATION_METHODS,
+    _ROLE_ACTIVITIES,
+    _THRESHOLD_METRICS,
+    validate_protocol_payload,
+)
 from quorabust.lineage import git_revision, sha256_file
 
 _REQUIRED_CONFIG = {
@@ -55,6 +61,132 @@ def _missing_keys(value: dict[str, Any], keys: set[str], label: str) -> None:
     missing = sorted(keys - set(value))
     if missing:
         raise ValueError(f"missing {label} field(s): {', '.join(missing)}")
+
+
+def _require_non_negative_int(value: Any, label: str) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise ValueError(f"{label} must be a non-negative integer")
+    return value
+
+
+def _require_fraction(value: Any, label: str) -> float:
+    if (
+        not isinstance(value, (int, float))
+        or isinstance(value, bool)
+        or not math.isfinite(float(value))
+        or not 0.0 < float(value) < 1.0
+    ):
+        raise ValueError(f"{label} must be finite and strictly between 0 and 1")
+    return float(value)
+
+
+def _require_question_id_columns(value: Any, label: str) -> list[str]:
+    if not isinstance(value, list) or not value or not all(isinstance(item, str) for item in value):
+        raise ValueError(f"{label} must be a non-empty list of strings")
+    columns = [item.strip() for item in value]
+    if not all(columns):
+        raise ValueError(f"{label} must not contain blank column names")
+    if len(columns) != len(set(columns)):
+        raise ValueError(f"{label} must not contain duplicates")
+    if not {"qid1", "qid2"}.issubset(columns):
+        raise ValueError(f"{label} must contain qid1 and qid2")
+    return sorted(columns)
+
+
+def _require_threshold_candidates(value: Any, label: str) -> list[float]:
+    if not isinstance(value, list) or not value:
+        raise ValueError(f"{label} must be a non-empty list of numbers")
+    candidates: list[float] = []
+    for candidate in value:
+        if (
+            not isinstance(candidate, (int, float))
+            or isinstance(candidate, bool)
+            or not math.isfinite(float(candidate))
+            or not 0.0 < float(candidate) < 1.0
+        ):
+            raise ValueError(f"{label} must contain finite values strictly between 0 and 1")
+        candidates.append(float(candidate))
+    if len(candidates) != len(set(candidates)):
+        raise ValueError(f"{label} must not contain duplicates")
+    return sorted(candidates)
+
+
+def _validate_config_contract(config: dict[str, Any]) -> dict[str, Any]:
+    """Validate scalar config policy before opening any external artifact."""
+    _missing_keys(config, _REQUIRED_CONFIG, "config")
+    _require_text(config["protocol_name"], "config.protocol_name")
+    _require_text(config["command"], "config.command")
+    _require_text(config["dependency_lock_path"], "config.dependency_lock_path")
+    _require_text(config["repository_path"], "config.repository_path")
+
+    dataset = _require_object(config["dataset"], "config.dataset")
+    _missing_keys(dataset, _REQUIRED_DATASET, "config.dataset")
+    for key in (
+        "name",
+        "source_path",
+        "source_reference",
+        "license",
+        "terms",
+        "audit_path",
+    ):
+        _require_text(dataset[key], f"config.dataset.{key}")
+
+    roles = _require_object(config["roles"], "config.roles")
+    expected_roles = set(_ROLE_ACTIVITIES)
+    missing_roles = sorted(expected_roles - set(roles))
+    if missing_roles:
+        raise ValueError("missing config.roles field(s): " + ", ".join(missing_roles))
+    unsupported_roles = sorted(set(roles) - expected_roles)
+    if unsupported_roles:
+        raise ValueError("unsupported config.roles field(s): " + ", ".join(unsupported_roles))
+    for role in _ROLE_ACTIVITIES:
+        role_config = _require_object(roles[role], f"config.roles.{role}")
+        _missing_keys(role_config, _REQUIRED_ROLE, f"config.roles.{role}")
+        _require_text(role_config["purpose"], f"config.roles.{role}.purpose")
+        _require_text(role_config["path"], f"config.roles.{role}.path")
+
+    split = _require_object(config["split"], "config.split")
+    _missing_keys(split, _REQUIRED_SPLIT, "config.split")
+    _require_text(split["manifest_path"], "config.split.manifest_path")
+    question_id_columns = _require_question_id_columns(
+        split["question_id_columns"],
+        "config.split.question_id_columns",
+    )
+    seed = _require_non_negative_int(split["seed"], "config.split.seed")
+    eval_fraction = _require_fraction(split["eval_fraction"], "config.split.eval_fraction")
+
+    policy = _require_object(config["decision_policy"], "config.decision_policy")
+    _missing_keys(policy, _REQUIRED_DECISION_POLICY, "config.decision_policy")
+    threshold_metric = _require_text(
+        policy["threshold_metric"],
+        "config.decision_policy.threshold_metric",
+    )
+    if threshold_metric not in _THRESHOLD_METRICS:
+        allowed = ", ".join(sorted(_THRESHOLD_METRICS))
+        raise ValueError(
+            "config.decision_policy.threshold_metric must be one of: " + allowed
+        )
+    calibration_method = _require_text(
+        policy["calibration_method"],
+        "config.decision_policy.calibration_method",
+    )
+    if calibration_method not in _CALIBRATION_METHODS:
+        allowed = ", ".join(sorted(_CALIBRATION_METHODS))
+        raise ValueError(
+            "config.decision_policy.calibration_method must be one of: " + allowed
+        )
+    threshold_candidates = _require_threshold_candidates(
+        policy["threshold_candidates"],
+        "config.decision_policy.threshold_candidates",
+    )
+    return {
+        "question_id_columns": question_id_columns,
+        "seed": seed,
+        "eval_fraction": eval_fraction,
+        "threshold_metric": threshold_metric,
+        "threshold_candidates": threshold_candidates,
+        "calibration_method": calibration_method,
+    }
 
 
 def _resolve_file(value: Any, label: str, base_dir: Path) -> Path:
@@ -118,7 +250,7 @@ def build_protocol_payload(
 ) -> dict[str, Any]:
     """Build and validate a protocol payload from a path-based config."""
     config = _require_object(config, "config")
-    _missing_keys(config, _REQUIRED_CONFIG, "config")
+    normalized = _validate_config_contract(config)
     root = (base_dir or Path.cwd()).resolve()
 
     protocol_name = _require_text(config["protocol_name"], "config.protocol_name")
@@ -165,16 +297,11 @@ def build_protocol_payload(
         "config.split.manifest_path",
         root,
     )
-    question_id_columns = split_config["question_id_columns"]
-    if not isinstance(question_id_columns, list) or not all(
-        isinstance(column, str) for column in question_id_columns
-    ):
-        raise ValueError("config.split.question_id_columns must be a list of strings")
     split = {
         "strategy": "question_component_holdout",
-        "question_id_columns": question_id_columns,
-        "seed": split_config["seed"],
-        "eval_fraction": split_config["eval_fraction"],
+        "question_id_columns": normalized["question_id_columns"],
+        "seed": normalized["seed"],
+        "eval_fraction": normalized["eval_fraction"],
         "manifest": _artifact(
             split_manifest_path,
             _reference(
@@ -188,10 +315,10 @@ def build_protocol_payload(
     policy_config = _require_object(config["decision_policy"], "config.decision_policy")
     _missing_keys(policy_config, _REQUIRED_DECISION_POLICY, "config.decision_policy")
     decision_policy = {
-        "threshold_metric": policy_config["threshold_metric"],
-        "threshold_candidates": policy_config["threshold_candidates"],
+        "threshold_metric": normalized["threshold_metric"],
+        "threshold_candidates": normalized["threshold_candidates"],
         "threshold_source_role": "tuning",
-        "calibration_method": policy_config["calibration_method"],
+        "calibration_method": normalized["calibration_method"],
         "calibration_source_role": "calibration",
         "final_holdout_role": "final_holdout",
     }

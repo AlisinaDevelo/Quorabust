@@ -1,0 +1,57 @@
+{
+  "protocol_name": "quorabust-quora-v1",
+  "dataset": {
+    "name": "Quora Question Pairs",
+    "source_path": "/absolute/path/to/quora/train.csv",
+    "source_reference": "https://www.kaggle.com/c/quora-question-pairs",
+    "license": "REPLACE_WITH_VERIFIED_DATASET_LICENSE",
+    "terms": "REPLACE_WITH_VERIFIED_DATASET_TERMS",
+    "audit_path": "/absolute/path/to/quora/train-data-audit.json",
+    "audit_reference": "external://quora/train-data-audit.json"
+  },
+  "roles": {
+    "train": {
+      "purpose": "fit model parameters",
+      "path": "/absolute/path/to/quora/roles/train.csv",
+      "reference": "external://quora/roles/train.csv"
+    },
+    "tuning": {
+      "purpose": "select model and threshold policy",
+      "path": "/absolute/path/to/quora/roles/tuning.csv",
+      "reference": "external://quora/roles/tuning.csv"
+    },
+    "calibration": {
+      "purpose": "fit probability calibration",
+      "path": "/absolute/path/to/quora/roles/calibration.csv",
+      "reference": "external://quora/roles/calibration.csv"
+    },
+    "final_holdout": {
+      "purpose": "evaluate the frozen release once",
+      "path": "/absolute/path/to/quora/roles/final-holdout.csv",
+      "reference": "external://quora/roles/final-holdout.csv"
+    }
+  },
+  "split": {
+    "manifest_path": "/absolute/path/to/quora/question-component-split.json",
+    "manifest_reference": "external://quora/question-component-split.json",
+    "seed": 42,
+    "eval_fraction": 0.1,
+    "question_id_columns": [
+      "qid1",
+      "qid2"
+    ]
+  },
+  "decision_policy": {
+    "threshold_metric": "f1",
+    "threshold_candidates": [
+      0.2,
+      0.5,
+      0.8
+    ],
+    "calibration_method": "sigmoid"
+  },
+  "dependency_lock_path": "../requirements.txt",
+  "dependency_lock_reference": "repo://requirements.txt",
+  "repository_path": "..",
+  "command": "quorabust-build-protocol --config reports/quorabust-protocol-builder.json --out reports/quorabust-benchmark-protocol.json"
+}

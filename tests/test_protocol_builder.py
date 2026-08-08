@@ -147,3 +147,69 @@ def test_build_protocol_cli_fails_for_invalid_config(tmp_path, capsys):
 
     assert main(["--config", str(config_path), "--out", str(tmp_path / "protocol.json")]) == 1
     assert "invalid builder config JSON" in capsys.readouterr().err
+
+
+def test_build_protocol_canonicalizes_unordered_policy_lists(tmp_path):
+    config_path, config, _ = _fixture(tmp_path)
+    config["split"]["question_id_columns"] = ["qid2", "qid1"]
+    config["decision_policy"]["threshold_candidates"] = [0.8, 0.2, 0.5]
+
+    payload = build_protocol_payload(config, base_dir=config_path.parent)
+
+    assert payload["split"]["question_id_columns"] == ["qid1", "qid2"]
+    assert payload["decision_policy"]["threshold_candidates"] == [0.2, 0.5, 0.8]
+
+
+@pytest.mark.parametrize(
+    ("section", "key", "value", "message"),
+    [
+        ("split", "seed", True, "config.split.seed must be a non-negative integer"),
+        (
+            "split",
+            "eval_fraction",
+            1.0,
+            "config.split.eval_fraction must be finite and strictly between 0 and 1",
+        ),
+        (
+            "split",
+            "question_id_columns",
+            ["qid1", "qid1"],
+            "config.split.question_id_columns must not contain duplicates",
+        ),
+        (
+            "decision_policy",
+            "threshold_candidates",
+            [0.5, 0.5],
+            "config.decision_policy.threshold_candidates must not contain duplicates",
+        ),
+        (
+            "decision_policy",
+            "threshold_metric",
+            0.5,
+            "config.decision_policy.threshold_metric must be a non-empty string",
+        ),
+    ],
+)
+def test_build_protocol_rejects_invalid_config_policy_before_file_resolution(
+    tmp_path,
+    section,
+    key,
+    value,
+    message,
+):
+    config_path, config, _ = _fixture(tmp_path)
+    config["dataset"]["source_path"] = "missing-source.csv"
+    config[section][key] = value
+
+    with pytest.raises(ValueError, match=message):
+        build_protocol_payload(config, base_dir=config_path.parent)
+
+
+def test_protocol_builder_template_contains_placeholders_only():
+    template_path = REPOSITORY_ROOT / "examples" / "protocol-builder.config.example.json"
+    template = json.loads(template_path.read_text(encoding="utf-8"))
+
+    assert "sha256" not in json.dumps(template)
+    assert template["dataset"]["source_path"].startswith("/absolute/path/")
+    assert template["dataset"]["license"].startswith("REPLACE_WITH_")
+    assert template["split"]["question_id_columns"] == ["qid1", "qid2"]
