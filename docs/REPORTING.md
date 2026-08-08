@@ -59,10 +59,39 @@ quorabust-report \
   --eval-csv data/processed/holdout.csv \
   --slice-column language \
   --slice-column domain \
+  --slice-manifest reports/holdout-slices.json \
   --max-slices 20 \
   --format json \
   --out reports/quorabust-slices.json
 ```
+
+For a benchmark or release report, bind the labels to a path-light sidecar whose hash is the
+exact evaluated CSV bytes:
+
+```json
+{
+  "schema_version": 1,
+  "source": {
+    "reference": "dataset://permitted-holdout-v1",
+    "sha256": "<64-hex-evaluated-csv-sha256>",
+    "rows": 1200
+  },
+  "columns": {
+    "language": {
+      "labeling_method": "dataset-owner annotation, reviewed 2026-08-09"
+    },
+    "domain": {
+      "labeling_method": "dataset-owner taxonomy v2"
+    }
+  }
+}
+```
+
+`--slice-manifest` requires the exact requested `--slice-column` set, a current CSV hash, a
+matching row count, and a non-empty labeling method for every column. The report records the
+canonical sidecar plus observed per-label row counts in its reproducibility manifest. A tiny
+synthetic fixture exercises this contract in CI; it is not multilingual or domain quality
+evidence.
 
 Each requested column is validated for existence, missing or blank labels, and bounded
 cardinality. The JSON and Markdown report contains one row per label with its sample count,
