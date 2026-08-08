@@ -32,6 +32,13 @@ The command fails for missing required columns, an empty dataset, non-binary lab
 missing/incomplete IDs when the strict benchmark flag is present. Without that flag, missing
 IDs remain an explicit warning because the trainer supports a documented row-level fallback.
 
+Before a public comparison, validate a versioned protocol manifest with
+`quorabust-validate-protocol --protocol reports/quorabust-benchmark-protocol.json`.
+The manifest binds the audited source hash, distinct train/tuning/calibration/final-holdout
+role artifacts, question-component split policy, threshold/calibration ownership, and
+runtime/dependency provenance. It also records that raw data is external and that the final
+holdout is not used for selection. See [BENCHMARK_PROTOCOL.md](BENCHMARK_PROTOCOL.md).
+
 For benchmark runs, pass `--eval-out` to `quorabust-train` and retain the exported holdout
 CSV with its metadata sidecar. The exact holdout hash is also copied into the lightweight
 registry record for release review.

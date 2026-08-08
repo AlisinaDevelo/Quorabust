@@ -62,6 +62,13 @@ splitting. It exits non-zero for missing required columns, an empty dataset, or 
 outside `{0, 1}`. Missing question IDs and duplicate pairs are reported as warnings, not
 silently treated as benchmark evidence.
 
+Before publishing a real-data comparison, freeze the source, split roles, threshold policy,
+and runtime provenance in a protocol manifest, then validate it with
+`quorabust-validate-protocol --protocol reports/quorabust-benchmark-protocol.json`.
+The contract and real-data handoff are documented in
+[docs/BENCHMARK_PROTOCOL.md](docs/BENCHMARK_PROTOCOL.md); the repository smoke fixture is
+explicitly not benchmark evidence.
+
 ## Usage
 
 ```python

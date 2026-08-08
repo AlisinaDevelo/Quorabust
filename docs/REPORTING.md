@@ -81,7 +81,20 @@ unless a permitted resampling protocol is supplied.
 
 ## Real Evaluation
 
-Start with a data preflight and keep its JSON output next to the training and evaluation
+Start by freezing the source, split roles, decision policy, and runtime provenance in the
+[benchmark protocol manifest](BENCHMARK_PROTOCOL.md). Validate it before publishing any
+real-data comparison:
+
+```bash
+quorabust-validate-protocol \
+  --protocol reports/quorabust-benchmark-protocol.json
+```
+
+The protocol validator requires a passing qid-aware audit, distinct train/tuning/calibration/
+final-holdout artifacts, a question-component split, and an explicit barrier against using
+the final holdout for selection. It is a reproducibility gate, not a quality result.
+
+Then run the data preflight and keep its JSON output next to the training and evaluation
 manifests:
 
 ```bash
