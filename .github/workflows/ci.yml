@@ -32,6 +32,8 @@ jobs:
         run: quorabust-audit-data --help
       - name: Benchmark protocol CLI
         run: quorabust-validate-protocol --help
+      - name: Benchmark protocol builder CLI
+        run: quorabust-build-protocol --help
       - name: Strict data audit smoke
         run: |
           python - <<'PY'
@@ -81,12 +83,10 @@ jobs:
         run: |
           python - <<'PY'
           import csv
-          import hashlib
           import json
-          import platform
-          import subprocess
           from pathlib import Path
 
+          root = Path.cwd()
           source = Path("/tmp/quorabust-protocol-source.csv")
           with source.open("w", newline="") as handle:
               writer = csv.writer(handle)
@@ -94,113 +94,58 @@ jobs:
               writer.writerow(["a", "a", 1, "q1", "q1"])
               writer.writerow(["b", "c", 0, "q2", "q3"])
 
-          def digest(value):
-              return hashlib.sha256(value.encode()).hexdigest()
+          roles = {}
+          for role in ("train", "tuning", "calibration", "final_holdout"):
+              role_path = Path(f"/tmp/quorabust-protocol-{role}.json")
+              role_path.write_text(json.dumps({"role": role}) + "\n")
+              roles[role] = {
+                  "purpose": f"synthetic {role} artifact",
+                  "path": str(role_path),
+                  "reference": f"synthetic://{role}.json",
+              }
 
-          source_digest = hashlib.sha256(source.read_bytes()).hexdigest()
-          subprocess.run(
-              [
-                  "quorabust-audit-data",
-                  "--csv",
-                  str(source),
-                  "--out",
-                  "/tmp/quorabust-protocol-audit.json",
-                  "--require-question-ids",
-              ],
-              check=True,
-          )
-          audit_path = Path("/tmp/quorabust-protocol-audit.json")
-          audit = json.loads(audit_path.read_text())
-          assert audit["status"] == "pass"
-          assert audit["source"]["sha256"] == source_digest
-
-          def artifact(name):
-              return {"reference": f"synthetic://{name}", "sha256": digest(name)}
-
-          protocol = {
-              "schema_version": 1,
+          split_path = Path("/tmp/quorabust-protocol-split.json")
+          split_path.write_text('{"strategy": "question_component_holdout"}\n')
+          config = {
               "protocol_name": "quorabust-synthetic-ci-v1",
-              "evidence_scope": "protocol_only_no_quality_claim",
               "dataset": {
                   "name": "synthetic CI fixture",
-                  "source_reference": str(source),
-                  "sha256": source_digest,
+                  "source_path": str(source),
+                  "source_reference": "synthetic://source.csv",
                   "license": "synthetic CI fixture",
                   "terms": "no external benchmark claim",
-                  "raw_data_policy": "external_not_committed",
-                  "audit": {
-                      "reference": str(audit_path),
-                      "sha256": hashlib.sha256(audit_path.read_bytes()).hexdigest(),
-                      "status": audit["status"],
-                      "source_sha256": audit["source"]["sha256"],
-                      "require_question_ids": True,
-                  },
+                  "audit_path": "/tmp/quorabust-protocol-audit.json",
+                  "audit_reference": "synthetic://audit.json",
               },
-              "roles": {
-                  "train": {
-                      "purpose": "fit model parameters",
-                      "allowed_activities": ["fit"],
-                      "artifact": artifact("train"),
-                  },
-                  "tuning": {
-                      "purpose": "select model and threshold policy",
-                      "allowed_activities": ["model_selection", "threshold_selection"],
-                      "artifact": artifact("tuning"),
-                  },
-                  "calibration": {
-                      "purpose": "fit probability calibration",
-                      "allowed_activities": ["probability_calibration"],
-                      "artifact": artifact("calibration"),
-                  },
-                  "final_holdout": {
-                      "purpose": "evaluate the frozen release once",
-                      "allowed_activities": ["final_evaluation"],
-                      "artifact": artifact("final_holdout"),
-                  },
-              },
+              "roles": roles,
               "split": {
-                  "strategy": "question_component_holdout",
-                  "question_id_columns": ["qid1", "qid2"],
+                  "manifest_path": str(split_path),
+                  "manifest_reference": "synthetic://split.json",
                   "seed": 42,
                   "eval_fraction": 0.1,
-                  "manifest": {
-                      "reference": "synthetic://split-manifest",
-                      "sha256": digest("split-manifest"),
-                  },
+                  "question_id_columns": ["qid1", "qid2"],
               },
               "decision_policy": {
                   "threshold_metric": "f1",
                   "threshold_candidates": [0.2, 0.5, 0.8],
-                  "threshold_source_role": "tuning",
                   "calibration_method": "sigmoid",
-                  "calibration_source_role": "calibration",
-                  "final_holdout_role": "final_holdout",
               },
-              "provenance": {
-                  "git_revision": subprocess.check_output(
-                      ["git", "rev-parse", "HEAD"], text=True
-                  ).strip(),
-                  "python_version": platform.python_version(),
-                  "dependency_lock": {
-                      "reference": "requirements.txt",
-                      "sha256": hashlib.sha256(Path("requirements.txt").read_bytes()).hexdigest(),
-                  },
-                  "command": "synthetic CI protocol smoke",
-                  "machine": f"{platform.system().lower()}/{platform.machine()}",
-              },
-              "safeguards": {
-                  "roles_are_disjoint": True,
-                  "final_holdout_used_for_tuning": False,
-                  "final_holdout_used_for_calibration": False,
-                  "final_holdout_used_for_model_selection": False,
-                  "raw_data_committed": False,
-                  "public_quality_claims_allowed": False,
-              },
+              "dependency_lock_path": str(root / "requirements.txt"),
+              "dependency_lock_reference": "repo://requirements.txt",
+              "repository_path": str(root),
+              "command": "synthetic CI protocol builder smoke",
           }
-          Path("/tmp/quorabust-protocol.json").write_text(
-              json.dumps(protocol, indent=2, sort_keys=True) + "\n"
+          Path("/tmp/quorabust-protocol-config.json").write_text(
+              json.dumps(config, indent=2, sort_keys=True) + "\n"
           )
           PY
+          quorabust-audit-data \
+            --csv /tmp/quorabust-protocol-source.csv \
+            --out /tmp/quorabust-protocol-audit.json \
+            --require-question-ids
+          quorabust-build-protocol \
+            --config /tmp/quorabust-protocol-config.json \
+            --out /tmp/quorabust-protocol.json
           quorabust-validate-protocol --protocol /tmp/quorabust-protocol.json
       - name: Serve CLI
         run: quorabust-serve --help

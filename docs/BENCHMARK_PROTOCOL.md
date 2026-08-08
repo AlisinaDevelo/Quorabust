@@ -31,6 +31,25 @@ The checked-in CI smoke fixture uses synthetic files and sets
 `evidence_scope` to `protocol_only_no_quality_claim`. It proves the contract and CLI
 work without turning the smoke fixture into benchmark evidence.
 
+## Build from artifacts
+
+Use the builder when the source, audit, role, and split artifacts are available. It hashes
+the bytes on disk, verifies that the audit is passing and bound to the current source, and
+records the repository commit and dependency lock before running the protocol validator:
+
+```bash
+quorabust-build-protocol \
+  --config reports/quorabust-protocol-builder.json \
+  --out reports/quorabust-benchmark-protocol.json
+```
+
+The builder config is JSON and must provide `protocol_name`, `dataset`, `roles`, `split`,
+`decision_policy`, `dependency_lock_path`, `repository_path`, and `command`. Dataset and
+role entries point to external files; `split.manifest_path` points to the exact split
+manifest. Relative paths resolve from the config file, while `repository_path` is an
+explicit checkout path used for the commit provenance. References and license/terms text
+are recorded in the output, but raw data remains outside Git.
+
 ## Real-data handoff
 
 For a permitted Quora release, keep the licensed source outside Git:
