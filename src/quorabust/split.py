@@ -149,11 +149,19 @@ def split_question_component_roles(
         component_counts["train"] += 1
 
     roles: dict[str, pd.DataFrame] = {}
+    label_counts: dict[str, dict[str, int]] = {}
     for role in _ROLE_NAMES:
         indices = sorted(assigned[role])
         if not indices:
             raise ValueError(f"unable to materialize a non-empty {role} role")
         roles[role] = frame.iloc[indices].reset_index(drop=True)
+        counts = roles[role]["is_duplicate"].value_counts().to_dict()
+        label_counts[role] = {str(label): int(counts.get(label, 0)) for label in (0, 1)}
+        if any(label_counts[role][str(label)] == 0 for label in (0, 1)):
+            raise ValueError(
+                f"benchmark {role} role requires both label classes; "
+                f"observed {label_counts[role]}"
+            )
 
     seen_question_ids: set[str] = set()
     for role in _ROLE_NAMES:
@@ -179,6 +187,7 @@ def split_question_component_roles(
             role: {
                 "rows": len(roles[role]),
                 "components": component_counts[role],
+                "label_counts": label_counts[role],
                 "observed_fraction": len(roles[role]) / len(frame),
             }
             for role in _ROLE_NAMES

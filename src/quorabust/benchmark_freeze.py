@@ -176,6 +176,7 @@ def freeze_protocol(
             "sha256": sha256_file(output_paths[role]),
             "rows": role_stats["rows"],
             "components": role_stats["components"],
+            "label_counts": role_stats["label_counts"],
             "observed_fraction": role_stats["observed_fraction"],
         }
 

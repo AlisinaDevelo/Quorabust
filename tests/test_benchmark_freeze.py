@@ -8,14 +8,15 @@ from quorabust.benchmark_freeze import ROLE_NAMES, freeze_protocol, main
 from quorabust.lineage import sha256_file
 
 
-def _write_source(path: Path, rows: int = 24) -> None:
+def _write_source(path: Path, components: int = 12) -> None:
+    rows = components * 2
     pd.DataFrame(
         {
             "question1": [f"question one {index}" for index in range(rows)],
-            "question2": [f"question two {index}" for index in range(rows)],
+            "question2": [f"question two {index // 2}" for index in range(rows)],
             "is_duplicate": [index % 2 for index in range(rows)],
-            "qid1": [f"q{index * 2}" for index in range(rows)],
-            "qid2": [f"q{index * 2 + 1}" for index in range(rows)],
+            "qid1": [f"q{index // 2 * 3}" for index in range(rows)],
+            "qid2": [f"q{index // 2 * 3 + index % 2 + 1}" for index in range(rows)],
         }
     ).to_csv(path, index=False)
 
@@ -57,6 +58,10 @@ def test_freeze_is_byte_deterministic_and_records_role_hashes(tmp_path):
     assert manifest["safeguards"]["final_holdout_used_for_tuning"] is False
     assert manifest["safeguards"]["final_holdout_used_for_calibration"] is False
     assert manifest["safeguards"]["final_holdout_used_for_model_selection"] is False
+    assert all(
+        record["label_counts"] == {"0": record["rows"] // 2, "1": record["rows"] // 2}
+        for record in manifest["roles"].values()
+    )
     assert sum(manifest["roles"][role]["rows"] for role in ROLE_NAMES) == len(pd.read_csv(source))
 
 
@@ -82,11 +87,27 @@ def test_freeze_writes_failing_audit_without_role_files(tmp_path):
 
 def test_freeze_rejects_insufficient_components_after_audit(tmp_path):
     source = tmp_path / "too-small.csv"
-    _write_source(source, rows=3)
+    _write_source(source, components=3)
     roles, audit, split = _freeze_paths(tmp_path / "outputs")
 
     with pytest.raises(ValueError, match="at least four question components"):
         freeze_protocol(source, roles, audit, split)
+
+    assert json.loads(audit.read_text(encoding="utf-8"))["status"] == "pass"
+    assert not roles.exists()
+    assert not split.exists()
+
+
+def test_freeze_rejects_role_without_both_label_classes(tmp_path):
+    source = tmp_path / "imbalanced-roles.csv"
+    _write_source(source)
+    frame = pd.read_csv(source)
+    frame["is_duplicate"] = 0
+    frame.to_csv(source, index=False)
+    roles, audit, split = _freeze_paths(tmp_path / "outputs")
+
+    with pytest.raises(ValueError, match="requires both label classes"):
+        freeze_protocol(source, roles, audit, split, seed=9)
 
     assert json.loads(audit.read_text(encoding="utf-8"))["status"] == "pass"
     assert not roles.exists()
