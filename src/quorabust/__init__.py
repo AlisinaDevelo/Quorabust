@@ -6,6 +6,7 @@ from quorabust.features import PairFeatureBuilder, word_jaccard
 from quorabust.model import eval_classification_metrics, train_duplicate_classifier
 from quorabust.persist import load_classifier, save_classifier
 from quorabust.preprocess import clean_text
+from quorabust.protocol_builder import build_protocol, build_protocol_payload
 from quorabust.retrieval import (
     CatalogHit,
     CatalogQuestion,
@@ -47,4 +48,6 @@ __all__ = [
     "save_safe_classifier",
     "load_safe_classifier",
     "safe_metadata",
+    "build_protocol",
+    "build_protocol_payload",
 ]
