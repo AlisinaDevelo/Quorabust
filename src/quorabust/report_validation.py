@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from quorabust.benchmark_protocol import validate_protocol_payload
+from quorabust.slice_manifest import validate_slice_provenance_payload
 
 _REQUIRED_TOP_LEVEL = {
     "artifact",
@@ -284,6 +285,11 @@ def validate_report_payload(
                     continue
                 for key in _missing_keys(value, keys):
                     errors.append(f"missing evaluation_manifest.{section} field: {key}")
+            if "slice_provenance" in manifest:
+                errors.extend(
+                    "evaluation_manifest." + error
+                    for error in validate_slice_provenance_payload(manifest["slice_provenance"])
+                )
             if require_question_component_split:
                 _validate_question_component_split(manifest, errors)
     if protocol_bound:

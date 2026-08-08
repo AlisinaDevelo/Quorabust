@@ -28,6 +28,7 @@ from sklearn.metrics import (
 from quorabust.lineage import git_revision, sha256_file
 from quorabust.model import predict_proba_duplicate
 from quorabust.persist import load_classifier
+from quorabust.slice_manifest import load_slice_manifest
 
 _REQUIRED_COLUMNS = {"question1", "question2", "is_duplicate"}
 _DEFAULT_MAX_SLICES = 50
@@ -242,6 +243,7 @@ def build_evaluation_manifest(
     calibration_bins: int,
     command: str,
     slice_columns: list[str] | None = None,
+    slice_provenance: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build an auditable, path-light record for a holdout evaluation run."""
     labels = eval_df["is_duplicate"].astype(int)
@@ -276,7 +278,7 @@ def build_evaluation_manifest(
     if normalized_slice_columns:
         evaluation_policy["slice_columns"] = normalized_slice_columns
 
-    return {
+    manifest = {
         "schema_version": 1,
         "artifact": {
             "label": artifact_label,
@@ -300,6 +302,9 @@ def build_evaluation_manifest(
         "command": command,
         "generated_at_utc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     }
+    if slice_provenance is not None:
+        manifest["slice_provenance"] = slice_provenance
+    return manifest
 
 
 def _metrics_at_threshold(y: np.ndarray, proba: np.ndarray, threshold: float) -> dict[str, Any]:
@@ -469,6 +474,21 @@ def evaluate_slices(
             rows.append({"value": label, **metrics})
         output[normalized_column] = rows
     return output
+
+
+def _slice_observed_row_counts(
+    evaluation_slices: dict[str, list[dict[str, Any]]],
+) -> dict[str, dict[str, Any]]:
+    return {
+        column: {
+            "rows": sum(int(row["n"]) for row in rows),
+            "labels": {
+                str(row["value"]): int(row["n"])
+                for row in rows
+            },
+        }
+        for column, rows in sorted(evaluation_slices.items())
+    }
 
 
 def render_model_card(
@@ -896,6 +916,15 @@ def main(argv: list[str] | None = None) -> int:
         help="Maximum distinct labels allowed per requested slice column",
     )
     parser.add_argument(
+        "--slice-manifest",
+        type=Path,
+        default=None,
+        help=(
+            "Optional JSON provenance sidecar bound to the evaluated CSV; requires "
+            "--slice-column"
+        ),
+    )
+    parser.add_argument(
         "--artifact-label",
         default=None,
         help="Public artifact label to print instead of the local model path",
@@ -945,6 +974,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.slice_column and args.eval_csv is None:
         print("--slice-column requires --eval-csv", file=sys.stderr)
         return 1
+    if args.slice_manifest is not None and args.eval_csv is None:
+        print("--slice-manifest requires --eval-csv", file=sys.stderr)
+        return 1
+    if args.slice_manifest is not None and not args.slice_column:
+        print("--slice-manifest requires --slice-column", file=sys.stderr)
+        return 1
 
     builder, clf, meta = load_classifier(args.model)
     artifact = args.artifact_label or str(args.model.resolve())
@@ -954,6 +989,7 @@ def main(argv: list[str] | None = None) -> int:
     comparison_metrics = None
     evaluation_manifest = None
     evaluation_slices = None
+    slice_provenance = None
     if args.eval_csv is not None:
         if not args.eval_csv.is_file():
             print(f"File not found: {args.eval_csv}", file=sys.stderr)
@@ -983,6 +1019,16 @@ def main(argv: list[str] | None = None) -> int:
                     calibration_bins=args.calibration_bins,
                     max_slices=args.max_slices,
                 )
+                if args.slice_manifest is not None:
+                    slice_provenance = {
+                        "manifest": load_slice_manifest(
+                            args.slice_manifest,
+                            eval_path=args.eval_csv,
+                            eval_rows=len(eval_df),
+                            slice_columns=args.slice_column,
+                        ),
+                        "observed_row_counts": _slice_observed_row_counts(evaluation_slices),
+                    }
             if args.compare_model:
                 comparison_metrics = [
                     _comparison_metrics(
@@ -1013,6 +1059,7 @@ def main(argv: list[str] | None = None) -> int:
             calibration_bins=args.calibration_bins,
             command=_report_command(argv),
             slice_columns=args.slice_column,
+            slice_provenance=slice_provenance,
         )
 
     if args.format == "json":

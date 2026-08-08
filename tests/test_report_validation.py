@@ -195,6 +195,29 @@ def test_validate_report_payload_reports_missing_fields():
     assert "missing calibration field: bins" in errors
 
 
+def test_validate_report_payload_rejects_incomplete_slice_provenance():
+    payload = _payload()
+    payload["evaluation_manifest"]["slice_provenance"] = {
+        "manifest": {
+            "schema_version": 1,
+            "source": {
+                "reference": "synthetic://evaluation.csv",
+                "sha256": "a" * 64,
+                "rows": 3,
+            },
+            "columns": {"language": {"labeling_method": "owner labels"}},
+        },
+        "observed_row_counts": {"language": {"rows": 3, "labels": {"en": 1}}},
+    }
+
+    errors = validate_report_payload(payload, require_manifest=True)
+
+    assert (
+        "evaluation_manifest.slice_provenance.observed_row_counts.language.labels must sum to rows"
+        in errors
+    )
+
+
 def test_validate_report_cli_passes(tmp_path):
     report = tmp_path / "report.json"
     report.write_text(json.dumps(_payload()), encoding="utf-8")

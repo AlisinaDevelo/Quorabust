@@ -482,6 +482,60 @@ def test_report_cli_writes_evaluation_slices_to_json_and_markdown(tmp_path):
     assert "| language | en |" in card
 
 
+def test_report_cli_binds_slice_provenance_manifest(tmp_path):
+    model, _, _ = _artifact(tmp_path)
+    eval_csv = tmp_path / "eval.csv"
+    _slice_df().to_csv(eval_csv, index=False)
+    slice_manifest = tmp_path / "slice-manifest.json"
+    slice_manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "source": {
+                    "reference": "synthetic://evaluation.csv",
+                    "sha256": sha256_file(eval_csv),
+                    "rows": 30,
+                },
+                "columns": {
+                    "language": {
+                        "labeling_method": "synthetic fixture owner labels",
+                        "description": "Controlled CI-only language labels.",
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    out = tmp_path / "MODEL_CARD.json"
+
+    assert (
+        main(
+            [
+                "--model",
+                str(model),
+                "--eval-csv",
+                str(eval_csv),
+                "--slice-column",
+                "language",
+                "--slice-manifest",
+                str(slice_manifest),
+                "--format",
+                "json",
+                "--out",
+                str(out),
+            ]
+        )
+        == 0
+    )
+
+    payload = json.loads(out.read_text(encoding="utf-8"))
+    provenance = payload["evaluation_manifest"]["slice_provenance"]
+    assert provenance["manifest"]["source"]["sha256"] == sha256_file(eval_csv)
+    assert provenance["observed_row_counts"] == {
+        "language": {"rows": 30, "labels": {"en": 15, "it": 15}}
+    }
+
+
 def test_report_cli_writes_comparison_json(tmp_path):
     model, _, _ = _artifact(tmp_path)
     eval_csv = tmp_path / "eval.csv"
