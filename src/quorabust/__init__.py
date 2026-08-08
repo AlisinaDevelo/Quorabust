@@ -2,6 +2,7 @@
 
 from importlib.metadata import PackageNotFoundError, version
 
+from quorabust.benchmark_freeze import ROLE_NAMES, freeze_protocol
 from quorabust.features import PairFeatureBuilder, word_jaccard
 from quorabust.model import eval_classification_metrics, train_duplicate_classifier
 from quorabust.persist import load_classifier, save_classifier
@@ -50,4 +51,6 @@ __all__ = [
     "safe_metadata",
     "build_protocol",
     "build_protocol_payload",
+    "ROLE_NAMES",
+    "freeze_protocol",
 ]

@@ -70,6 +70,7 @@ quorabust-validate-protocol = "quorabust.benchmark_protocol:main"
 quorabust-validate-retrieval = "quorabust.retrieval_validation:main"
 quorabust-demo-assets = "quorabust.demo_assets:main"
 quorabust-build-protocol = "quorabust.protocol_builder:main"
+quorabust-freeze-protocol = "quorabust.benchmark_freeze:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
