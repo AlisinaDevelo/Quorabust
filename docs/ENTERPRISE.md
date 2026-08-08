@@ -77,7 +77,9 @@ per-backend policy.
   `QUORABUST_MAX_BATCH_SIZE` to bound scoring work; the default is 256 pairs. Health,
   readiness, and metrics remain available for platform probes and should be network-scoped.
   Set `QUORABUST_MAX_TEXT_LENGTH` to bound each question string before feature construction;
-  the default is 8192 characters and both sides of every pair are checked.
+  the default is 8192 characters and both sides of every pair are checked. Set
+  `QUORABUST_MAX_REQUEST_BYTES` to bound the raw HTTP body before FastAPI JSON/Pydantic parsing;
+  the default is 8 MiB and oversized requests return the stable `request_too_large` error code.
 - **Artifact integrity**: pin `QUORABUST_MODEL_SHA256` and
   `QUORABUST_MODEL_B_SHA256` when promoting artifacts; mismatches fail before pickle
   loading.

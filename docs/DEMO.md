@@ -6,6 +6,10 @@ Prometheus metrics, and Grafana dashboards.
 The smoke model below is not a quality benchmark. It uses `examples/smoke_pairs.csv` only
 to demonstrate the API and observability contract.
 
+The Compose stack binds its ports to loopback by default. The API also applies a raw request
+body budget before JSON/Pydantic parsing; set `QUORABUST_MAX_REQUEST_BYTES` explicitly when
+testing a different local workload.
+
 For a quick static inspection without starting Docker, see the generated JSON snapshots
 in [demo-assets](demo-assets). Regenerate them with:
 

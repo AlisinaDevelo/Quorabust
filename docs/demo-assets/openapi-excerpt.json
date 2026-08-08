@@ -216,7 +216,7 @@
     },
     "/predict": {
       "post": {
-        "description": "Scores one or more question pairs. Optional header `X-Quorabust-Variant: b` selects the B artifact when configured. Set query parameter `explain=true` to return input feature values. Set `threshold` to override the duplicate decision cutoff for this request. Deployments can configure `QUORABUST_API_KEY` and `QUORABUST_MAX_BATCH_SIZE` and `QUORABUST_MAX_TEXT_LENGTH` for access control and bounded work. Every response includes an `X-Request-ID` UUID for support and log correlation.",
+        "description": "Scores one or more question pairs. Optional header `X-Quorabust-Variant: b` selects the B artifact when configured. Set query parameter `explain=true` to return input feature values. Set `threshold` to override the duplicate decision cutoff for this request. Deployments can configure `QUORABUST_API_KEY` and `QUORABUST_MAX_BATCH_SIZE`, `QUORABUST_MAX_TEXT_LENGTH`, and `QUORABUST_MAX_REQUEST_BYTES` for access control and bounded work. Every response includes an `X-Request-ID` UUID for support and log correlation.",
         "operationId": "predict_predict_post",
         "parameters": [
           {
@@ -305,7 +305,7 @@
             "description": "API key required or invalid"
           },
           "413": {
-            "description": "request batch or text exceeds configured maximum"
+            "description": "request body, batch, or text exceeds configured maximum"
           },
           "422": {
             "content": {

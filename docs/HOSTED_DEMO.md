@@ -54,6 +54,8 @@ Optional:
 - `QUORABUST_MAX_BATCH_SIZE=32` (or another small value) to bound public demo work.
 - `QUORABUST_MAX_TEXT_LENGTH=8192` (or a smaller value) to reject oversized question strings
   before feature construction.
+- `QUORABUST_MAX_REQUEST_BYTES=1048576` (or another reviewed value) to reject oversized HTTP
+  bodies before JSON/Pydantic parsing.
 
 ## Safety boundaries
 
@@ -65,6 +67,8 @@ Optional:
   rate limiting, quotas, and key rotation at the host or gateway.
 - Keep the per-question text cap enabled; rejected text is neither logged nor echoed in the
   stable 413 error response.
+- Keep the raw request-body byte cap enabled; it limits parser memory before request validation
+  and rejected bodies are neither logged nor echoed.
 - Keep request logs privacy-safe and ship only the structured operational event fields;
   never expose question text or API keys through logs.
 - Disable or protect the demo when it is no longer useful; the goal is inspection, not

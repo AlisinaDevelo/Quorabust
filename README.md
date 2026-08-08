@@ -238,15 +238,16 @@ artifact paths or training CSV paths. It includes the actual `artifact_sha256` o
 loaded artifact so deployment checks can confirm which immutable bytes are serving.
 Client errors use one stable envelope: `{"error":{"code":"...","message":"...","request_id":"..."}}`.
 Codes include `invalid_request`, `validation_error`, `unauthorized`, `batch_too_large`,
-`model_unavailable`, and `not_found`; the `request_id` matches the `X-Request-ID` response
-header.
+`request_too_large`, `model_unavailable`, and `not_found`; the `request_id` matches the
+`X-Request-ID` response header.
 For a deployment-level boundary, set `QUORABUST_API_KEY` to require the
 `X-Quorabust-API-Key` header on `/predict` and `/models`, and use
 `QUORABUST_MAX_BATCH_SIZE` to bound request work (default 256), and
 `QUORABUST_MAX_TEXT_LENGTH` to reject an individual question that is too large (default 8192
 characters). The text limit applies to both sides of every pair and is checked before feature
-construction; the API does not log or echo rejected text. Keep TLS, rate limiting, quotas, and
-key rotation at the gateway.
+construction; the API does not log or echo rejected text. Set `QUORABUST_MAX_REQUEST_BYTES` to
+bound the raw HTTP body before JSON/Pydantic parsing (default 8 MiB). The byte limit is an
+application boundary; keep TLS, rate limiting, quotas, and key rotation at the gateway.
 For artifact integrity, set `QUORABUST_MODEL_SHA256` and optionally
 `QUORABUST_MODEL_B_SHA256`; serving verifies each digest before unpickling and fails
 startup on a mismatch. `quorabust-train --metadata-out ...` records the post-save
