@@ -25,6 +25,7 @@ requirements and portfolio capture notes.
 
 - Pairwise text features with TF-IDF, optional sentence-transformer embeddings, or
   optional cross-encoder pair scoring
+- Leakage-safe lexical hard-negative mining for cross-encoder training experiments
 - Leakage-aware question-component holdouts when `qid1`/`qid2` identifiers are available
 - XGBoost training with optional holdout evaluation and early stopping
 - Saved artifacts that include lineage, feature schema, dataset checksum, and metrics
@@ -103,6 +104,26 @@ python -m quorabust --csv data/raw/train.csv --out models/quorabust.pkl   # equi
 ```
 
 Options: `--max-rows N`, `--eval-fraction 0.1` (default), `--eval-fraction 0` to train on all rows without a holdout, `--eval-out` to export the exact holdout used by training, `--require-question-ids` to fail if leakage-safe IDs are absent, `--seed`, `--feature-backend {tfidf,embedding,cross-encoder}`, `--embedding-model …`, `--cross-encoder-model …`, `--thresholds`, `--threshold-metric {accuracy,precision,recall,f1}` for holdout-based decision-threshold selection, `--registry-dir` (JSONL registry), `--metadata-out` (JSON sidecar for reviewing artifact lineage without loading the pickle).
+
+To generate lexical hard negatives for training or tuning experiments, use only the
+permitted training/tuning material and keep the calibration and final holdout files out:
+
+```bash
+quorabust-mine-hard-negatives \
+  --csv data/processed/train.csv \
+  --out data/derived/train-hard-negatives.csv \
+  --metadata-out data/derived/train-hard-negatives.meta.json \
+  --candidate-k 50 \
+  --negatives-per-positive 2 \
+  --seed 42
+```
+
+The command requires complete question IDs, builds the known-positive graph from label-1
+edges, and excludes every question in an anchor's positive component. It emits label-0
+pairs with retrieval rank and score, plus a sidecar containing input/output hashes,
+configuration, and runtime provenance. These are candidate training examples, not a
+quality benchmark or evidence that the model improved; validate them on the frozen protocol
+before making a model-card claim.
 
 To calibrate a trained artifact, keep the calibration and threshold-selection CSVs
 independent from training and from each other:

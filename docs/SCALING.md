@@ -17,6 +17,36 @@ This document maps **ambitions** to what ships in-repo and what stays external.
   for pair scoring, but it is slower than TF-IDF or bi-encoder embeddings because every
   pair must be passed through the transformer jointly.
 
+### Leakage-safe hard negatives
+
+Use `quorabust-mine-hard-negatives` to generate lexical near-neighbours for training or
+tuning experiments:
+
+```bash
+quorabust-mine-hard-negatives \
+  --csv data/processed/train.csv \
+  --out data/derived/train-hard-negatives.csv \
+  --metadata-out data/derived/train-hard-negatives.meta.json \
+  --candidate-k 50 \
+  --negatives-per-positive 2 \
+  --seed 42
+```
+
+The input must contain complete `qid1`/`qid2` values and binary labels. Only label-1 edges
+build the known-positive graph; every candidate in the anchor's connected component is
+excluded, including transitive positives. The output remains a normal pair CSV, and each
+row records its source positive row, anchor side, lexical rank, and retrieval score. The
+sidecar binds the generated file to the input hash, configuration, output hash, git
+revision, and runtime.
+
+Keep calibration and final-holdout rows out of the mining input. If the source contains
+only the training role, the generated negatives may be appended to training data after
+review; they must not be used to tune a decision threshold or to replace the untouched
+final holdout. TF-IDF similarity is a candidate-generation signal, not a duplicate
+probability, and this path makes no quality claim without a permitted real-data evaluation.
+See [#16](https://github.com/AlisinaDevelo/Quorabust/issues/16) and
+[#44](https://github.com/AlisinaDevelo/Quorabust/issues/44).
+
 ## Catalog retrieval
 
 The optional catalog path starts with a deterministic TF-IDF first-stage retriever:

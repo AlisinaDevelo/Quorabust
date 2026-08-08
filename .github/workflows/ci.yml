@@ -249,6 +249,8 @@ jobs:
         run: quorabust-retrieve-profile --help
       - name: Retrieval validator CLI
         run: quorabust-validate-retrieval --help
+      - name: Hard-negative mining CLI
+        run: quorabust-mine-hard-negatives --help
       - name: Safe artifact CLI
         run: quorabust-export-safe --help
       - name: Tracing helper
