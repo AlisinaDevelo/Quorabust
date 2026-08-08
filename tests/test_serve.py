@@ -387,6 +387,54 @@ def test_create_app_rejects_non_positive_text_limit():
         create_app(max_text_length=0)
 
 
+def test_create_app_rejects_non_positive_request_limit():
+    with pytest.raises(ValueError, match="max_request_bytes"):
+        create_app(max_request_bytes=0)
+
+
+def test_predict_rejects_raw_body_before_validation_without_echoing_input(tmp_path):
+    p = tmp_path / "m.pkl"
+    _tiny_pkl(p)
+    app = create_app(model_path_a=str(p), max_request_bytes=64)
+    request_id = "123e4567-e89b-42d3-a456-426614174000"
+    content = (
+        '{"question1":["sensitive-' + "x" * 100 + '"],"question2":["hello"]}'
+    ).encode()
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/predict",
+            content=content,
+            headers={"Content-Type": "application/json", "X-Request-ID": request_id},
+        )
+
+    assert response.status_code == 413
+    assert response.headers["X-Request-ID"] == request_id
+    assert response.json()["error"] == {
+        "code": "request_too_large",
+        "message": "request body exceeds configured maximum of 64 bytes",
+        "request_id": request_id,
+    }
+    assert "sensitive-" not in response.text
+
+
+def test_predict_uses_request_limit_environment(tmp_path, monkeypatch):
+    p = tmp_path / "m.pkl"
+    _tiny_pkl(p)
+    monkeypatch.setenv("QUORABUST_MAX_REQUEST_BYTES", "64")
+    app = create_app(model_path_a=str(p))
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/predict",
+            content=b'{"question1":["' + b"x" * 100 + b'"],"question2":["y"]}',
+            headers={"Content-Type": "application/json"},
+        )
+
+    assert response.status_code == 413
+    assert response.json()["error"]["code"] == "request_too_large"
+
+
 def test_predict_uses_text_limit_environment(tmp_path, monkeypatch):
     p = tmp_path / "m.pkl"
     _tiny_pkl(p)

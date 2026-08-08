@@ -19,6 +19,7 @@ from fastapi.security import APIKeyHeader
 from prometheus_client import CollectorRegistry, Counter, Histogram, generate_latest
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from quorabust.explain import explain_pair_features
 from quorabust.lineage import sha256_file
@@ -34,6 +35,7 @@ from quorabust.tracing import (
 DEFAULT_DECISION_THRESHOLD = 0.5
 DEFAULT_MAX_BATCH_SIZE = 256
 DEFAULT_MAX_TEXT_LENGTH = 8192
+DEFAULT_MAX_REQUEST_BYTES = 8 * 1024 * 1024
 API_KEY_HEADER = "X-Quorabust-API-Key"
 REQUEST_ID_HEADER = "X-Request-ID"
 HTTP_LOGGER = logging.getLogger("quorabust.http")
@@ -93,11 +95,12 @@ def _error_response(
     status_code: int,
     message: str,
     headers: Mapping[str, str] | None = None,
+    error_code: str | None = None,
 ) -> JSONResponse:
     request_id = getattr(request.state, "quorabust_request_id", str(uuid.uuid4()))
     payload = {
         "error": {
-            "code": _ERROR_CODES.get(status_code, "http_error"),
+            "code": error_code or _ERROR_CODES.get(status_code, "http_error"),
             "message": message,
             "request_id": request_id,
         }
@@ -158,6 +161,73 @@ def _env_max_text_length() -> int:
     except ValueError:
         return DEFAULT_MAX_TEXT_LENGTH
     return value if value > 0 else DEFAULT_MAX_TEXT_LENGTH
+
+
+def _env_max_request_bytes() -> int:
+    raw = os.environ.get("QUORABUST_MAX_REQUEST_BYTES")
+    if raw is None:
+        return DEFAULT_MAX_REQUEST_BYTES
+    try:
+        value = int(raw)
+    except ValueError:
+        return DEFAULT_MAX_REQUEST_BYTES
+    return value if value > 0 else DEFAULT_MAX_REQUEST_BYTES
+
+
+class _RequestBodyTooLarge(Exception):
+    def __init__(self, max_body_bytes: int) -> None:
+        super().__init__(f"request body exceeds configured maximum of {max_body_bytes} bytes")
+
+
+class _RequestBodyLimitMiddleware:
+    """Bound request bytes before FastAPI materializes JSON or Pydantic models."""
+
+    def __init__(self, app: ASGIApp, max_body_bytes: int) -> None:
+        self.app = app
+        self.max_body_bytes = max_body_bytes
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        content_length = next(
+            (
+                value
+                for name, value in scope.get("headers", [])
+                if name.lower() == b"content-length"
+            ),
+            None,
+        )
+        if content_length is not None:
+            try:
+                declared_length = int(content_length)
+            except ValueError:
+                declared_length = None
+            if declared_length is not None and declared_length > self.max_body_bytes:
+                raise _RequestBodyTooLarge(self.max_body_bytes)
+
+        messages: list[Message] = []
+        total_bytes = 0
+        while True:
+            message = await receive()
+            messages.append(message)
+            if message["type"] == "http.disconnect":
+                break
+            if message["type"] != "http.request":
+                break
+            total_bytes += len(message.get("body", b""))
+            if total_bytes > self.max_body_bytes:
+                raise _RequestBodyTooLarge(self.max_body_bytes)
+            if not message.get("more_body", False):
+                break
+
+        async def replay() -> Message:
+            if messages:
+                return messages.pop(0)
+            return {"type": "http.disconnect"}
+
+        await self.app(scope, replay, send)
 
 
 class PredictBody(BaseModel):
@@ -290,6 +360,7 @@ def create_app(
     api_key: str | None = None,
     max_batch_size: int | None = None,
     max_text_length: int | None = None,
+    max_request_bytes: int | None = None,
     model_sha256: str | None = None,
     model_b_sha256: str | None = None,
 ) -> FastAPI:
@@ -312,10 +383,15 @@ def create_app(
     configured_max_text_length = (
         max_text_length if max_text_length is not None else _env_max_text_length()
     )
+    configured_max_request_bytes = (
+        max_request_bytes if max_request_bytes is not None else _env_max_request_bytes()
+    )
     if configured_max_batch_size < 1:
         raise ValueError("max_batch_size must be at least 1")
     if configured_max_text_length < 1:
         raise ValueError("max_text_length must be at least 1")
+    if configured_max_request_bytes < 1:
+        raise ValueError("max_request_bytes must be at least 1")
 
     api_key_header = APIKeyHeader(name=API_KEY_HEADER, auto_error=False)
 
@@ -416,6 +492,11 @@ def create_app(
             },
         ],
     )
+    # Keep this inside request_context so oversized requests retain request IDs and metrics.
+    app.add_middleware(
+        _RequestBodyLimitMiddleware,
+        max_body_bytes=configured_max_request_bytes,
+    )
 
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(
@@ -461,6 +542,32 @@ def create_app(
             ) as request_span:
                 try:
                     response = await call_next(request)
+                except _RequestBodyTooLarge as exc:
+                    duration_seconds = time.perf_counter() - started
+                    path = _route_path(request)
+                    response = _error_response(
+                        request,
+                        status_code=413,
+                        message=str(exc),
+                        error_code="request_too_large",
+                    )
+                    observe_http(request, path, response.status_code, duration_seconds)
+                    record_http_response(
+                        request_span,
+                        route=path,
+                        status_code=response.status_code,
+                    )
+                    if request_span is not None:
+                        request_span.update_name(f"{request.method} {path}")
+                    response.headers[REQUEST_ID_HEADER] = request_id
+                    _log_http_event(
+                        request_id=request_id,
+                        method=request.method,
+                        path=path,
+                        status_code=response.status_code,
+                        duration_ms=duration_seconds * 1000,
+                    )
+                    return response
                 except Exception:
                     duration_seconds = time.perf_counter() - started
                     path = _route_path(request)
@@ -560,9 +667,9 @@ def create_app(
             "Set query parameter `explain=true` to return input feature values. "
             "Set `threshold` to override the duplicate decision cutoff for this request. "
             "Deployments can configure `QUORABUST_API_KEY` and "
-            "`QUORABUST_MAX_BATCH_SIZE` and `QUORABUST_MAX_TEXT_LENGTH` for access control "
-            "and bounded work. Every response includes an `X-Request-ID` UUID for support "
-            "and log correlation."
+            "`QUORABUST_MAX_BATCH_SIZE`, `QUORABUST_MAX_TEXT_LENGTH`, and "
+            "`QUORABUST_MAX_REQUEST_BYTES` for access control and bounded work. Every response "
+            "includes an `X-Request-ID` UUID for support and log correlation."
         ),
         responses={
             200: {
@@ -576,7 +683,7 @@ def create_app(
             },
             401: {"description": "API key required or invalid"},
             400: {"description": "question1 and question2 length mismatch"},
-            413: {"description": "request batch or text exceeds configured maximum"},
+            413: {"description": "request body, batch, or text exceeds configured maximum"},
             503: {"description": "Model not loaded or variant unavailable"},
         },
     )
