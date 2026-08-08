@@ -17,3 +17,20 @@ jobs:
           context: .
           push: false
           tags: quorabust:ci
+      - name: Validate Compose safety defaults
+        run: |
+          docker compose config --quiet
+          python - <<'PY'
+          import json
+          import subprocess
+
+          config = json.loads(
+              subprocess.check_output(["docker", "compose", "config", "--format", "json"])
+          )
+          for service in config["services"].values():
+              for port in service.get("ports", []):
+                  assert port["host_ip"] == "127.0.0.1"
+          grafana = config["services"]["grafana"]["environment"]
+          assert grafana["GF_AUTH_ANONYMOUS_ENABLED"] == "true"
+          assert grafana["GF_AUTH_ANONYMOUS_ORG_ROLE"] == "Viewer"
+          PY

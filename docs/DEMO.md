@@ -10,6 +10,10 @@ The Compose stack binds its ports to loopback by default. The API also applies a
 body budget before JSON/Pydantic parsing; set `QUORABUST_MAX_REQUEST_BYTES` explicitly when
 testing a different local workload.
 
+Grafana keeps anonymous access read-only for the local dashboard. To bind the demo beyond
+loopback, set `QUORABUST_BIND_HOST` explicitly and put TLS, authentication, and network policy
+in front of the stack first.
+
 For a quick static inspection without starting Docker, see the generated JSON snapshots
 in [demo-assets](demo-assets). Regenerate them with:
 
