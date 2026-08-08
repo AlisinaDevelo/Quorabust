@@ -39,13 +39,31 @@ row records its source positive row, anchor side, lexical rank, and retrieval sc
 sidecar binds the generated file to the input hash, configuration, output hash, git
 revision, and runtime.
 
+TF-IDF is the dependency-free control. To test semantic candidate generation, install the
+optional NLP extra and select the existing sentence-transformer catalog retriever:
+
+```bash
+quorabust-mine-hard-negatives \
+  --csv data/processed/train.csv \
+  --out data/derived/train-hard-negatives-dense.csv \
+  --retriever embedding \
+  --embedding-model sentence-transformers/all-MiniLM-L6-v2 \
+  --candidate-k 50 \
+  --negatives-per-positive 2
+```
+
+The embedding model is used only to generate bounded candidates; it is not fine-tuned by
+this command, and its score is not a calibrated duplicate probability. Base CI does not
+download model weights; optional NLP evaluation belongs in a separately permitted run.
+
 Keep calibration and final-holdout rows out of the mining input. If the source contains
 only the training role, the generated negatives may be appended to training data after
 review; they must not be used to tune a decision threshold or to replace the untouched
 final holdout. TF-IDF similarity is a candidate-generation signal, not a duplicate
 probability, and this path makes no quality claim without a permitted real-data evaluation.
 See [#16](https://github.com/AlisinaDevelo/Quorabust/issues/16) and
-[#44](https://github.com/AlisinaDevelo/Quorabust/issues/44).
+[#44](https://github.com/AlisinaDevelo/Quorabust/issues/44), and
+[#45](https://github.com/AlisinaDevelo/Quorabust/issues/45).
 
 ## Catalog retrieval
 

@@ -125,6 +125,12 @@ configuration, and runtime provenance. These are candidate training examples, no
 quality benchmark or evidence that the model improved; validate them on the frozen protocol
 before making a model-card claim.
 
+The default `--retriever tfidf` is the deterministic, dependency-free control. For a
+semantic candidate-generation experiment, install `.[nlp]` and select
+`--retriever embedding --embedding-model sentence-transformers/all-MiniLM-L6-v2`; the
+sidecar records the selected model name. Dense retrieval may produce a different candidate
+set, but it is still a hypothesis until measured on the frozen real-data protocol.
+
 To calibrate a trained artifact, keep the calibration and threshold-selection CSVs
 independent from training and from each other:
 
