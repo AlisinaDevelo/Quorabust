@@ -43,6 +43,47 @@ transformer-backed row is currently a safe serialized Quorabust artifact.
 | Sentence-transformer embedding + XGBoost + isotonic | 0.40 | 0.8834 | 0.7799 | 0.4023 | 0.1341 | 0.0075 | 0.6785 | 0.8371 | 0.7495 | 0.7938 |
 | Direct Quora cross-encoder + isotonic | 0.40 | 0.9731 | 0.9472 | 0.2007 | 0.0596 | 0.0034 | 0.8731 | 0.9159 | 0.8940 | 0.9199 |
 
+### Threshold Sweep
+
+Every cell below is `F1 (FP/FN)` on the same final holdout. A `*` marks the threshold
+selected on the tuning role by F1; the sweep itself does not tune on the final holdout.
+
+| threshold | TF-IDF + XGBoost | embedding + XGBoost | direct cross-encoder |
+| ---: | ---: | ---: | ---: |
+| 0.20 | 0.6599 (14,084/629) | 0.7271 (10,162/584) | 0.8753 (3,529/559) |
+| 0.30* | 0.6711 (12,039/1,296) | 0.7463 (8,068/1,229) | 0.8902 (2,550/902) |
+| 0.40* | 0.6695 (10,112/2,316) | 0.7495 (5,912/2,428) | 0.8940 (1,984/1,254) |
+| 0.50 | 0.6306 (6,768/4,923) | 0.7284 (4,303/3,900) | 0.8920 (1,681/1,551) |
+| 0.60 | 0.3182 (1,415/11,815) | 0.7072 (3,386/4,897) | 0.8866 (1,384/1,934) |
+| 0.70 | 0.1381 (378/13,769) | 0.5854 (1,660/8,048) | 0.8759 (1,086/2,443) |
+| 0.80 | 0.0343 (53/14,641) | 0.3394 (390/11,777) | 0.8606 (892/2,972) |
+
+### Operating Point And Cost Review
+
+The selected operating points have the following final-holdout confusion counts. The last
+column is an equal-unit diagnostic `FP + FN` only; no application-specific false-positive
+or false-negative cost weights were supplied, so it is not a deployment cost policy.
+
+| candidate | threshold | TN | FP | FN | TP | equal-unit errors |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| TF-IDF + XGBoost | 0.30 | 13,496 | 12,039 | 1,296 | 13,606 | 13,335 |
+| embedding + XGBoost | 0.40 | 19,623 | 5,912 | 2,428 | 12,474 | 8,340 |
+| direct cross-encoder | 0.40 | 23,551 | 1,984 | 1,254 | 13,648 | 3,238 |
+
+### Promotion Decision
+
+- **Promote as the current supported control:** TF-IDF + XGBoost + isotonic remains the only
+  candidate with a safe `.qmodel` artifact, small artifact size, and high warm throughput.
+- **Keep as the quality candidate:** the direct cross-encoder is materially stronger on this
+  holdout, but its direct score run has no serialized Quorabust artifact and has roughly 1.6 GB
+  peak RSS. It is not promoted from this benchmark alone.
+- **Keep as the intermediate candidate:** embedding improves substantially over TF-IDF at a
+  lower cost than the cross-encoder, but its trusted pickle is large and not safe for untrusted
+  distribution.
+- **Decision:** do not replace the supported production control yet. Package and parity-test a
+  safe transformer artifact, then repeat cold-start/load and representative domain checks before
+  selecting a transformer for promotion.
+
 The embedding candidate used `sentence-transformers/all-MiniLM-L6-v2` at revision
 `1110a243fdf4706b3f48f1d95db1a4f5529b4d41`. Its trusted pickle was 173,917,653 bytes,
 loaded in 4,216 ms, scored the final holdout at 1,057 pairs/second, and reached a process
@@ -52,10 +93,11 @@ deployment load testing remain open.
 
 The cross-encoder used `cross-encoder/quora-distilroberta-base` at revision
 `f62e7a4b20b97195c2868e53ec59126df5eac743`, `max_length=128`, batch size `128`, and explicit
-CPU execution. Scoring throughput was 163.6, 170.6, and 171.9 pairs/second for tuning,
-calibration, and final holdout respectively; peak RSS was approximately 1.4 GB. This is
-the central enterprise tradeoff: the model quality jump is substantial, but the serving
-cost and artifact packaging still need engineering before promotion.
+CPU execution. Model load was 1,431 ms. Scoring throughput was 173.3, 163.1, and 183.7
+pairs/second for tuning, calibration, and final holdout respectively; peak RSS was
+approximately 1.6 GB. This is the central enterprise tradeoff: the model quality jump is
+substantial, but the serving cost and artifact packaging still need engineering before
+promotion.
 
 For the same final holdout, a warm single-process pass through the protocol-bound TF-IDF
 safe artifact scored 40,437 pairs in 1,160.7 ms, or 34,839 pairs/second. The artifact is
