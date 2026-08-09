@@ -94,6 +94,67 @@ def test_calibrate_cli_writes_artifact_metadata_and_registry(tmp_path):
     assert record["artifact_sha256"] == sha256_file(calibrated)
 
 
+def test_calibrate_cli_allows_explicit_frozen_tuning_role(tmp_path):
+    train_csv = tmp_path / "train.csv"
+    tuning_csv = tmp_path / "tuning.csv"
+    calibration_csv = tmp_path / "calibration.csv"
+    model = tmp_path / "base.pkl"
+    calibrated = tmp_path / "calibrated.qmodel"
+    metadata = tmp_path / "calibrated.meta.json"
+
+    def write_role(path, start, count):
+        pd.DataFrame(
+            {
+                "qid1": [start + index * 2 for index in range(count)],
+                "qid2": [start + index * 2 + 1 for index in range(count)],
+                "question1": [f"question one {index}" for index in range(count)],
+                "question2": [f"question two {index}" for index in range(count)],
+                "is_duplicate": [index % 2 for index in range(count)],
+            }
+        ).to_csv(path, index=False)
+
+    write_role(train_csv, 1, 40)
+    write_role(tuning_csv, 1001, 40)
+    write_role(calibration_csv, 2001, 40)
+    assert (
+        train_main(
+            [
+                "--csv",
+                str(train_csv),
+                "--eval-csv",
+                str(tuning_csv),
+                "--eval-fraction",
+                "0.1",
+                "--out",
+                str(model),
+                "--require-question-ids",
+            ]
+        )
+        == 0
+    )
+
+    assert (
+        calibrate_main(
+            [
+                "--model",
+                str(model),
+                "--calibration-csv",
+                str(calibration_csv),
+                "--threshold-csv",
+                str(tuning_csv),
+                "--allow-evaluation-threshold",
+                "--out",
+                str(calibrated),
+                "--metadata-out",
+                str(metadata),
+            ]
+        )
+        == 0
+    )
+    payload = json.loads(metadata.read_text(encoding="utf-8"))
+    assert payload["threshold_reuses_evaluation_role"] is True
+
+
 def test_calibrate_cli_persists_expected_cost_policy(tmp_path):
     _train_base(tmp_path)
     calibration_csv = tmp_path / "calibration.csv"

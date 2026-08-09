@@ -63,6 +63,14 @@ def main(argv: list[str] | None = None) -> int:
         required=True,
         help="Independent labeled CSV used only to select the decision threshold",
     )
+    parser.add_argument(
+        "--allow-evaluation-threshold",
+        action="store_true",
+        help=(
+            "Allow the threshold CSV to reuse an explicitly supplied --eval-csv role; "
+            "intended for the frozen benchmark tuning role"
+        ),
+    )
     parser.add_argument("--out", type=Path, required=True, help="Output calibrated artifact")
     parser.add_argument(
         "--calibration-method",
@@ -147,10 +155,24 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 1
-    source_hashes = {meta.get("csv_sha256"), meta.get("eval_csv_sha256")}
-    if calibration_sha256 in source_hashes or threshold_sha256 in source_hashes:
+    training_hash = meta.get("csv_sha256")
+    evaluation_hash = meta.get("eval_csv_sha256")
+    source_hashes = {training_hash, evaluation_hash}
+    if calibration_sha256 in source_hashes:
         print(
             "calibration and threshold data must not reuse the training/evaluation CSV",
+            file=sys.stderr,
+        )
+        return 1
+    threshold_reuses_evaluation = threshold_sha256 == evaluation_hash
+    if threshold_sha256 in source_hashes and not (
+        args.allow_evaluation_threshold
+        and meta.get("eval_split_source") == "explicit_csv"
+        and threshold_reuses_evaluation
+    ):
+        print(
+            "threshold data must not reuse the training/evaluation CSV without "
+            "--allow-evaluation-threshold for an explicit frozen evaluation role",
             file=sys.stderr,
         )
         return 1
@@ -198,6 +220,7 @@ def main(argv: list[str] | None = None) -> int:
         "calibration_method": args.calibration_method,
         "calibration_csv_sha256": calibration_sha256,
         "threshold_csv_sha256": threshold_sha256,
+        "threshold_reuses_evaluation_role": threshold_reuses_evaluation,
         "n_calibration": len(calibration_df),
         "n_threshold": len(threshold_df),
         "calibration_command": _calibration_command(argv),
