@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### Added
+- Explicit `quorabust-train --eval-csv` support for frozen benchmark roles, with question-component disjointness and role-hash lineage.
+- Protocol-bound report validation for train, tuning, calibration, and final-holdout artifacts.
 - `quorabust-report` for generating Markdown model cards from saved artifacts and
   optional labeled holdout CSVs.
 - `GET /models` serving endpoint for safe loaded-model metadata.

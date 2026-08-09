@@ -103,7 +103,13 @@ quorabust-train --csv data/raw/train.csv --out models/quorabust.pkl
 python -m quorabust --csv data/raw/train.csv --out models/quorabust.pkl   # equivalent
 ```
 
-Options: `--max-rows N`, `--eval-fraction 0.1` (default), `--eval-fraction 0` to train on all rows without a holdout, `--eval-out` to export the exact holdout used by training, `--require-question-ids` to fail if leakage-safe IDs are absent, `--seed`, `--feature-backend {tfidf,embedding,cross-encoder}`, `--embedding-model …`, `--cross-encoder-model …`, `--thresholds`, `--threshold-metric {accuracy,precision,recall,f1,expected_cost}` for holdout-based decision-threshold selection, `--registry-dir` (JSONL registry), `--metadata-out` (JSON sidecar for reviewing artifact lineage without loading the pickle).
+Options: `--max-rows N`, `--eval-fraction 0.1` (default), `--eval-fraction 0` to train on all rows without a holdout, `--eval-out` to export the exact holdout used by training, `--eval-csv` to use an independently frozen evaluation role, `--require-question-ids` to fail if leakage-safe IDs are absent, `--seed`, `--feature-backend {tfidf,embedding,cross-encoder}`, `--embedding-model …`, `--cross-encoder-model …`, `--thresholds`, `--threshold-metric {accuracy,precision,recall,f1,expected_cost}` for holdout-based decision-threshold selection, `--registry-dir` (JSONL registry), `--metadata-out` (JSON sidecar for reviewing artifact lineage without loading the pickle).
+
+For the four-role benchmark protocol, train only on the frozen `train.csv` role and pass
+the independent `tuning.csv` role with `--eval-csv`. Quorabust verifies complete question-ID
+component disjointness and records both role hashes; calibration and final evaluation remain
+separate commands. See [docs/BENCHMARK_PROTOCOL.md](docs/BENCHMARK_PROTOCOL.md) for the full
+release sequence.
 
 For workflows where false positives and false negatives have different operational impact,
 use `--threshold-metric expected_cost` with both `--false-positive-cost` and

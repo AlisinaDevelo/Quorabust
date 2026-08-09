@@ -141,15 +141,16 @@ missing or blank `qid1`/`qid2` a failed audit for the public benchmark protocol.
 for an explicitly documented exploratory or customer-domain run where the row-level fallback
 is an accepted limitation.
 
-For comparable numbers, generate the report from a held-out CSV that was not used for
-training:
+For a role-based benchmark, train on the frozen `train` role and pass the independent
+`tuning` role explicitly. This keeps the raw source archive, model-fit rows, threshold-selection
+rows, calibration rows, and final evaluation rows distinct:
 
 ```bash
 quorabust-train \
-  --csv data/raw/train.csv \
+  --csv /external/quora/roles/train.csv \
+  --eval-csv /external/quora/roles/tuning.csv \
   --out models/quorabust.pkl \
   --metadata-out models/quorabust.meta.json \
-  --eval-out data/processed/holdout.csv \
   --require-question-ids \
   --eval-fraction 0.1 \
   --thresholds 0.2,0.3,0.4,0.5,0.6,0.7,0.8 \
@@ -159,23 +160,22 @@ quorabust-train \
 quorabust-report \
   --model models/quorabust.pkl \
   --artifact-label quorabust-tfidf-v1.pkl \
-  --eval-csv data/processed/holdout.csv \
+  --eval-csv /external/quora/roles/final_holdout.csv \
   --thresholds 0.2,0.3,0.4,0.5,0.6,0.7,0.8 \
   --calibration-bins 10 \
   --out reports/quorabust-tfidf-v1.md
 ```
 
-When the training CSV contains the Kaggle `qid1` and `qid2` columns, `quorabust-train`
-uses a deterministic connected-component holdout so the same question cannot appear in
-both training and evaluation through a different pair. The artifact metadata records
-`split_strategy: question_component_holdout` and the question-ID columns used. Datasets
-without both complete ID columns retain the deterministic shuffled-row fallback and are
-reported as `shuffled_prefix_holdout`.
+When `--eval-csv` is supplied with complete Kaggle `qid1` and `qid2` columns,
+`quorabust-train` verifies that no question component crosses the training/evaluation
+boundary and records `eval_split_source: explicit_csv`. The artifact metadata records
+`split_strategy: question_component_holdout` and both role hashes. Without `--eval-csv`,
+the existing deterministic connected-component holdout remains available; datasets without
+complete question IDs retain the documented shuffled-row fallback.
 
-`--eval-out` exports the exact rows used for early stopping and threshold selection. The
-artifact metadata and registry record the exported holdout SHA-256, so the later
-`quorabust-report --eval-csv` step can be tied to the training run rather than an
-independently reconstructed split.
+`--eval-out` exports the exact rows used for early stopping and threshold selection in the
+single-source workflow. With `--eval-csv`, the supplied evaluation role is never rewritten;
+its SHA-256 is recorded directly so the later report can be tied to the frozen role artifact.
 
 Use `--require-question-ids` for public benchmark runs. It fails before training when
 `qid1` or `qid2` is missing or incomplete, preventing an accidental row-level fallback.
@@ -254,17 +254,18 @@ request overrides it with `?threshold=...`.
 ## Separate calibration and threshold selection
 
 For a promoted artifact, fit probability calibration and choose the action threshold on
-independent labeled data rather than reusing the training or final evaluation rows:
+the independent `calibration` and `tuning` roles rather than reusing training or final
+evaluation rows:
 
 ```bash
 quorabust-calibrate \
   --model models/quorabust.pkl \
-  --calibration-csv data/processed/calibration.csv \
-  --threshold-csv data/processed/threshold.csv \
+  --calibration-csv /external/quora/roles/calibration.csv \
+  --threshold-csv /external/quora/roles/tuning.csv \
   --calibration-method sigmoid \
   --thresholds 0.2,0.3,0.4,0.5,0.6,0.7,0.8 \
   --threshold-metric f1 \
-  --out models/quorabust-calibrated.pkl \
+  --out models/quorabust-calibrated.qmodel \
   --metadata-out models/quorabust-calibrated.meta.json
 ```
 

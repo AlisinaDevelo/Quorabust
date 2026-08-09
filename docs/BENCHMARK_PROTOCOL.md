@@ -89,13 +89,18 @@ For a permitted Quora release, keep the licensed source outside Git:
 2. Review the passing audit and role counts, including the untouched final holdout. The
    freezer fails closed for missing or incomplete IDs, invalid labels, insufficient
    components, invalid fractions, and output collisions.
-3. Record the calibration method and threshold candidates, then point each decision to
+3. Train only on the `train.csv` role and pass `tuning.csv` as `quorabust-train --eval-csv`.
+   The command verifies component disjointness and records the train and tuning hashes.
+   Never train on the full source after roles have been frozen.
+4. Record the calibration method and threshold candidates, then point each decision to
    its owning role. If the threshold metric is `expected_cost`, also record positive
    `false_positive_cost` and `false_negative_cost` values in `decision_policy`; the
    report validator binds the artifact's persisted cost matrix to those values. Never
    tune or calibrate against the final holdout.
-4. Hash the dependency lock and record the exact training/report commands and commit.
-5. Validate the completed manifest before generating a comparative model card.
+5. Hash the dependency lock and record the exact training/report commands and commit.
+6. Validate the completed manifest before generating a comparative model card. Protocol-bound
+   validation checks the train, tuning, calibration, and final-holdout role hashes rather
+   than treating the raw source hash as the training artifact.
 
 This gate does not download data, inspect a license, prove row-level disjointness, or
 establish model quality by itself. The audit and split artifacts remain the evidence that
