@@ -10,8 +10,9 @@ from quorabust.split import split_train_eval
 
 
 class _FakeCrossEncoder:
-    def __init__(self, model_name: str) -> None:
+    def __init__(self, model_name: str, **kwargs) -> None:
         self.model_name = model_name
+        self.kwargs = kwargs
 
     def predict(self, pairs, show_progress_bar: bool = False):
         return [0.9 if idx % 2 else 0.1 for idx, _pair in enumerate(pairs)]
@@ -360,6 +361,8 @@ def test_cli_trains_with_cross_encoder_backend(tmp_path, monkeypatch):
                 "cross-encoder",
                 "--cross-encoder-model",
                 "fake-cross-encoder",
+                "--cross-encoder-model-revision",
+                "abc123",
                 "--metadata-out",
                 str(meta),
                 "--eval-fraction",
@@ -372,6 +375,7 @@ def test_cli_trains_with_cross_encoder_backend(tmp_path, monkeypatch):
     payload = json.loads(meta.read_text(encoding="utf-8"))
     assert payload["feature_backend"] == "cross-encoder"
     assert payload["feature_schema"] == ["cross_score", "len_ratio", "abs_len_diff", "len_sum"]
+    assert payload["cross_encoder_model_revision"] == "abc123"
 
 
 def test_cli_rejects_bad_columns(tmp_path):

@@ -14,13 +14,23 @@ except ImportError:
 class PairCrossEncoderBuilder:
     """Cross-encoder pair scores plus simple length features (optional ``nlp`` extra)."""
 
-    def __init__(self, model_name: str = "cross-encoder/quora-distilroberta-base") -> None:
+    def __init__(
+        self,
+        model_name: str = "cross-encoder/quora-distilroberta-base",
+        *,
+        revision: str | None = None,
+    ) -> None:
         if CrossEncoder is None:
             raise RuntimeError(
                 'Missing dependency: install with pip install "Quorabust[nlp]"',
             )
+        normalized_revision = revision.strip() if revision is not None else None
+        if revision is not None and not normalized_revision:
+            raise ValueError("revision must be a non-empty string when provided")
         self.model_name = model_name
-        self._model = CrossEncoder(model_name)
+        self.model_revision = normalized_revision
+        model_kwargs = {"revision": normalized_revision} if normalized_revision else {}
+        self._model = CrossEncoder(model_name, **model_kwargs)
         self._fitted = True
 
     def fit(self, corpus: list[str] | None = None) -> PairCrossEncoderBuilder:

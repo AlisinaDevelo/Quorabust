@@ -147,9 +147,25 @@ def main(argv: list[str] | None = None) -> int:
         help="When --feature-backend=embedding, SentenceTransformer model id",
     )
     p.add_argument(
+        "--embedding-model-revision",
+        default=None,
+        help=(
+            "Immutable model revision (prefer a commit SHA) for the embedding backend; "
+            "recorded in artifact lineage"
+        ),
+    )
+    p.add_argument(
         "--cross-encoder-model",
         default="cross-encoder/quora-distilroberta-base",
         help="When --feature-backend=cross-encoder, CrossEncoder model id",
+    )
+    p.add_argument(
+        "--cross-encoder-model-revision",
+        default=None,
+        help=(
+            "Immutable model revision (prefer a commit SHA) for the cross-encoder backend; "
+            "recorded in artifact lineage"
+        ),
     )
     p.add_argument(
         "--registry-dir",
@@ -294,11 +310,17 @@ def main(argv: list[str] | None = None) -> int:
     if args.feature_backend == "embedding":
         from quorabust.embedding_features import PairEmbeddingBuilder
 
-        feature_builder = PairEmbeddingBuilder(model_name=args.embedding_model)
+        feature_builder = PairEmbeddingBuilder(
+            model_name=args.embedding_model,
+            revision=args.embedding_model_revision,
+        )
     elif args.feature_backend == "cross-encoder":
         from quorabust.cross_encoder_features import PairCrossEncoderBuilder
 
-        feature_builder = PairCrossEncoderBuilder(model_name=args.cross_encoder_model)
+        feature_builder = PairCrossEncoderBuilder(
+            model_name=args.cross_encoder_model,
+            revision=args.cross_encoder_model_revision,
+        )
 
     builder, clf = train_duplicate_classifier(
         train_df,
@@ -336,9 +358,15 @@ def main(argv: list[str] | None = None) -> int:
         "feature_schema": feat_names,
     }
     if args.feature_backend == "embedding":
+        assert feature_builder is not None
         meta["embedding_model"] = args.embedding_model
+        if args.embedding_model_revision is not None:
+            meta["embedding_model_revision"] = feature_builder.model_revision
     elif args.feature_backend == "cross-encoder":
+        assert feature_builder is not None
         meta["cross_encoder_model"] = args.cross_encoder_model
+        if args.cross_encoder_model_revision is not None:
+            meta["cross_encoder_model_revision"] = feature_builder.model_revision
     if eval_csv_sha256 is not None:
         meta["eval_csv_sha256"] = eval_csv_sha256
     eval_target = eval_df if eval_df is not None else train_df

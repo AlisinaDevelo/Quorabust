@@ -16,12 +16,17 @@ feature store. This keeps repeated-question workloads predictable without allowi
 unbounded text-derived memory growth.
 
 - **Optional extra** `pip install ".[nlp]"`**: `PairEmbeddingBuilder` in `quorabust.embedding_features` uses `sentence-transformers` to encode pairs and feeds cosine / L2 / pooling stats into the same XGBoost head. Training can select `--feature-backend embedding` in `quorabust-train`.
+  Pass `--embedding-model-revision <commit-sha>` for a reproducible model identity; the
+  revision is persisted in artifact metadata and model-card lineage. A model name alone is
+  mutable and is insufficient for a promoted comparison.
 - **Cross-encoder pair scoring**: `PairCrossEncoderBuilder` in
   `quorabust.cross_encoder_features` uses a Sentence Transformers `CrossEncoder` to score
   each pair directly, then feeds that score plus length stats into the same XGBoost head.
   Select it with `--feature-backend cross-encoder`. This is the modern high-accuracy path
   for pair scoring, but it is slower than TF-IDF or bi-encoder embeddings because every
-  pair must be passed through the transformer jointly.
+  pair must be passed through the transformer jointly. Pass
+  `--cross-encoder-model-revision <commit-sha>` when recording a benchmark or promotion
+  candidate; the immutable revision is persisted alongside the model name.
 
 ### Leakage-safe hard negatives
 

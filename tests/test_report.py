@@ -183,6 +183,8 @@ def test_build_evaluation_manifest_captures_reproducibility_context(tmp_path):
             "quorabust_version": "0.3.2",
             "csv_sha256": "train-dataset-hash",
             "feature_backend": "tfidf",
+            "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+            "embedding_model_revision": "embedding-commit",
             "question_id_columns": ["qid1", "qid2"],
             "n_train": 100,
             "seed": 42,
@@ -210,6 +212,7 @@ def test_build_evaluation_manifest_captures_reproducibility_context(tmp_path):
         "calibration_bins": 10,
     }
     assert manifest["training_lineage"]["git_revision"] == "train-commit"
+    assert manifest["training_lineage"]["embedding_model_revision"] == "embedding-commit"
     assert manifest["training_lineage"]["question_id_columns"] == ["qid1", "qid2"]
     assert manifest["command"] == "quorabust-report --eval-csv holdout.csv"
     assert manifest["runtime"]["report_git_revision"]

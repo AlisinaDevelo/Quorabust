@@ -6,8 +6,9 @@ import quorabust.cross_encoder_features as cef
 
 
 class _FakeCrossEncoder:
-    def __init__(self, model_name: str) -> None:
+    def __init__(self, model_name: str, **kwargs) -> None:
         self.model_name = model_name
+        self.kwargs = kwargs
 
     def predict(self, pairs, show_progress_bar: bool = False):
         return np.asarray([0.9 if a.split()[0:1] == b.split()[0:1] else 0.1 for a, b in pairs])
@@ -35,3 +36,17 @@ def test_pair_cross_encoder_builder_shapes(monkeypatch):
     assert X.shape == (2, 4)
     assert X[0, 0] == 0.9
     assert X[1, 0] == 0.1
+
+
+def test_pair_cross_encoder_builder_records_model_revision(monkeypatch):
+    monkeypatch.setattr(cef, "CrossEncoder", _FakeCrossEncoder)
+    builder = cef.PairCrossEncoderBuilder(revision="  abc123  ")
+
+    assert builder.model_revision == "abc123"
+    assert builder._model.kwargs == {"revision": "abc123"}
+
+
+def test_pair_cross_encoder_builder_rejects_blank_model_revision(monkeypatch):
+    monkeypatch.setattr(cef, "CrossEncoder", _FakeCrossEncoder)
+    with pytest.raises(ValueError, match="revision"):
+        cef.PairCrossEncoderBuilder(revision=" ")

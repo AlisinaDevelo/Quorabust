@@ -20,6 +20,7 @@ class PairEmbeddingBuilder:
         self,
         model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
         *,
+        revision: str | None = None,
         batch_size: int = 64,
         cache_size: int = 50_000,
     ) -> None:
@@ -31,8 +32,13 @@ class PairEmbeddingBuilder:
             raise ValueError("batch_size must be at least 1")
         if cache_size < 0:
             raise ValueError("cache_size must be zero or greater")
+        normalized_revision = revision.strip() if revision is not None else None
+        if revision is not None and not normalized_revision:
+            raise ValueError("revision must be a non-empty string when provided")
         self.model_name = model_name
-        self._model = SentenceTransformer(model_name)
+        self.model_revision = normalized_revision
+        model_kwargs = {"revision": normalized_revision} if normalized_revision else {}
+        self._model = SentenceTransformer(model_name, **model_kwargs)
         self._batch_size = batch_size
         self._cache_size = cache_size
         self._embedding_cache: OrderedDict[str, np.ndarray] = OrderedDict()

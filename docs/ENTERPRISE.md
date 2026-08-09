@@ -23,6 +23,12 @@ cost-sensitive policy (`expected_cost`) also persists its false-positive/false-n
 cost matrix and selected weighted-error metrics in the sidecar and registry. Treat `.pkl`
 files as **trusted** (pickle); load only from controlled storage.
 
+When using an optional sentence-transformer embedding or cross-encoder backend, pass the
+corresponding `--embedding-model-revision` or `--cross-encoder-model-revision` option,
+preferably with an immutable model commit SHA. The model name alone is mutable; the supplied
+revision is copied into artifact metadata, model cards, and the public `/models` identity so
+quality and cost comparisons can be reproduced.
+
 When source data includes complete `qid1`/`qid2` columns, the default holdout is split by
 question connected components so a question cannot cross the train/eval boundary. The
 chosen strategy is persisted in metadata for review.
