@@ -22,6 +22,17 @@ The freezer was repeated from the same source bytes. All four role file hashes m
 exactly; only provenance fields such as the producing commit differed. Protocol and
 protocol-bound report validation passed.
 
+## Retrospective Data-Quality Note
+
+The role set above is retained as historical evidence, but it is not promotion-grade under
+the current strict benchmark policy: a direct cross-encoder dry run found one missing
+`question2` value in the calibration role. The run failed closed before producing a
+cross-encoder result; no quality or cost claim is made for that candidate. Commit `a90b310`
+now makes the protocol freezer reject missing or blank question text, so the next comparison
+must be re-frozen from corrected permitted source bytes. The published control and embedding
+numbers are unchanged historical measurements and should not be read as evidence that the
+defective role is acceptable for a new promotion.
+
 ## Pair Classification
 
 All rows below use the untouched final holdout. Thresholds were selected on the tuning role;
