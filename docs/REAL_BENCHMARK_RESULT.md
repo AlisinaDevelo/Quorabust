@@ -48,6 +48,12 @@ calibration, and final holdout respectively; peak RSS was approximately 1.4 GB. 
 the central enterprise tradeoff: the model quality jump is substantial, but the serving
 cost and artifact packaging still need engineering before promotion.
 
+For the same final holdout, a warm single-process pass through the protocol-bound TF-IDF
+safe artifact scored 40,437 pairs in 1,160.7 ms, or 34,839 pairs/second. The artifact is
+354,745 bytes and the measured process peak RSS was 231,620,608 bytes. This profile excludes
+process startup and model loading, so it is a local comparison point rather than a
+deployment SLO.
+
 The path-light comparison evidence is kept outside Git at
 `/tmp/quorabust-release-20260809-corrected-v2/reports/backend-comparison-v2.json`.
 
