@@ -46,7 +46,7 @@ def test_calibrate_cli_writes_artifact_metadata_and_registry(tmp_path):
     train_csv, model = _train_base(tmp_path)
     calibration_csv = tmp_path / "calibration.csv"
     threshold_csv = tmp_path / "threshold.csv"
-    calibrated = tmp_path / "calibrated.pkl"
+    calibrated = tmp_path / "calibrated.qmodel"
     metadata = tmp_path / "calibrated.meta.json"
     registry = tmp_path / "registry"
     _write_pairs(calibration_csv, 100, 40)

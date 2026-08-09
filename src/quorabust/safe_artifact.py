@@ -11,12 +11,14 @@ import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from xgboost import XGBClassifier
 
+from quorabust.calibration import CalibratedClassifier, ProbabilityCalibrator
 from quorabust.features import PairFeatureBuilder
 from quorabust.lineage import sha256_file
 
 SAFE_ARTIFACT_FORMAT = "quorabust.safe.tfidf_xgboost"
 SAFE_ARTIFACT_SUFFIX = ".qmodel"
-_MEMBERS = {"manifest.json", "builder.json", "booster.json"}
+_BASE_MEMBERS = {"manifest.json", "builder.json", "booster.json"}
+_CALIBRATION_MEMBER = "calibrator.json"
 _MAX_MEMBER_BYTES = 256 * 1024 * 1024
 _PATH_METADATA_KEYS = {
     "csv",
@@ -109,35 +111,61 @@ def save_safe_classifier(
     meta: dict[str, Any] | None = None,
 ) -> Path:
     """Write a non-pickle TF-IDF/XGBoost artifact as a validated ZIP bundle."""
-    if not isinstance(clf, XGBClassifier):
-        raise TypeError("safe artifacts currently support XGBClassifier only")
+    calibration_payload: dict[str, Any] | None = None
+    base_classifier = clf
+    if isinstance(clf, CalibratedClassifier):
+        if not isinstance(clf.calibrator, ProbabilityCalibrator):
+            raise TypeError("safe artifacts require ProbabilityCalibrator wrappers")
+        base_classifier = clf.base_classifier
+        calibration_payload = clf.calibrator.to_safe_payload()
+    if not isinstance(base_classifier, XGBClassifier):
+        raise TypeError(
+            "safe artifacts currently support XGBClassifier or CalibratedClassifier[XGBClassifier]"
+        )
     builder_payload = _builder_payload(builder)
     metadata = safe_metadata(meta)
+    if calibration_payload is not None:
+        if metadata.get("calibration_method") != calibration_payload.get("method"):
+            raise ValueError(
+                "safe calibrated artifacts require matching calibration_method metadata"
+            )
+    elif "calibration_method" in metadata:
+        raise ValueError("raw safe artifacts must not declare calibration_method metadata")
     try:
-        booster_bytes = bytes(clf.get_booster().save_raw(raw_format="json"))
+        booster_bytes = bytes(base_classifier.get_booster().save_raw(raw_format="json"))
     except (AttributeError, ValueError) as exc:
         raise ValueError("XGBClassifier must be fitted before safe export") from exc
 
     manifest = {
-        "schema_version": 1,
+        "schema_version": 2 if calibration_payload is not None else 1,
         "format": SAFE_ARTIFACT_FORMAT,
         "metadata": metadata,
         "builder_member": "builder.json",
         "booster_member": "booster.json",
     }
+    if calibration_payload is not None:
+        manifest["calibrator_member"] = _CALIBRATION_MEMBER
     output = Path(path)
     output.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(output, mode="w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("manifest.json", json.dumps(manifest, sort_keys=True))
         archive.writestr("builder.json", json.dumps(builder_payload, sort_keys=True))
         archive.writestr("booster.json", booster_bytes)
+        if calibration_payload is not None:
+            archive.writestr(
+                _CALIBRATION_MEMBER,
+                json.dumps(calibration_payload, sort_keys=True),
+            )
     return output
 
 
-def _validate_archive(archive: zipfile.ZipFile) -> None:
+def _validate_archive(archive: zipfile.ZipFile, *, schema_version: int) -> None:
     infos = archive.infolist()
     names = [info.filename for info in infos]
-    if len(names) != len(set(names)) or set(names) != _MEMBERS:
+    expected_members = _BASE_MEMBERS | (
+        {_CALIBRATION_MEMBER} if schema_version == 2 else set()
+    )
+    if len(names) != len(set(names)) or set(names) != expected_members:
         raise ValueError("safe artifact must contain exactly the expected members")
     for info in infos:
         if info.is_dir() or info.file_size > _MAX_MEMBER_BYTES:
@@ -208,7 +236,7 @@ def load_safe_classifier(
     path: str | Path,
     *,
     expected_sha256: str | None = None,
-) -> tuple[PairFeatureBuilder, XGBClassifier, dict[str, Any]]:
+) -> tuple[PairFeatureBuilder, XGBClassifier | CalibratedClassifier, dict[str, Any]]:
     """Load only the JSON/ZIP safe artifact format; no code deserialization occurs."""
     artifact = Path(path)
     if expected_sha256 is not None:
@@ -219,17 +247,36 @@ def load_safe_classifier(
         if actual != expected:
             raise ValueError(f"artifact SHA-256 mismatch for {artifact}")
     with zipfile.ZipFile(artifact, mode="r") as archive:
-        _validate_archive(archive)
         manifest = json.loads(archive.read("manifest.json"))
         if not isinstance(manifest, dict):
             raise ValueError("safe artifact manifest is malformed")
-        if manifest.get("schema_version") != 1 or manifest.get("format") != SAFE_ARTIFACT_FORMAT:
+        schema_version = manifest.get("schema_version")
+        if type(schema_version) is not int or schema_version not in {1, 2}:
+            raise ValueError("unsupported safe artifact schema")
+        if manifest.get("format") != SAFE_ARTIFACT_FORMAT:
             raise ValueError("unsupported safe artifact format")
+        if schema_version == 2 and manifest.get("calibrator_member") != _CALIBRATION_MEMBER:
+            raise ValueError("safe calibrated artifact manifest is malformed")
+        if schema_version == 1 and "calibrator_member" in manifest:
+            raise ValueError("safe artifact manifest is malformed")
+        _validate_archive(archive, schema_version=schema_version)
         metadata = manifest.get("metadata", {})
         if not isinstance(metadata, dict):
             raise ValueError("safe artifact metadata is malformed")
         builder_payload = json.loads(archive.read("builder.json"))
         booster_bytes = archive.read("booster.json")
+        calibration_payload = (
+            json.loads(archive.read(_CALIBRATION_MEMBER)) if schema_version == 2 else None
+        )
     builder = _load_builder(builder_payload)
-    classifier = _load_booster(booster_bytes)
+    classifier: XGBClassifier | CalibratedClassifier = _load_booster(booster_bytes)
+    if schema_version == 2:
+        calibrator = ProbabilityCalibrator.from_safe_payload(calibration_payload)
+        if metadata.get("calibration_method") != calibrator.method:
+            raise ValueError(
+                "safe calibration metadata does not match calibration payload"
+            )
+        classifier = CalibratedClassifier(classifier, calibrator)
+    elif "calibration_method" in metadata:
+        raise ValueError("raw safe artifact metadata declares calibration_method")
     return builder, classifier, dict(metadata)

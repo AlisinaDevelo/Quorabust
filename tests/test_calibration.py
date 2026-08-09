@@ -30,6 +30,40 @@ def test_isotonic_calibrator_clips_out_of_range_scores():
     assert np.all(np.diff(calibrated) >= 0.0)
 
 
+@pytest.mark.parametrize("method", ["sigmoid", "isotonic"])
+def test_safe_calibration_payload_round_trip_preserves_predictions(method):
+    scores = np.asarray([0.05, 0.2, 0.4, 0.7, 0.95])
+    labels = np.asarray([0, 0, 0, 1, 1])
+    calibrator = ProbabilityCalibrator(method).fit(scores, labels)
+
+    restored = ProbabilityCalibrator.from_safe_payload(calibrator.to_safe_payload())
+
+    assert np.allclose(restored.predict(scores), calibrator.predict(scores), atol=1e-12)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"schema_version": 1, "method": "temperature"},
+        {
+            "schema_version": 1,
+            "method": "sigmoid",
+            "coefficient": "bad",
+            "intercept": 0.0,
+        },
+        {
+            "schema_version": 1,
+            "method": "isotonic",
+            "x_thresholds": [0.2, 0.1],
+            "y_thresholds": [0.0, 1.0],
+        },
+    ],
+)
+def test_safe_calibration_payload_rejects_malformed_values(payload):
+    with pytest.raises(ValueError, match="calibration|isotonic"):
+        ProbabilityCalibrator.from_safe_payload(payload)
+
+
 def test_calibrated_classifier_delegates_and_preserves_binary_shape():
     base = _BaseClassifier()
     wrapper = calibrate_classifier(

@@ -19,7 +19,10 @@ def _command(argv: list[str] | None) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Export a trusted artifact to the non-pickle TF-IDF/XGBoost format.",
+        description=(
+            "Export a trusted artifact to the non-pickle TF-IDF/XGBoost format, including "
+            "supported calibration wrappers."
+        ),
     )
     parser.add_argument("--model", type=Path, required=True, help="Trusted source artifact")
     parser.add_argument("--out", type=Path, required=True, help="Output .qmodel artifact")
