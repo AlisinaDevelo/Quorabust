@@ -54,8 +54,8 @@ safe artifact scored 40,437 pairs in 1,160.7 ms, or 34,839 pairs/second. The art
 process startup and model loading, so it is a local comparison point rather than a
 deployment SLO.
 
-The path-light comparison evidence is kept outside Git at
-`/tmp/quorabust-release-20260809-corrected-v2/reports/backend-comparison-v2.json`.
+The path-light comparison evidence is retained with the external benchmark run outside
+Git; no local filesystem path or raw question text is published here.
 
 ## Historical Protocol (superseded)
 
