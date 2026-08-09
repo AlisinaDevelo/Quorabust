@@ -31,6 +31,7 @@ class PairEmbeddingBuilder:
             raise ValueError("batch_size must be at least 1")
         if cache_size < 0:
             raise ValueError("cache_size must be zero or greater")
+        self.model_name = model_name
         self._model = SentenceTransformer(model_name)
         self._batch_size = batch_size
         self._cache_size = cache_size

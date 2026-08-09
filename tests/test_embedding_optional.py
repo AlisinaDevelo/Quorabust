@@ -33,3 +33,4 @@ def test_pair_embedding_builder_batches_unique_texts_and_reuses_cache(monkeypatc
     assert first.shape == (2, 5)
     assert np.allclose(first[0], second[0])
     assert FakeSentenceTransformer.calls == [["same", "other"]]
+    assert builder.model_name == "sentence-transformers/all-MiniLM-L6-v2"

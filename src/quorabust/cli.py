@@ -335,6 +335,10 @@ def main(argv: list[str] | None = None) -> int:
         "feature_backend": args.feature_backend,
         "feature_schema": feat_names,
     }
+    if args.feature_backend == "embedding":
+        meta["embedding_model"] = args.embedding_model
+    elif args.feature_backend == "cross-encoder":
+        meta["cross_encoder_model"] = args.cross_encoder_model
     if eval_csv_sha256 is not None:
         meta["eval_csv_sha256"] = eval_csv_sha256
     eval_target = eval_df if eval_df is not None else train_df

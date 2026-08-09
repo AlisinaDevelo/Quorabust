@@ -57,6 +57,8 @@ _SLICE_UNCERTAINTY_NOTE = (
 _METADATA_KEYS = [
     "feature_backend",
     "feature_schema",
+    "embedding_model",
+    "cross_encoder_model",
     "n_train",
     "n_eval",
     "eval_csv_sha256",
