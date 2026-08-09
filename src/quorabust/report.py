@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import (
     accuracy_score,
+    average_precision_score,
     brier_score_loss,
     confusion_matrix,
     f1_score,
@@ -423,6 +424,7 @@ def evaluate_holdout(
     }
     if len(np.unique(y)) > 1:
         metrics["roc_auc"] = float(roc_auc_score(y, proba))
+        metrics["pr_auc"] = float(average_precision_score(y, proba))
     return metrics
 
 
@@ -568,6 +570,7 @@ def render_model_card(
             "f1",
             "log_loss",
             "roc_auc",
+            "pr_auc",
             "positive_rate",
             "predicted_positive_rate",
         ]
@@ -763,6 +766,7 @@ def render_comparison_report(
             row.get("recall", ""),
             row.get("accuracy", ""),
             row.get("roc_auc", ""),
+            row.get("pr_auc", ""),
             row.get("log_loss", ""),
         ]
         for row in _comparison_rows(rows)
@@ -782,6 +786,7 @@ def render_comparison_report(
                     "recall",
                     "accuracy",
                     "roc_auc",
+                    "pr_auc",
                     "log_loss",
                 ],
                 metric_rows,
@@ -928,6 +933,7 @@ def _comparison_metrics(
         "recall": metrics.get("recall"),
         "f1": metrics.get("f1"),
         "roc_auc": metrics.get("roc_auc"),
+        "pr_auc": metrics.get("pr_auc"),
         "log_loss": metrics.get("log_loss"),
         "positive_rate": metrics.get("positive_rate"),
         "predicted_positive_rate": metrics.get("predicted_positive_rate"),
