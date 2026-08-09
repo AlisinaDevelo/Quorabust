@@ -145,11 +145,9 @@ def _validate_protocol_binding(
         errors.append("protocol binding requires evaluation_manifest")
         return
 
-    protocol_dataset = protocol_payload["dataset"]
     protocol_roles = protocol_payload["roles"]
     protocol_split = protocol_payload["split"]
     protocol_policy = protocol_payload["decision_policy"]
-    protocol_dataset_hash = protocol_dataset["sha256"]
     protocol_final_hash = protocol_roles["final_holdout"]["artifact"]["sha256"]
 
     evaluation_dataset = manifest.get("evaluation_dataset")
@@ -168,14 +166,42 @@ def _validate_protocol_binding(
     if not isinstance(lineage, dict):
         errors.append("protocol binding requires evaluation_manifest.training_lineage")
         return
-    report_dataset_hash = lineage.get("csv_sha256")
+    report_train_hash = lineage.get("csv_sha256")
+    protocol_train_hash = protocol_roles["train"]["artifact"]["sha256"]
     if not (
-        isinstance(report_dataset_hash, str)
-        and isinstance(protocol_dataset_hash, str)
-        and report_dataset_hash.lower() == protocol_dataset_hash.lower()
+        isinstance(report_train_hash, str)
+        and isinstance(protocol_train_hash, str)
+        and report_train_hash.lower() == protocol_train_hash.lower()
     ):
         errors.append(
-            "evaluation_manifest.training_lineage.csv_sha256 must match protocol.dataset.sha256"
+            "evaluation_manifest.training_lineage.csv_sha256 must match "
+            "protocol.roles.train.artifact.sha256"
+        )
+    role_hashes = {
+        "eval_csv_sha256": ("tuning", protocol_roles["tuning"]["artifact"]["sha256"]),
+        "threshold_csv_sha256": (
+            "tuning",
+            protocol_roles["tuning"]["artifact"]["sha256"],
+        ),
+        "calibration_csv_sha256": (
+            "calibration",
+            protocol_roles["calibration"]["artifact"]["sha256"],
+        ),
+    }
+    for lineage_key, (role_name, expected_hash) in role_hashes.items():
+        observed_hash = lineage.get(lineage_key)
+        if not (
+            isinstance(observed_hash, str)
+            and isinstance(expected_hash, str)
+            and observed_hash.lower() == expected_hash.lower()
+        ):
+            errors.append(
+                f"evaluation_manifest.training_lineage.{lineage_key} must match "
+                f"protocol.roles.{role_name}.artifact.sha256"
+            )
+    if lineage.get("eval_split_source") != "explicit_csv":
+        errors.append(
+            "evaluation_manifest.training_lineage.eval_split_source must be explicit_csv"
         )
     if lineage.get("split_strategy") != protocol_split["strategy"]:
         errors.append(
@@ -203,6 +229,11 @@ def _validate_protocol_binding(
         errors.append(
             "evaluation_manifest.training_lineage.threshold_metric must match "
             "protocol.decision_policy.threshold_metric"
+        )
+    if lineage.get("calibration_method") != protocol_policy["calibration_method"]:
+        errors.append(
+            "evaluation_manifest.training_lineage.calibration_method must match "
+            "protocol.decision_policy.calibration_method"
         )
     if protocol_policy["threshold_metric"] == "expected_cost":
         expected_costs = {

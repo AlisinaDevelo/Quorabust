@@ -61,6 +61,7 @@ _METADATA_KEYS = [
     "n_eval",
     "eval_csv_sha256",
     "eval_fraction",
+    "eval_split_source",
     "split_strategy",
     "question_id_columns",
     "max_rows",
@@ -75,6 +76,10 @@ _METADATA_KEYS = [
     "decision_threshold_source",
     "decision_threshold_metric",
     "decision_threshold_costs",
+    "calibration_method",
+    "calibration_csv_sha256",
+    "threshold_csv_sha256",
+    "calibration_git_revision",
 ]
 
 
@@ -257,6 +262,7 @@ def build_evaluation_manifest(
         "n_eval",
         "eval_csv_sha256",
         "eval_fraction",
+        "eval_split_source",
         "split_strategy",
         "question_id_columns",
         "max_rows",
@@ -269,6 +275,10 @@ def build_evaluation_manifest(
         "decision_threshold_source",
         "decision_threshold_metric",
         "decision_threshold_costs",
+        "calibration_method",
+        "calibration_csv_sha256",
+        "threshold_csv_sha256",
+        "calibration_git_revision",
     ]
     training_lineage = {key: meta[key] for key in lineage_keys if key in meta}
     evaluation_policy: dict[str, Any] = {

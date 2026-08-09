@@ -59,6 +59,30 @@ def _parse_thresholds(raw: str) -> list[float]:
     return thresholds
 
 
+def _missing_or_incomplete_question_ids(df: pd.DataFrame) -> list[str]:
+    """Return qid columns that are absent or contain blank values."""
+    return [
+        column
+        for column in OPTIONAL_QUESTION_ID_COLUMNS
+        if column not in df.columns
+        or df[column].isna().any()
+        or df[column].astype("string").str.strip().eq("").any()
+    ]
+
+
+def _question_ids_are_disjoint(left: pd.DataFrame, right: pd.DataFrame) -> bool:
+    """Check that complete question-component IDs do not cross an explicit holdout."""
+    if any(_missing_or_incomplete_question_ids(frame) for frame in (left, right)):
+        return False
+    left_ids = set(
+        left[list(OPTIONAL_QUESTION_ID_COLUMNS)].astype("string").to_numpy().reshape(-1)
+    )
+    right_ids = set(
+        right[list(OPTIONAL_QUESTION_ID_COLUMNS)].astype("string").to_numpy().reshape(-1)
+    )
+    return left_ids.isdisjoint(right_ids)
+
+
 def _training_command(argv: list[str] | None) -> str:
     """Return a copy-pasteable command that records the training configuration."""
     arguments = sys.argv[1:] if argv is None else argv
@@ -93,6 +117,15 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         default=None,
         help="Write the exact training holdout CSV used for evaluation and threshold selection",
+    )
+    p.add_argument(
+        "--eval-csv",
+        type=Path,
+        default=None,
+        help=(
+            "Use an independent labeled CSV as the evaluation/threshold role instead of "
+            "splitting the training CSV"
+        ),
     )
     p.add_argument(
         "--require-question-ids",
@@ -175,11 +208,7 @@ def main(argv: list[str] | None = None) -> int:
         print(e, file=sys.stderr)
         return 1
     if args.require_question_ids:
-        missing_or_incomplete = [
-            column
-            for column in OPTIONAL_QUESTION_ID_COLUMNS
-            if column not in df.columns or df[column].isna().any()
-        ]
+        missing_or_incomplete = _missing_or_incomplete_question_ids(df)
         if missing_or_incomplete:
             print(
                 "--require-question-ids needs complete qid1/qid2 columns; "
@@ -187,18 +216,62 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 1
-    try:
-        train_df, eval_df, split_strategy = split_train_eval(
-            df,
-            eval_fraction=args.eval_fraction,
-            seed=args.seed,
-            max_rows=args.max_rows,
-        )
-    except ValueError as exc:
-        print(str(exc), file=sys.stderr)
-        return 1
 
     eval_csv_sha256: str | None = None
+    eval_split_source = "generated_from_source"
+    if args.eval_csv is not None:
+        if args.eval_out is not None:
+            print("--eval-out cannot be combined with --eval-csv", file=sys.stderr)
+            return 1
+        if not args.eval_csv.is_file():
+            print(f"File not found: {args.eval_csv}", file=sys.stderr)
+            return 1
+        if args.eval_csv.resolve() == args.csv.resolve():
+            print("--eval-csv must be different from --csv", file=sys.stderr)
+            return 1
+        try:
+            eval_df = _load_quora_csv(args.eval_csv)
+        except ValueError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        if args.require_question_ids:
+            eval_missing_ids = _missing_or_incomplete_question_ids(eval_df)
+            if eval_missing_ids:
+                print(
+                    "--require-question-ids needs complete qid1/qid2 columns in --eval-csv; "
+                    f"missing or incomplete: {', '.join(eval_missing_ids)}",
+                    file=sys.stderr,
+                )
+                return 1
+        if _missing_or_incomplete_question_ids(df) or _missing_or_incomplete_question_ids(
+            eval_df
+        ):
+            split_strategy = "explicit_holdout"
+        elif not _question_ids_are_disjoint(df, eval_df):
+            print(
+                "--csv and --eval-csv question IDs overlap; provide disjoint components",
+                file=sys.stderr,
+            )
+            return 1
+        else:
+            split_strategy = "question_component_holdout"
+        train_df = df.sample(frac=1.0, random_state=args.seed).reset_index(drop=True)
+        if args.max_rows is not None:
+            train_df = train_df.head(args.max_rows).copy()
+        eval_csv_sha256 = sha256_file(args.eval_csv)
+        eval_split_source = "explicit_csv"
+    else:
+        try:
+            train_df, eval_df, split_strategy = split_train_eval(
+                df,
+                eval_fraction=args.eval_fraction,
+                seed=args.seed,
+                max_rows=args.max_rows,
+            )
+        except ValueError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+
     if args.eval_out is not None:
         if eval_df is None:
             print(
@@ -245,6 +318,7 @@ def main(argv: list[str] | None = None) -> int:
         "n_train": len(train_df),
         "n_eval": len(eval_df) if eval_df is not None else 0,
         "eval_fraction": args.eval_fraction,
+        "eval_split_source": eval_split_source,
         "split_strategy": split_strategy,
         "question_id_columns": ["qid1", "qid2"]
         if split_strategy == "question_component_holdout"

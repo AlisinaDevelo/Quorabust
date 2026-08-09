@@ -227,6 +227,85 @@ def test_cli_uses_question_component_holdout_when_ids_are_available(tmp_path):
     assert payload["n_eval"] > 0
 
 
+def test_cli_accepts_explicit_disjoint_evaluation_csv(tmp_path):
+    train_csv = tmp_path / "train.csv"
+    eval_csv = tmp_path / "tuning.csv"
+    out = tmp_path / "model.pkl"
+    meta = tmp_path / "model.meta.json"
+
+    def write_role(path, start, count):
+        pd.DataFrame(
+            {
+                "qid1": [start + index * 2 for index in range(count)],
+                "qid2": [start + index * 2 + 1 for index in range(count)],
+                "question1": [f"question one {index}" for index in range(count)],
+                "question2": [f"question two {index}" for index in range(count)],
+                "is_duplicate": [index % 2 for index in range(count)],
+            }
+        ).to_csv(path, index=False)
+
+    write_role(train_csv, 1, 40)
+    write_role(eval_csv, 1001, 20)
+
+    assert (
+        main(
+            [
+                "--csv",
+                str(train_csv),
+                "--eval-csv",
+                str(eval_csv),
+                "--eval-fraction",
+                "0.1",
+                "--out",
+                str(out),
+                "--metadata-out",
+                str(meta),
+                "--require-question-ids",
+            ]
+        )
+        == 0
+    )
+
+    payload = json.loads(meta.read_text(encoding="utf-8"))
+    assert payload["n_train"] == 40
+    assert payload["n_eval"] == 20
+    assert payload["eval_csv_sha256"] == sha256_file(eval_csv)
+    assert payload["eval_split_source"] == "explicit_csv"
+    assert payload["split_strategy"] == "question_component_holdout"
+
+
+def test_cli_rejects_overlapping_explicit_evaluation_csv(tmp_path, capsys):
+    train_csv = tmp_path / "train.csv"
+    eval_csv = tmp_path / "tuning.csv"
+    frame = pd.DataFrame(
+        {
+            "qid1": ["q1", "q3"],
+            "qid2": ["q2", "q4"],
+            "question1": ["a", "b"],
+            "question2": ["c", "d"],
+            "is_duplicate": [0, 1],
+        }
+    )
+    frame.to_csv(train_csv, index=False)
+    frame.to_csv(eval_csv, index=False)
+
+    assert (
+        main(
+            [
+                "--csv",
+                str(train_csv),
+                "--eval-csv",
+                str(eval_csv),
+                "--out",
+                str(tmp_path / "model.pkl"),
+                "--require-question-ids",
+            ]
+        )
+        == 1
+    )
+    assert "question IDs overlap" in capsys.readouterr().err
+
+
 def test_cli_can_require_question_ids_for_benchmark_runs(tmp_path):
     csv = tmp_path / "train.csv"
     _write_synthetic_csv(csv)

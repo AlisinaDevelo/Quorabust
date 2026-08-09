@@ -4,6 +4,10 @@ import json
 from quorabust.report_validation import main, validate_report_payload
 
 
+def _digest(value):
+    return hashlib.sha256(value.encode()).hexdigest()
+
+
 def _payload():
     return {
         "artifact": "model.pkl",
@@ -70,13 +74,18 @@ def _payload():
             },
             "training_lineage": {
                 "git_revision": "abc123",
-                "csv_sha256": "c" * 64,
+                "csv_sha256": _digest("train"),
+                "eval_csv_sha256": _digest("tuning"),
+                "eval_split_source": "explicit_csv",
                 "split_strategy": "question_component_holdout",
                 "question_id_columns": ["qid1", "qid2"],
                 "require_question_ids": True,
                 "seed": 42,
                 "eval_fraction": 0.1,
                 "threshold_metric": "f1",
+                "calibration_method": "sigmoid",
+                "calibration_csv_sha256": _digest("calibration"),
+                "threshold_csv_sha256": _digest("tuning"),
             },
             "runtime": {
                 "python_version": "3.12.0",
@@ -91,9 +100,6 @@ def _payload():
 
 
 def _protocol_payload():
-    def digest(value):
-        return hashlib.sha256(value.encode()).hexdigest()
-
     return {
         "schema_version": 1,
         "protocol_name": "quorabust-synthetic-report-binding-v1",
@@ -107,7 +113,7 @@ def _protocol_payload():
             "raw_data_policy": "external_not_committed",
             "audit": {
                 "reference": "synthetic://audit.json",
-                "sha256": digest("audit"),
+                "sha256": _digest("audit"),
                 "status": "pass",
                 "source_sha256": "c" * 64,
                 "require_question_ids": True,
@@ -117,19 +123,19 @@ def _protocol_payload():
             "train": {
                 "purpose": "fit model parameters",
                 "allowed_activities": ["fit"],
-                "artifact": {"reference": "synthetic://train.csv", "sha256": digest("train")},
+                "artifact": {"reference": "synthetic://train.csv", "sha256": _digest("train")},
             },
             "tuning": {
                 "purpose": "select model and threshold policy",
                 "allowed_activities": ["model_selection", "threshold_selection"],
-                "artifact": {"reference": "synthetic://tuning.csv", "sha256": digest("tuning")},
+                "artifact": {"reference": "synthetic://tuning.csv", "sha256": _digest("tuning")},
             },
             "calibration": {
                 "purpose": "fit probability calibration",
                 "allowed_activities": ["probability_calibration"],
                 "artifact": {
                     "reference": "synthetic://calibration.csv",
-                    "sha256": digest("calibration"),
+                    "sha256": _digest("calibration"),
                 },
             },
             "final_holdout": {
@@ -143,7 +149,7 @@ def _protocol_payload():
             "question_id_columns": ["qid1", "qid2"],
             "seed": 42,
             "eval_fraction": 0.1,
-            "manifest": {"reference": "synthetic://split.json", "sha256": digest("split")},
+            "manifest": {"reference": "synthetic://split.json", "sha256": _digest("split")},
         },
         "decision_policy": {
             "threshold_metric": "f1",
@@ -158,7 +164,7 @@ def _protocol_payload():
             "python_version": "3.12.0",
             "dependency_lock": {
                 "reference": "requirements.txt",
-                "sha256": digest("requirements"),
+                "sha256": _digest("requirements"),
             },
             "command": "synthetic report binding",
             "machine": "ci/linux-x86_64",
