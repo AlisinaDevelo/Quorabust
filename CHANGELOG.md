@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### Added
+- Redacted real-data benchmark evidence comparing the TF-IDF control with a
+  sentence-transformer embedding candidate, including PR-AUC and explicit calibration
+  limitations; licensed source data remains outside Git.
+- PR-AUC in JSON and Markdown model reports, optional NLP model identities in artifact
+  metadata, and unique-text batching with a bounded embedding cache.
 - Explicit `quorabust-train --eval-csv` support for frozen benchmark roles, with question-component disjointness and role-hash lineage.
 - Protocol-bound report validation for train, tuning, calibration, and final-holdout artifacts.
 - `quorabust-report` for generating Markdown model cards from saved artifacts and
