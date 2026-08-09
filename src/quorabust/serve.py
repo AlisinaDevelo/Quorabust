@@ -10,7 +10,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable, Mapping
 from contextlib import asynccontextmanager
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from quorabust.calibration import CalibratedClassifier
 from quorabust.explain import explain_pair_features
 from quorabust.lineage import sha256_file
 from quorabust.model import predict_proba_duplicate
@@ -139,6 +140,44 @@ def _model_decision_threshold(meta: dict[str, Any], fallback: float) -> float:
     if isinstance(raw, int | float) and 0.0 <= float(raw) <= 1.0:
         return float(raw)
     return fallback
+
+
+def _decision_threshold_source(meta: dict[str, Any], request_override: bool) -> str:
+    if request_override:
+        return "request"
+    if "decision_threshold" in meta:
+        source = meta.get("decision_threshold_source")
+        if isinstance(source, str) and source.strip():
+            return source
+        return "artifact_metadata"
+    raw_environment = os.environ.get("QUORABUST_DECISION_THRESHOLD")
+    if raw_environment is not None:
+        try:
+            environment_threshold = float(raw_environment)
+        except ValueError:
+            environment_threshold = None
+        if environment_threshold is not None and 0.0 <= environment_threshold <= 1.0:
+            return "environment"
+    return "default"
+
+
+def _predict_probability_semantics(
+    builder: Any,
+    classifier: Any,
+    question1: list[str],
+    question2: list[str],
+) -> tuple[Any, Any | None, Literal["raw", "calibrated"]]:
+    if isinstance(classifier, CalibratedClassifier):
+        raw = predict_proba_duplicate(
+            builder,
+            classifier.base_classifier,
+            question1,
+            question2,
+        )[:, 1]
+        calibrated = predict_proba_duplicate(builder, classifier, question1, question2)[:, 1]
+        return raw, calibrated, "calibrated"
+    raw = predict_proba_duplicate(builder, classifier, question1, question2)[:, 1]
+    return raw, None, "raw"
 
 
 def _env_max_batch_size() -> int:
@@ -269,9 +308,13 @@ class PredictOut(BaseModel):
         json_schema_extra={
             "examples": [
                 {
+                    "raw_proba_duplicate": [0.84, 0.29],
+                    "calibrated_proba_duplicate": [0.82, 0.31],
                     "proba_duplicate": [0.82, 0.31],
                     "is_duplicate": [True, False],
                     "decision_threshold": 0.5,
+                    "decision_threshold_source": "artifact_metadata",
+                    "probability_source": "calibrated",
                     "variant": "a",
                     "features": [
                         {
@@ -287,9 +330,27 @@ class PredictOut(BaseModel):
         }
     )
 
+    raw_proba_duplicate: list[float] = Field(
+        ...,
+        description=(
+            "Positive-class probability from the base classifier before calibration. "
+            "It is a model probability output, not necessarily a calibrated probability."
+        ),
+    )
+    calibrated_proba_duplicate: list[float] | None = Field(
+        ...,
+        description=(
+            "Positive-class probability after artifact calibration, or null when the loaded "
+            "artifact has no probability calibrator."
+        ),
+    )
     proba_duplicate: list[float] = Field(
         ...,
-        description="P(duplicate) for each pair, same order as the request lists.",
+        description=(
+            "Effective probability used for the thresholded decision. This remains the "
+            "backward-compatible response field and equals calibrated_proba_duplicate when "
+            "available, otherwise raw_proba_duplicate."
+        ),
     )
     is_duplicate: list[bool] = Field(
         ...,
@@ -303,6 +364,17 @@ class PredictOut(BaseModel):
             "Probability threshold used to compute is_duplicate. Request threshold wins over "
             "artifact metadata; artifact metadata wins over QUORABUST_DECISION_THRESHOLD."
         ),
+    )
+    decision_threshold_source: str = Field(
+        ...,
+        description=(
+            "Source of the threshold used for this request: request, artifact metadata, "
+            "environment, or default."
+        ),
+    )
+    probability_source: Literal["raw", "calibrated"] = Field(
+        ...,
+        description="Whether proba_duplicate is raw or calibrated artifact output.",
     )
     variant: str = Field(..., description="Scoring variant (a or b) after A/B fallback rules.")
     features: list[dict[str, float]] | None = Field(
@@ -717,6 +789,7 @@ def create_app(
             if threshold is not None
             else _model_decision_threshold(_meta, default_threshold)
         )
+        threshold_source = _decision_threshold_source(_meta, threshold is not None)
         if len(body.question1) != len(body.question2):
             raise HTTPException(status_code=400, detail="question1 and question2 length mismatch")
         if len(body.question1) > configured_max_batch_size:
@@ -744,7 +817,15 @@ def create_app(
                     "quorabust.batch_size": len(body.question1),
                 },
             ) as current:
-                proba = predict_proba_duplicate(bld, clf, body.question1, body.question2)[:, 1]
+                raw_proba, calibrated_proba, probability_source = (
+                    _predict_probability_semantics(
+                        bld,
+                        clf,
+                        body.question1,
+                        body.question2,
+                    )
+                )
+                proba = calibrated_proba if calibrated_proba is not None else raw_proba
                 set_attributes(current, {"quorabust.output_count": len(proba)})
         finally:
             latency.labels(v).observe(time.perf_counter() - t0)
@@ -763,10 +844,18 @@ def create_app(
                     feature_schema=schema if isinstance(schema, list) else None,
                 )
         probs = [float(x) for x in proba]
+        raw_probs = [float(x) for x in raw_proba]
+        calibrated_probs = (
+            [float(x) for x in calibrated_proba] if calibrated_proba is not None else None
+        )
         return PredictOut(
+            raw_proba_duplicate=raw_probs,
+            calibrated_proba_duplicate=calibrated_probs,
             proba_duplicate=probs,
             is_duplicate=[p >= effective_threshold for p in probs],
             decision_threshold=effective_threshold,
+            decision_threshold_source=threshold_source,
+            probability_source=probability_source,
             variant=v,
             features=features,
         )

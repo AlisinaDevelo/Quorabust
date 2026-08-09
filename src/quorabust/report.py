@@ -675,9 +675,9 @@ def render_model_card(
             "",
             (
                 "`POST /predict` accepts `question1` and `question2` arrays of equal length "
-                "and returns `proba_duplicate`, `is_duplicate`, and `decision_threshold` "
-                "in the same order. `GET /metrics` exposes Prometheus counters and "
-                "latency histograms."
+                "and returns raw, optional calibrated, and effective duplicate probabilities, "
+                "alongside `is_duplicate`, `decision_threshold`, and their source fields. "
+                "`GET /metrics` exposes Prometheus counters and latency histograms."
             ),
             "",
             "## Caveats",
@@ -794,9 +794,13 @@ def build_report_payload(
             "metrics": "GET /metrics",
             "input": {"question1": "list[str]", "question2": "list[str]"},
             "output": {
+                "raw_proba_duplicate": "list[float]",
+                "calibrated_proba_duplicate": "list[float] | null",
                 "proba_duplicate": "list[float]",
                 "is_duplicate": "list[bool]",
                 "decision_threshold": "float",
+                "decision_threshold_source": "string",
+                "probability_source": "raw|calibrated",
             },
         },
         "caveats": [

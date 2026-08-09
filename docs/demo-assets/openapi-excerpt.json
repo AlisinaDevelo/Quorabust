@@ -59,7 +59,12 @@
         "description": "Per-row duplicate probabilities and which model variant served the request.",
         "examples": [
           {
+            "calibrated_proba_duplicate": [
+              0.82,
+              0.31
+            ],
             "decision_threshold": 0.5,
+            "decision_threshold_source": "artifact_metadata",
             "features": [
               {
                 "abs_len_diff": 1.0,
@@ -77,14 +82,39 @@
               0.82,
               0.31
             ],
+            "probability_source": "calibrated",
+            "raw_proba_duplicate": [
+              0.84,
+              0.29
+            ],
             "variant": "a"
           }
         ],
         "properties": {
+          "calibrated_proba_duplicate": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Positive-class probability after artifact calibration, or null when the loaded artifact has no probability calibrator.",
+            "title": "Calibrated Proba Duplicate"
+          },
           "decision_threshold": {
             "description": "Probability threshold used to compute is_duplicate. Request threshold wins over artifact metadata; artifact metadata wins over QUORABUST_DECISION_THRESHOLD.",
             "title": "Decision Threshold",
             "type": "number"
+          },
+          "decision_threshold_source": {
+            "description": "Source of the threshold used for this request: request, artifact metadata, environment, or default.",
+            "title": "Decision Threshold Source",
+            "type": "string"
           },
           "features": {
             "anyOf": [
@@ -113,11 +143,28 @@
             "type": "array"
           },
           "proba_duplicate": {
-            "description": "P(duplicate) for each pair, same order as the request lists.",
+            "description": "Effective probability used for the thresholded decision. This remains the backward-compatible response field and equals calibrated_proba_duplicate when available, otherwise raw_proba_duplicate.",
             "items": {
               "type": "number"
             },
             "title": "Proba Duplicate",
+            "type": "array"
+          },
+          "probability_source": {
+            "description": "Whether proba_duplicate is raw or calibrated artifact output.",
+            "enum": [
+              "raw",
+              "calibrated"
+            ],
+            "title": "Probability Source",
+            "type": "string"
+          },
+          "raw_proba_duplicate": {
+            "description": "Positive-class probability from the base classifier before calibration. It is a model probability output, not necessarily a calibrated probability.",
+            "items": {
+              "type": "number"
+            },
+            "title": "Raw Proba Duplicate",
             "type": "array"
           },
           "variant": {
@@ -127,9 +174,13 @@
           }
         },
         "required": [
+          "raw_proba_duplicate",
+          "calibrated_proba_duplicate",
           "proba_duplicate",
           "is_duplicate",
           "decision_threshold",
+          "decision_threshold_source",
+          "probability_source",
           "variant"
         ],
         "title": "PredictOut",

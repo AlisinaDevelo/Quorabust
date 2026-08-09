@@ -140,6 +140,11 @@ def test_build_report_payload_is_machine_readable():
     assert payload["persisted_evaluation"]["accuracy"] == 0.75
     assert payload["confusion_matrix"]["actual_1"]["predicted_1"] == 4
     assert payload["calibration"]["expected_calibration_error"] == 0.05
+    assert payload["serving_contract"]["output"]["raw_proba_duplicate"] == "list[float]"
+    assert payload["serving_contract"]["output"]["calibrated_proba_duplicate"] == (
+        "list[float] | null"
+    )
+    assert payload["serving_contract"]["output"]["probability_source"] == "raw|calibrated"
     assert payload["threshold_sweep"][0]["f1"] == 0.8
     assert "csv" not in payload["training_metadata"]
     assert "training_command" not in payload["training_metadata"]

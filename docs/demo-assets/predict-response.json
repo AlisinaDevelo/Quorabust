@@ -1,5 +1,7 @@
 {
+  "calibrated_proba_duplicate": null,
   "decision_threshold": 0.9,
+  "decision_threshold_source": "request",
   "features": [
     {
       "abs_len_diff": 3.0,
@@ -21,6 +23,11 @@
     false
   ],
   "proba_duplicate": [
+    0.95,
+    0.25
+  ],
+  "probability_source": "raw",
+  "raw_proba_duplicate": [
     0.95,
     0.25
   ],

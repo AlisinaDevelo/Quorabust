@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 from starlette.testclient import TestClient
 
+from quorabust.calibration import calibrate_classifier
 from quorabust.lineage import sha256_file
 from quorabust.model import train_duplicate_classifier
 from quorabust.persist import save_classifier
@@ -60,7 +61,39 @@ def _tiny_pkl_with_threshold(path, threshold: float, costs: dict | None = None) 
     )
 
 
-def test_serve_health_ready_predict(tmp_path):
+def _tiny_calibrated_pkl(path) -> None:
+    df = pd.DataFrame(
+        {
+            "question1": ["hello world", "foo bar", "what is python", "cache api"],
+            "question2": ["hello there", "baz qux", "python language", "api cache"],
+            "is_duplicate": [1, 0, 1, 1],
+        }
+    )
+    builder, classifier = train_duplicate_classifier(
+        df,
+        xgb_params={"n_estimators": 12, "max_depth": 3},
+    )
+    calibrated = calibrate_classifier(
+        classifier,
+        builder.transform_frame(df),
+        df["is_duplicate"].to_numpy(),
+    )
+    save_classifier(
+        path,
+        builder,
+        calibrated,
+        meta={
+            "feature_backend": "tfidf",
+            "feature_schema": ["cos", "jaccard", "len_ratio", "abs_len_diff", "len_sum"],
+            "calibration_method": "sigmoid",
+            "decision_threshold": 0.7,
+            "decision_threshold_source": "calibration_threshold_csv",
+        },
+    )
+
+
+def test_serve_health_ready_predict(tmp_path, monkeypatch):
+    monkeypatch.delenv("QUORABUST_DECISION_THRESHOLD", raising=False)
     p = tmp_path / "m.pkl"
     _tiny_pkl(p)
     app = create_app(model_path_a=str(p))
@@ -74,8 +107,12 @@ def test_serve_health_ready_predict(tmp_path):
         assert r.status_code == 200
         body = r.json()
         assert "proba_duplicate" in body
+        assert body["raw_proba_duplicate"] == pytest.approx(body["proba_duplicate"])
+        assert body["calibrated_proba_duplicate"] is None
+        assert body["probability_source"] == "raw"
         assert "is_duplicate" in body
         assert body["decision_threshold"] == 0.5
+        assert body["decision_threshold_source"] == "default"
         assert len(body["is_duplicate"]) == len(body["proba_duplicate"])
         assert body["variant"] == "a"
         assert body["features"] is None
@@ -268,6 +305,43 @@ def test_predict_uses_artifact_decision_threshold(tmp_path):
         )
     assert r.status_code == 200
     assert r.json()["decision_threshold"] == 0.91
+    assert r.json()["decision_threshold_source"] == "artifact_metadata"
+
+
+def test_predict_uses_environment_threshold_source(tmp_path, monkeypatch):
+    monkeypatch.setenv("QUORABUST_DECISION_THRESHOLD", "0.73")
+    p = tmp_path / "m.pkl"
+    _tiny_pkl(p)
+    app = create_app(model_path_a=str(p))
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/predict",
+            json={"question1": ["hello"], "question2": ["hello there"]},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["decision_threshold"] == 0.73
+    assert response.json()["decision_threshold_source"] == "environment"
+
+
+def test_predict_exposes_raw_and_calibrated_probabilities(tmp_path):
+    p = tmp_path / "calibrated.pkl"
+    _tiny_calibrated_pkl(p)
+    app = create_app(model_path_a=str(p))
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/predict",
+            json={"question1": ["hello"], "question2": ["hello there"]},
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["probability_source"] == "calibrated"
+    assert body["calibrated_proba_duplicate"] == pytest.approx(body["proba_duplicate"])
+    assert len(body["raw_proba_duplicate"]) == 1
+    assert body["decision_threshold_source"] == "calibration_threshold_csv"
 
 
 def test_models_exposes_public_decision_threshold_metadata(tmp_path):
@@ -311,6 +385,7 @@ def test_predict_threshold_query_overrides_artifact_threshold(tmp_path):
         )
     assert r.status_code == 200
     assert r.json()["decision_threshold"] == 0.2
+    assert r.json()["decision_threshold_source"] == "request"
 
 
 def test_predict_rejects_invalid_threshold(tmp_path):

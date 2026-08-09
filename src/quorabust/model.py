@@ -77,13 +77,13 @@ def train_duplicate_classifier(
 
 def predict_proba_duplicate(
     builder: Any,
-    clf: XGBClassifier,
+    clf: Any,
     q1: list[str],
     q2: list[str],
 ) -> np.ndarray:
     """Probability of duplicate for each pair (shape (n, 2) for sklearn convention)."""
     X = builder.transform_pairs(q1, q2)
-    return clf.predict_proba(X)
+    return np.asarray(clf.predict_proba(X))
 
 
 def eval_log_loss(
