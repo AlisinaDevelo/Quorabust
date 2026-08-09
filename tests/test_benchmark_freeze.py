@@ -85,6 +85,29 @@ def test_freeze_writes_failing_audit_without_role_files(tmp_path):
     assert not split.exists()
 
 
+def test_freeze_writes_failing_audit_without_role_files_for_missing_question_text(tmp_path):
+    source = tmp_path / "missing-question-text.csv"
+    pd.DataFrame(
+        {
+            "question1": ["a", "b"],
+            "question2": ["c", None],
+            "is_duplicate": [0, 1],
+            "qid1": ["q1", "q2"],
+            "qid2": ["q3", "q4"],
+        }
+    ).to_csv(source, index=False)
+    roles, audit, split = _freeze_paths(tmp_path / "outputs")
+
+    with pytest.raises(ValueError, match="source audit failed"):
+        freeze_protocol(source, roles, audit, split)
+
+    payload = json.loads(audit.read_text(encoding="utf-8"))
+    assert payload["status"] == "fail"
+    assert payload["policy"]["require_question_text"] is True
+    assert not roles.exists()
+    assert not split.exists()
+
+
 def test_freeze_rejects_insufficient_components_after_audit(tmp_path):
     source = tmp_path / "too-small.csv"
     _write_source(source, components=3)

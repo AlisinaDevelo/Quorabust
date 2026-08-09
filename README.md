@@ -65,6 +65,10 @@ splitting. It exits non-zero for missing required columns, an empty dataset, or 
 outside `{0, 1}`. Missing question IDs and duplicate pairs are reported as warnings, not
 silently treated as benchmark evidence.
 
+For a public benchmark, add `--require-question-ids --require-question-text`; this also
+fails closed on blank or missing question text. Exploratory callers can leave either strict
+flag off, but the resulting warnings must remain visible in the evaluation record.
+
 Before publishing a real-data comparison, freeze the source, split roles, threshold policy,
 and runtime provenance in a protocol manifest, then validate it with
 `quorabust-validate-protocol --protocol reports/quorabust-benchmark-protocol.json`.

@@ -130,7 +130,8 @@ manifests:
 quorabust-audit-data \
   --csv data/raw/train.csv \
   --out reports/train-data-audit.json \
-  --require-question-ids
+  --require-question-ids \
+  --require-question-text
 ```
 
 The audit records a SHA-256 for the source CSV, required-column and binary-label checks,
@@ -139,7 +140,8 @@ not replace the leakage-aware split performed by `quorabust-train`; it makes the
 contract and any warnings reviewable before training starts. `--require-question-ids` makes
 missing or blank `qid1`/`qid2` a failed audit for the public benchmark protocol. Omit it only
 for an explicitly documented exploratory or customer-domain run where the row-level fallback
-is an accepted limitation.
+is an accepted limitation. `--require-question-text` likewise fails on missing or blank
+question text; the benchmark freezer enables both strict policies automatically.
 
 For a role-based benchmark, train on the frozen `train` role and pass the independent
 `tuning` role explicitly. This keeps the raw source archive, model-fit rows, threshold-selection

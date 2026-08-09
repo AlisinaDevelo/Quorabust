@@ -152,6 +152,7 @@ def freeze_protocol(
         source_name=csv_path.name,
         source_sha256=source_sha256,
         require_question_ids=True,
+        require_question_text=True,
     )
     _write_json(audit_out, audit)
     if audit["status"] != "pass":

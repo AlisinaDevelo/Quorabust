@@ -103,6 +103,7 @@ def audit_dataframe(
     source_name: str | None = None,
     source_sha256: str | None = None,
     require_question_ids: bool = False,
+    require_question_text: bool = False,
 ) -> dict[str, Any]:
     """Build a path-light quality and leakage preflight manifest for a pair dataset."""
     columns = [str(column).strip() for column in df.columns]
@@ -166,14 +167,19 @@ def audit_dataframe(
         ),
         _check(
             "question_text",
-            "warn"
+            "fail"
+            if require_question_text and (pairs["empty_question1"] or pairs["empty_question2"])
+            else "warn"
             if pairs["empty_question1"] or pairs["empty_question2"]
             else "pass",
             "all question fields contain text"
             if not pairs["empty_question1"] and not pairs["empty_question2"]
+            else "question text is required for this benchmark protocol"
+            if require_question_text
             else "some question fields are empty",
             empty_question1=pairs["empty_question1"],
             empty_question2=pairs["empty_question2"],
+            required=require_question_text,
         ),
         _check(
             "duplicate_pairs",
@@ -209,6 +215,10 @@ def audit_dataframe(
         "labels": labels,
         "pairs": pairs,
         "question_ids": question_ids,
+        "policy": {
+            "require_question_ids": require_question_ids,
+            "require_question_text": require_question_text,
+        },
         "checks": checks,
     }
 
@@ -217,6 +227,7 @@ def audit_csv(
     path: str | Path,
     *,
     require_question_ids: bool = False,
+    require_question_text: bool = False,
 ) -> dict[str, Any]:
     """Read a CSV and return its dataset audit manifest."""
     csv_path = Path(path)
@@ -227,6 +238,7 @@ def audit_csv(
         source_name=csv_path.name,
         source_sha256=sha256_file(csv_path),
         require_question_ids=require_question_ids,
+        require_question_text=require_question_text,
     )
 
 
@@ -241,13 +253,22 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Fail unless qid1 and qid2 are complete and non-blank",
     )
+    parser.add_argument(
+        "--require-question-text",
+        action="store_true",
+        help="Fail unless both question columns are non-empty",
+    )
     args = parser.parse_args(argv)
 
     if not args.csv.is_file():
         print(f"File not found: {args.csv}", file=sys.stderr)
         return 1
     try:
-        audit = audit_csv(args.csv, require_question_ids=args.require_question_ids)
+        audit = audit_csv(
+            args.csv,
+            require_question_ids=args.require_question_ids,
+            require_question_text=args.require_question_text,
+        )
     except (OSError, ValueError) as exc:
         print(f"Unable to audit {args.csv}: {exc}", file=sys.stderr)
         return 1

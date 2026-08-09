@@ -16,7 +16,8 @@ quorabust-validate-protocol \
 The validator is deliberately fail-closed. A valid manifest must include:
 
 - the dataset source reference, license/terms, source SHA-256, and a passing audit
-  manifest whose source hash matches and whose `qid1`/`qid2` requirement is enabled;
+  manifest whose source hash matches and whose `qid1`/`qid2` and non-empty question-text
+  requirements are enabled;
 - four distinct artifact references for `train`, `tuning`, `calibration`, and
   `final_holdout`, with each role limited to its declared activity;
 - `question_component_holdout`, complete question-ID columns, a non-negative seed,
@@ -87,7 +88,8 @@ For a permitted Quora release, keep the licensed source outside Git:
    Each role must contain both label classes so calibration and final evaluation fail before
    artifact generation rather than later in the release pipeline.
 2. Review the passing audit and role counts, including the untouched final holdout. The
-   freezer fails closed for missing or incomplete IDs, invalid labels, insufficient
+   freezer fails closed for missing or incomplete IDs, missing or blank question text,
+   invalid labels, insufficient
    components, invalid fractions, and output collisions.
 3. Train only on the `train.csv` role and pass `tuning.csv` as `quorabust-train --eval-csv`.
    The command verifies component disjointness and records the train and tuning hashes.
