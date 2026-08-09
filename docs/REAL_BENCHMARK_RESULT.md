@@ -4,7 +4,54 @@ This page records one permitted Quora Question Pairs evaluation run. It is evide
 review, not a claim of state-of-the-art quality. The raw dataset and frozen role CSVs stay
 outside Git.
 
-## Protocol
+## Corrected Strict v2 Protocol
+
+The earlier role set below is retained for audit history. This is the current corrected
+comparison: three rows with missing or blank question text were removed from a permitted
+external source copy, then the strict freezer was rerun under the current release code.
+
+- Source: `external://quora/quorabust-qqp-strict-v1.csv`
+- Corrected source SHA-256: `9bbef5123fc764a2b2232752edacea21a0d1e5c303c48d8340263ed78d829d8c`
+- Source-cleaning manifest SHA-256: `2d07609cd853d354a760b490dedcbc7aa1fe3cc5a2c5fd20878ed9d07a65deb4`
+- Corrected source rows: 404,348; final holdout rows: 40,437; positive rate: 0.3685
+- Split: question-component holdout, seed `42`, four roles at 70/10/10/10 percent.
+- Train role SHA-256: `ee76ccb99b5784a4f9be3cd66e393369e9813167f2d52349237c61661b116ab3`
+- Tuning role SHA-256: `ba982060fb37884bdeae2e1238fcad460ef2465387844967180fed5447e34c69`
+- Calibration role SHA-256: `e41eec62728934614de333b957d2e2ebdadfc0102119df830b96cb832c333f37`
+- Final holdout SHA-256: `cedad10a2d5af66cb88fbdc8cfd9edc201234d0aa8e319e3dad9b2ab73181744`
+- Strict audit SHA-256: `2be55ea1d284d4551233d6a97d9c73a8812a1ada545f84d19a2e19d2308d6885`
+- Split manifest SHA-256: `260435a10d8fad0ee03a8c00c2e083fe206165729f4027ed4b7490201e577714`
+- Protocol SHA-256: `eca7596aefa3ee69a0b7a33db4b3f80a239723e3453d5b2d0e034e300777b6c4`
+- Evaluation/report code: commit `e349581fc1b5e531c22897b8039936bc78ff8f11`
+- Audit policy: `require_question_ids: true`, `require_question_text: true`
+
+The source-cleaning manifest records only the original/output hashes, row counts, the
+drop policy, and row fingerprints; raw question text remains outside Git. The protocol,
+all role audits, and the protocol-bound TF-IDF report validator passed.
+
+## Corrected Strict v2 Pair Classification
+
+Both rows use the same untouched final holdout, tuning threshold candidates, isotonic
+calibration role, and strict role hashes. The TF-IDF row is a serialized Quorabust safe
+artifact and passed protocol-bound report validation. The cross-encoder row is direct
+pretrained scoring evidence only; it is not yet a serialized Quorabust artifact.
+
+| candidate | threshold | ROC-AUC | PR-AUC | log loss | Brier | ECE | precision | recall | F1 | accuracy |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| TF-IDF + XGBoost + isotonic | 0.30 | 0.7896 | 0.6243 | 0.5111 | 0.1761 | 0.0063 | 0.5306 | 0.9130 | 0.6711 | 0.6702 |
+| Direct Quora cross-encoder + isotonic | 0.40 | 0.9731 | 0.9472 | 0.2007 | 0.0596 | 0.0034 | 0.8731 | 0.9159 | 0.8940 | 0.9199 |
+
+The cross-encoder used `cross-encoder/quora-distilroberta-base` at revision
+`f62e7a4b20b97195c2868e53ec59126df5eac743`, `max_length=128`, batch size `128`, and explicit
+CPU execution. Scoring throughput was 163.6, 170.6, and 171.9 pairs/second for tuning,
+calibration, and final holdout respectively; peak RSS was approximately 1.4 GB. This is
+the central enterprise tradeoff: the model quality jump is substantial, but the serving
+cost and artifact packaging still need engineering before promotion.
+
+The path-light comparison evidence is kept outside Git at
+`/tmp/quorabust-release-20260809-corrected-v2/reports/backend-comparison-v2.json`.
+
+## Historical Protocol (superseded)
 
 - Source: Kaggle Question Pairs Dataset v2, `kaggle://quora/question-pairs-dataset@2`
 - Terms: Quora/Kaggle terms reviewed for this run; non-commercial use; raw data is not
@@ -27,13 +74,13 @@ protocol-bound report validation passed.
 The role set above is retained as historical evidence, but it is not promotion-grade under
 the current strict benchmark policy: a direct cross-encoder dry run found one missing
 `question2` value in the calibration role. The run failed closed before producing a
-cross-encoder result; no quality or cost claim is made for that candidate. Commit `a90b310`
-now makes the protocol freezer reject missing or blank question text, so the next comparison
-must be re-frozen from corrected permitted source bytes. The published control and embedding
-numbers are unchanged historical measurements and should not be read as evidence that the
-defective role is acceptable for a new promotion.
+cross-encoder result; no quality or cost claim is made for that historical candidate.
+Commits `a90b310` and `9087ded` now make the freezer, protocol builder, training lineage, and
+report validator reject missing or blank question text. The corrected strict v2 comparison
+above is the current evidence; the historical control and embedding numbers below should
+not be read as evidence that the defective role is acceptable for a new promotion.
 
-## Pair Classification
+## Historical Pair Classification (superseded)
 
 All rows below use the untouched final holdout. Thresholds were selected on the tuning role;
 the final holdout was not used for model or threshold selection.
@@ -57,8 +104,9 @@ the final holdout it slightly improved ECE over the raw control, but worsened lo
 Sigmoid calibration worsened both Brier score and ECE in this run. The calibration methods
 remain available as explicit artifacts; neither is silently presented as a global winner.
 
-The cross-encoder candidate was not run on the full frozen protocol in this release. No
-cross-encoder quality claim is made.
+The cross-encoder candidate was not run on the historical role set above. No claim should
+be inferred from that historical omission; the corrected strict v2 evidence is recorded at
+the top of this page.
 
 ## Retrieval Cost Sample
 
@@ -82,12 +130,14 @@ an extrapolated capacity claim.
 ## Release Reading
 
 - Use TF-IDF as the cheap, inspectable control.
-- Use the embedding backend as the quality candidate for further latency, artifact, and
-  domain validation.
+- Treat the direct cross-encoder as the current quality candidate, with explicit latency,
+  memory, artifact, and domain validation still required before promotion.
+- Keep the embedding backend as a lower-cost intermediate candidate for latency and domain
+  validation; it remains stronger than the historical lexical control.
 - Keep threshold policy and calibration method explicit per deployment; do not assume the
   Quora calibration result transfers to customer data.
-- Treat the cross-encoder and multilingual/domain slices as follow-up research until they
-  have permitted, frozen evaluation data.
+- Treat multilingual/domain slices, cross-encoder artifact packaging, and production load
+  tests as the next release tasks.
 
 See [REPORTING.md](REPORTING.md) for the commands and [BENCHMARK_PROTOCOL.md](BENCHMARK_PROTOCOL.md)
 for the release gate.
