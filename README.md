@@ -20,6 +20,8 @@ via Docker Compose.
 OpenAPI excerpts for quick inspection without running the service.
 **Hosted demo checklist:** [docs/HOSTED_DEMO.md](docs/HOSTED_DEMO.md) — safe public demo
 requirements and portfolio capture notes.
+**Real benchmark evidence:** [docs/REAL_BENCHMARK_RESULT.md](docs/REAL_BENCHMARK_RESULT.md) —
+redacted frozen-role comparison of the TF-IDF control and embedding candidate.
 
 ## What it demonstrates
 

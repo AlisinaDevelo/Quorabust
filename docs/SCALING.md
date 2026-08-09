@@ -9,6 +9,12 @@ This document maps **ambitions** to what ships in-repo and what stays external.
 
 ## Modern NLP (embeddings)
 
+The pair builder encodes each distinct normalized question once per batch and keeps a
+bounded in-memory LRU cache of 50,000 vectors by default. `batch_size` and `cache_size`
+are explicit constructor controls; the cache is process-local and is not a persisted
+feature store. This keeps repeated-question workloads predictable without allowing
+unbounded text-derived memory growth.
+
 - **Optional extra** `pip install ".[nlp]"`**: `PairEmbeddingBuilder` in `quorabust.embedding_features` uses `sentence-transformers` to encode pairs and feeds cosine / L2 / pooling stats into the same XGBoost head. Training can select `--feature-backend embedding` in `quorabust-train`.
 - **Cross-encoder pair scoring**: `PairCrossEncoderBuilder` in
   `quorabust.cross_encoder_features` uses a Sentence Transformers `CrossEncoder` to score
