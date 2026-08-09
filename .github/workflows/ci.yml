@@ -65,7 +65,8 @@ jobs:
           quorabust-audit-data \
             --csv /tmp/quorabust-strict-audit.csv \
             --out /tmp/quorabust-strict-audit.json \
-            --require-question-ids
+            --require-question-ids \
+            --require-question-text
           python - <<'PY'
           import json
           from pathlib import Path
@@ -73,6 +74,7 @@ jobs:
           payload = json.loads(Path("/tmp/quorabust-strict-audit.json").read_text())
           assert payload["status"] == "pass"
           assert payload["question_ids"]["present"] is True
+          assert payload["policy"]["require_question_text"] is True
           PY
           if quorabust-audit-data \
             --csv examples/smoke_pairs.csv \
@@ -210,7 +212,8 @@ jobs:
           quorabust-audit-data \
             --csv /tmp/quorabust-protocol-source.csv \
             --out /tmp/quorabust-protocol-audit.json \
-            --require-question-ids
+            --require-question-ids \
+            --require-question-text
           quorabust-build-protocol \
             --config /tmp/quorabust-protocol-config.json \
             --out /tmp/quorabust-protocol.json
