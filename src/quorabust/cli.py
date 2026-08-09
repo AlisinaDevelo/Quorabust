@@ -14,7 +14,6 @@ from quorabust.drift import feature_means_from_matrix
 from quorabust.lineage import git_revision, sha256_file
 from quorabust.model import (
     eval_classification_metrics,
-    predict_proba_duplicate,
     select_decision_threshold,
     train_duplicate_classifier,
     validate_threshold_costs,
@@ -339,17 +338,13 @@ def main(argv: list[str] | None = None) -> int:
     if eval_csv_sha256 is not None:
         meta["eval_csv_sha256"] = eval_csv_sha256
     eval_target = eval_df if eval_df is not None else train_df
-    m = eval_classification_metrics(builder, clf, eval_target)
+    eval_features = builder.transform_frame(eval_target)
+    m = eval_classification_metrics(builder, clf, eval_target, features=eval_features)
     for k, v in m.items():
         meta[f"eval_{k}"] = v
     if eval_df is not None:
         y_eval = eval_df["is_duplicate"].astype(int).to_numpy()
-        p_eval = predict_proba_duplicate(
-            builder,
-            clf,
-            eval_df["question1"].astype(str).tolist(),
-            eval_df["question2"].astype(str).tolist(),
-        )[:, 1]
+        p_eval = clf.predict_proba(eval_features)[:, 1]
         selected_threshold = select_decision_threshold(
             y_eval,
             p_eval,

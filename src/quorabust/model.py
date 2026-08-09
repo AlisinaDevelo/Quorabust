@@ -107,9 +107,15 @@ def eval_classification_metrics(
     label_col: str = "is_duplicate",
     col_q1: str = "question1",
     col_q2: str = "question2",
+    *,
+    features: np.ndarray | None = None,
 ) -> dict[str, float]:
     """Accuracy, log loss, and ROC-AUC when both classes are present."""
-    X = builder.transform_frame(df, col_q1=col_q1, col_q2=col_q2)
+    X = (
+        builder.transform_frame(df, col_q1=col_q1, col_q2=col_q2)
+        if features is None
+        else features
+    )
     y = df[label_col].astype(int).to_numpy()
     proba = clf.predict_proba(X)[:, 1]
     y_hat = (proba >= 0.5).astype(int)
