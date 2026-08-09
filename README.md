@@ -210,6 +210,29 @@ For process-level rollout sizing, `quorabust-retrieve-profile` repeats the bench
 subprocesses and records process-to-report startup time, warm metrics, input sizes, and optional
 local artifact hashes. It is an operational profile, not model-quality evidence.
 
+For pair-classifier rollout sizing, profile a saved artifact against a labeled or unlabeled pair
+CSV:
+
+```bash
+quorabust-pair-profile \
+  --model models/quorabust.qmodel \
+  --eval-csv data/processed/holdout.csv \
+  --dependency-lock requirements.txt \
+  --batch-size 32 \
+  --warmup-runs 1 \
+  --repetitions 3 \
+  --cold-start-repetitions 3 \
+  --out reports/pair-profile.json
+```
+
+The path-light report binds the artifact, evaluation input, optional dependency lock, model
+metadata, repository revision, batch policy, and runtime environment. It separates fresh-process
+cold-start p50/p95/p99 from serial warm batch and per-pair latency, throughput, peak RSS, artifact
+size, and short/medium/long pair-length strata. When `is_duplicate` is present, it also records
+label counts and optional quality metrics using the artifact threshold, an explicit `--threshold`,
+or `0.5`. Use this beside `quorabust-report`, not as a replacement for a permitted holdout model
+card; smoke measurements do not establish a production SLO or a universal model-quality claim.
+
 Use `quorabust-validate-retrieval` in release jobs to validate report provenance, measurement
 counts, latency summaries, and query-length strata, then apply caller-owned policies such as
 `--min-final-recall-at-k 10=0.95`, `--max-end-to-end-p95-ms 100`,

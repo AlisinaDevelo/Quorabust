@@ -250,6 +250,8 @@ jobs:
         run: quorabust-retrieve-benchmark --help
       - name: Retrieval profile CLI
         run: quorabust-retrieve-profile --help
+      - name: Pair classifier profile CLI
+        run: quorabust-pair-profile --help
       - name: Retrieval validator CLI
         run: quorabust-validate-retrieval --help
       - name: Hard-negative mining CLI
@@ -403,3 +405,31 @@ jobs:
             --max-cold-start-p95-ms 20000 \
             --max-peak-rss-bytes 8589934592 \
             --max-total-artifact-bytes 10485760
+      - name: Pair classifier profile smoke
+        run: |
+          quorabust-pair-profile \
+            --model /tmp/quorabust-smoke.qmodel \
+            --eval-csv examples/smoke_pairs.csv \
+            --dependency-lock requirements.txt \
+            --batch-size 8 \
+            --warmup-runs 0 \
+            --repetitions 1 \
+            --cold-start-repetitions 2 \
+            --timeout-seconds 30 \
+            --out /tmp/quorabust-pair-profile.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/quorabust-pair-profile.json").read_text())
+          assert report["schema_version"] == 1
+          assert report["benchmark"] == "quorabust-pair-profile"
+          assert report["evidence_scope"] == "pair_classifier_timing_and_optional_quality"
+          assert report["cold_start"]["measurement_count"] == 2
+          assert report["artifacts"][0]["bytes"] > 0
+          assert report["sources"]["evaluation"]["bytes"] > 0
+          assert report["dependency_lock"]["sha256"]
+          assert report["warm_benchmark"]["pair_count"] == 32
+          assert report["warm_benchmark"]["labels"]["present"] is True
+          assert report["warm_benchmark"]["pair_length_strata"]
+          PY

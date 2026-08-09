@@ -128,8 +128,11 @@ per-backend policy.
 See [SCALING.md](SCALING.md) for chunked CSV I/O, optional **embedding** training
 (`pip install ".[nlp]"`, `quorabust-train --feature-backend embedding`), optional
 **cross-encoder** pair scoring (`quorabust-train --feature-backend cross-encoder`), and
-pointers to distributed XGBoost. Use `quorabust-retrieve-profile` there for fresh-process
-startup and artifact-size evidence before setting deployment budgets.
+pointers to distributed XGBoost. Use `quorabust-retrieve-profile` for catalog-path evidence and
+`quorabust-pair-profile` for pair-classifier evidence before setting deployment budgets. The pair
+profile records fresh-process startup, warm batch/per-pair latency, throughput, peak RSS, artifact
+bytes, model identity, dependency-lock hash, and optional labeled quality metrics. Treat those
+reports as release evidence to review alongside the model card; they do not define universal SLOs.
 
 ## Registry and drift (lightweight)
 
