@@ -89,7 +89,7 @@ Scores pairs of short natural-language questions and returns the probability tha
 
 ## Serving Contract
 
-`POST /predict` accepts `question1` and `question2` arrays of equal length and returns `proba_duplicate`, `is_duplicate`, and `decision_threshold` in the same order. `GET /metrics` exposes Prometheus counters and latency histograms.
+`POST /predict` accepts `question1` and `question2` arrays of equal length and returns raw, nullable calibrated, and effective duplicate probabilities, thresholded `is_duplicate`, and explicit probability/threshold source fields. `GET /metrics` exposes Prometheus counters and latency histograms.
 
 ## Caveats
 

@@ -12,7 +12,8 @@ is exposed.
 - `/models` shows safe metadata without local paths.
 - `/predict?explain=true&threshold=0.9` accepts the sample request from
   [DEMO.md](DEMO.md) and returns `proba_duplicate`, `is_duplicate`,
-  `decision_threshold`, `variant`, and feature values.
+  raw/calibrated probability fields, threshold and probability sources, `decision_threshold`,
+  `variant`, and feature values.
 - Responses include `X-Request-ID`; use it when sharing a support/debugging example.
 - A visible note near the link says: **demo smoke model, not production quality**.
 

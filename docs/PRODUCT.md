@@ -49,9 +49,16 @@ dataset or customer-domain labels before making performance claims.
 
 `POST /predict` accepts aligned `question1[]` and `question2[]` arrays. It returns:
 
-- `proba_duplicate`: raw duplicate probability per pair.
+- `raw_proba_duplicate`: base-classifier positive probability before calibration; it is not
+  automatically a calibrated probability.
+- `calibrated_proba_duplicate`: calibrated positive probability, or `null` for an
+  uncalibrated artifact.
+- `proba_duplicate`: effective probability used for the decision, retained for client
+  compatibility and equal to the calibrated value when available.
 - `is_duplicate`: thresholded decision per pair.
 - `decision_threshold`: threshold used for the decision.
+- `decision_threshold_source`: request, artifact metadata, environment, or default.
+- `probability_source`: `raw` or `calibrated`.
 - `variant`: active model variant, useful during A/B rollout.
 - `features`: optional input feature values when `?explain=true`.
 

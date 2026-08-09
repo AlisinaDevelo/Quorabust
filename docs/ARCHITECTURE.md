@@ -65,7 +65,7 @@ sequenceDiagram
   API->>FS: load model.pkl
   Client->>API: POST /predict {question1[], question2[]}
   API->>API: build features, score pairs
-  API-->>Client: proba_duplicate[]
+  API-->>Client: raw/calibrated/effective probabilities + decisions
   Client->>API: GET /models
   API-->>Client: version · backend · metrics · lineage
 ```

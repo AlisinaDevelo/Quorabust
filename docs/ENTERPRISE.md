@@ -77,9 +77,10 @@ per-backend policy.
 ## Serving and SLOs
 
 - **`quorabust-serve`**: FastAPI with `/health`, `/ready`, `/predict`, `/metrics` (Prometheus). Configure **`QUORABUST_MODEL_PATH`** and optional **`QUORABUST_MODEL_B`** for A/B; clients may send **`X-Quorabust-Variant: b`**.
-- **Decisioning**: `/predict` returns both `proba_duplicate` and thresholded
-  `is_duplicate`. Clients can pass `?threshold=0.7`; otherwise serving uses the
-  holdout-selected artifact metadata `decision_threshold`, then
+- **Decisioning**: `/predict` returns raw and nullable calibrated probabilities, the
+  backward-compatible effective `proba_duplicate`, thresholded `is_duplicate`, and explicit
+  probability/threshold sources. Clients can pass `?threshold=0.7`; otherwise serving uses
+  the holdout-selected artifact metadata `decision_threshold`, then
   `QUORABUST_DECISION_THRESHOLD`, then `0.5`.
 - **Optional access controls**: set `QUORABUST_API_KEY` to require
   `X-Quorabust-API-Key` on `/predict` and `/models`. Set

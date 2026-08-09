@@ -66,9 +66,10 @@ curl -s 'http://localhost:8000/predict?explain=true&threshold=0.9' \
   }' | python -m json.tool
 ```
 
-The response includes `proba_duplicate`, thresholded `is_duplicate`,
-`decision_threshold`, and optional feature values. The example uses `threshold=0.9` to
-show both positive and negative decisions with the smoke model.
+The response includes raw `raw_proba_duplicate`, nullable
+`calibrated_proba_duplicate`, effective `proba_duplicate`, explicit probability and
+threshold sources, thresholded `is_duplicate`, and optional feature values. The example
+uses `threshold=0.9` to show both positive and negative decisions with the smoke model.
 
 ## Stop
 
