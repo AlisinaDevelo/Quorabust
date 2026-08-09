@@ -31,15 +31,24 @@ all role audits, and the protocol-bound TF-IDF report validator passed.
 
 ## Corrected Strict v2 Pair Classification
 
-Both rows use the same untouched final holdout, tuning threshold candidates, isotonic
+All three rows use the same untouched final holdout, tuning threshold candidates, isotonic
 calibration role, and strict role hashes. The TF-IDF row is a serialized Quorabust safe
-artifact and passed protocol-bound report validation. The cross-encoder row is direct
-pretrained scoring evidence only; it is not yet a serialized Quorabust artifact.
+artifact and passed protocol-bound report validation. The embedding row is a trusted
+pickle artifact; the cross-encoder row is direct pretrained scoring evidence only. Neither
+transformer-backed row is currently a safe serialized Quorabust artifact.
 
 | candidate | threshold | ROC-AUC | PR-AUC | log loss | Brier | ECE | precision | recall | F1 | accuracy |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | TF-IDF + XGBoost + isotonic | 0.30 | 0.7896 | 0.6243 | 0.5111 | 0.1761 | 0.0063 | 0.5306 | 0.9130 | 0.6711 | 0.6702 |
+| Sentence-transformer embedding + XGBoost + isotonic | 0.40 | 0.8834 | 0.7799 | 0.4023 | 0.1341 | 0.0075 | 0.6785 | 0.8371 | 0.7495 | 0.7938 |
 | Direct Quora cross-encoder + isotonic | 0.40 | 0.9731 | 0.9472 | 0.2007 | 0.0596 | 0.0034 | 0.8731 | 0.9159 | 0.8940 | 0.9199 |
+
+The embedding candidate used `sentence-transformers/all-MiniLM-L6-v2` at revision
+`1110a243fdf4706b3f48f1d95db1a4f5529b4d41`. Its trusted pickle was 173,917,653 bytes,
+loaded in 4,216 ms, scored the final holdout at 1,057 pairs/second, and reached a process
+peak RSS of 1,287,618,560 bytes on this machine. It is a useful middle point between the
+cheap lexical control and the cross-encoder, but safe transformer artifact packaging and
+deployment load testing remain open.
 
 The cross-encoder used `cross-encoder/quora-distilroberta-base` at revision
 `f62e7a4b20b97195c2868e53ec59126df5eac743`, `max_length=128`, batch size `128`, and explicit
