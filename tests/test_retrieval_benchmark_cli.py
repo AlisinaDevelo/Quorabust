@@ -60,8 +60,10 @@ def test_benchmark_cli_writes_provenance_and_stage_metrics(tmp_path):
     assert payload["benchmark"] == "quorabust-retrieve-benchmark"
     assert payload["configuration"] == {
         "embedding_model": None,
+        "embedding_model_revision": None,
         "ks": [1, 2],
         "reranker_model": None,
+        "reranker_model_revision": None,
         "retriever": "tfidf",
         "warmup_runs": 0,
         "repetitions": 2,

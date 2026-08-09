@@ -140,12 +140,20 @@ class TfidfCatalogRetriever:
         return _rank_hits(self._questions, scores, k)
 
 
-def _load_sentence_transformer(model_name: str) -> Any:
+def _normalize_model_revision(revision: str | None) -> str | None:
+    normalized = revision.strip() if revision is not None else None
+    if revision is not None and not normalized:
+        raise ValueError("revision must be a non-empty string when provided")
+    return normalized
+
+
+def _load_sentence_transformer(model_name: str, revision: str | None = None) -> Any:
     try:
         from sentence_transformers import SentenceTransformer
     except ImportError as exc:
         raise RuntimeError('Missing dependency: install with pip install "Quorabust[nlp]"') from exc
-    return SentenceTransformer(model_name)
+    model_kwargs = {"revision": revision} if revision is not None else {}
+    return SentenceTransformer(model_name, **model_kwargs)
 
 
 def _normalize_embeddings(embeddings: Any) -> np.ndarray:
@@ -160,9 +168,20 @@ def _normalize_embeddings(embeddings: Any) -> np.ndarray:
 class SentenceTransformerCatalogRetriever:
     """Optional dense first-stage retriever using normalized sentence embeddings."""
 
-    def __init__(self, model_name: str, model: Any | None = None) -> None:
+    def __init__(
+        self,
+        model_name: str,
+        model: Any | None = None,
+        *,
+        revision: str | None = None,
+    ) -> None:
         self.model_name = model_name
-        self._model = model if model is not None else _load_sentence_transformer(model_name)
+        self.model_revision = _normalize_model_revision(revision)
+        self._model = (
+            model
+            if model is not None
+            else _load_sentence_transformer(model_name, self.model_revision)
+        )
         self._questions: list[CatalogQuestion] = []
         self._matrix: np.ndarray | None = None
 
@@ -218,14 +237,17 @@ class SentenceTransformerCatalogRetriever:
             raise RuntimeError("fit() or fit_frame() must be called before search()")
         if k < 1:
             raise ValueError("k must be at least 1")
+        attributes: dict[str, Any] = {
+            "quorabust.retriever": "sentence_transformer",
+            "quorabust.model_name": self.model_name,
+            "quorabust.catalog_size": self.size,
+            "quorabust.k": k,
+        }
+        if self.model_revision is not None:
+            attributes["quorabust.model_revision"] = self.model_revision
         with span(
             "quorabust.retrieval",
-            attributes={
-                "quorabust.retriever": "sentence_transformer",
-                "quorabust.model_name": self.model_name,
-                "quorabust.catalog_size": self.size,
-                "quorabust.k": k,
-            },
+            attributes=attributes,
         ) as current:
             query_embedding = self._encode([clean_text(query)])[0]
             scores = np.asarray(self._matrix @ query_embedding, dtype=np.float64).reshape(-1)
@@ -233,20 +255,32 @@ class SentenceTransformerCatalogRetriever:
         return _rank_hits(self._questions, scores, k)
 
 
-def _load_cross_encoder(model_name: str) -> Any:
+def _load_cross_encoder(model_name: str, revision: str | None = None) -> Any:
     try:
         from sentence_transformers import CrossEncoder
     except ImportError as exc:
         raise RuntimeError('Missing dependency: install with pip install "Quorabust[nlp]"') from exc
-    return CrossEncoder(model_name)
+    model_kwargs = {"revision": revision} if revision is not None else {}
+    return CrossEncoder(model_name, **model_kwargs)
 
 
 class SentenceTransformerCrossEncoderReranker:
     """Optional raw-score adapter for the bounded second retrieval stage."""
 
-    def __init__(self, model_name: str, model: Any | None = None) -> None:
+    def __init__(
+        self,
+        model_name: str,
+        model: Any | None = None,
+        *,
+        revision: str | None = None,
+    ) -> None:
         self.model_name = model_name
-        self._model = model if model is not None else _load_cross_encoder(model_name)
+        self.model_revision = _normalize_model_revision(revision)
+        self._model = (
+            model
+            if model is not None
+            else _load_cross_encoder(model_name, self.model_revision)
+        )
 
     def score_batch(self, question1: list[str], question2: list[str]) -> list[float]:
         if len(question1) != len(question2):

@@ -121,8 +121,12 @@ def _child_command(args: argparse.Namespace, child_out: Path) -> list[str]:
     ]
     if args.retriever == "embedding":
         command.extend(["--embedding-model", args.embedding_model])
+        if args.embedding_model_revision is not None:
+            command.extend(["--embedding-model-revision", args.embedding_model_revision])
     if args.reranker_model:
         command.extend(["--reranker-model", args.reranker_model])
+        if args.reranker_model_revision is not None:
+            command.extend(["--reranker-model-revision", args.reranker_model_revision])
     return command
 
 
@@ -184,7 +188,9 @@ def main(argv: list[str] | None = None) -> int:
         "--embedding-model",
         default="sentence-transformers/all-MiniLM-L6-v2",
     )
+    parser.add_argument("--embedding-model-revision", default=None)
     parser.add_argument("--reranker-model", default=None)
+    parser.add_argument("--reranker-model-revision", default=None)
     parser.add_argument("--id-column", default="question_id")
     parser.add_argument("--text-column", default="question")
     parser.add_argument("--warmup-runs", type=_non_negative_int, default=1)
@@ -201,6 +207,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, default=None)
     args = parser.parse_args(argv)
 
+    if args.embedding_model_revision is not None and args.retriever != "embedding":
+        print("--embedding-model-revision requires --retriever=embedding", file=sys.stderr)
+        return 1
+    if args.reranker_model_revision is not None and args.reranker_model is None:
+        print("--reranker-model-revision requires --reranker-model", file=sys.stderr)
+        return 1
     for path in [args.catalog_csv, args.qrels_csv, *args.artifact]:
         if not path.is_file():
             print(f"File not found: {path}", file=sys.stderr)
@@ -238,7 +250,13 @@ def main(argv: list[str] | None = None) -> int:
             "embedding_model": args.embedding_model
             if args.retriever == "embedding"
             else None,
+            "embedding_model_revision": args.embedding_model_revision
+            if args.retriever == "embedding"
+            else None,
             "reranker_model": args.reranker_model,
+            "reranker_model_revision": args.reranker_model_revision
+            if args.reranker_model
+            else None,
             "ks": args.ks,
             "candidate_k": args.candidate_k,
             "warmup_runs": args.warmup_runs,

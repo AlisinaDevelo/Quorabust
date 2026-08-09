@@ -204,6 +204,18 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = p.parse_args(argv)
 
+    if args.embedding_model_revision is not None and args.feature_backend != "embedding":
+        print(
+            "--embedding-model-revision requires --feature-backend=embedding",
+            file=sys.stderr,
+        )
+        return 1
+    if args.cross_encoder_model_revision is not None and args.feature_backend != "cross-encoder":
+        print(
+            "--cross-encoder-model-revision requires --feature-backend=cross-encoder",
+            file=sys.stderr,
+        )
+        return 1
     if not args.csv.is_file():
         print(f"File not found: {args.csv}", file=sys.stderr)
         return 1

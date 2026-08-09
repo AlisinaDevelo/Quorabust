@@ -69,8 +69,10 @@ def test_retrieval_cli_can_use_optional_dense_and_reranker_stages(tmp_path, monk
     _write_catalog(catalog)
 
     class FakeDenseRetriever:
-        def __init__(self, model_name):
+        def __init__(self, model_name, **kwargs):
             assert model_name == "fake-embedding"
+            assert kwargs == {"revision": "embedding-commit"}
+            self.model_revision = "embedding-commit"
             self.size = 2
 
         def fit_frame(self, frame, *, id_col, text_col):
@@ -85,8 +87,10 @@ def test_retrieval_cli_can_use_optional_dense_and_reranker_stages(tmp_path, monk
             ][:k]
 
     class FakeReranker:
-        def __init__(self, model_name):
+        def __init__(self, model_name, **kwargs):
             assert model_name == "fake-cross"
+            assert kwargs == {"revision": "cross-commit"}
+            self.model_revision = "cross-commit"
 
         def score_batch(self, question1, question2):
             assert question1 == ["python", "python"]
@@ -107,8 +111,12 @@ def test_retrieval_cli_can_use_optional_dense_and_reranker_stages(tmp_path, monk
                 "embedding",
                 "--embedding-model",
                 "fake-embedding",
+                "--embedding-model-revision",
+                "embedding-commit",
                 "--reranker-model",
                 "fake-cross",
+                "--reranker-model-revision",
+                "cross-commit",
                 "--candidate-k",
                 "2",
                 "--out",
@@ -120,5 +128,7 @@ def test_retrieval_cli_can_use_optional_dense_and_reranker_stages(tmp_path, monk
 
     payload = json.loads(output.read_text(encoding="utf-8"))
     assert payload["retriever"] == "embedding"
+    assert payload["embedding_model_revision"] == "embedding-commit"
     assert payload["reranker"] == "fake-cross"
+    assert payload["reranker_model_revision"] == "cross-commit"
     assert payload["queries"][0]["hits"][0]["rerank_score"] == 0.9

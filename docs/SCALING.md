@@ -89,7 +89,9 @@ quorabust-retrieve \
 
 The retrieval module also exposes a bounded batch reranker contract. With the optional NLP
 extra, select `--retriever embedding` and pass `--reranker-model` to apply a cross-encoder
-only to the candidate set. Measure candidate recall@k first, and do not interpret an
+only to the candidate set. Pass `--embedding-model-revision` and
+`--reranker-model-revision` (preferably immutable model commit SHAs) when generating a
+benchmark or deployment profile. Measure candidate recall@k first, and do not interpret an
 uncalibrated reranker score as `P(duplicate)`. See
 [#15](https://github.com/AlisinaDevelo/Quorabust/issues/15) for the retrieve-and-rerank
 product work.

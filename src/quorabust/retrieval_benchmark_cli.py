@@ -144,15 +144,31 @@ def main(argv: list[str] | None = None) -> int:
         help="Sentence Transformer model for --retriever embedding",
     )
     parser.add_argument(
+        "--embedding-model-revision",
+        default=None,
+        help="Immutable embedding model revision, preferably a commit SHA",
+    )
+    parser.add_argument(
         "--reranker-model",
         default=None,
         help="Optional CrossEncoder model for bounded candidate reranking",
+    )
+    parser.add_argument(
+        "--reranker-model-revision",
+        default=None,
+        help="Immutable reranker model revision, preferably a commit SHA",
     )
     parser.add_argument("--id-column", default="question_id")
     parser.add_argument("--text-column", default="question")
     parser.add_argument("--out", type=Path, default=None, help="Write JSON instead of stdout")
     args = parser.parse_args(argv)
 
+    if args.embedding_model_revision is not None and args.retriever != "embedding":
+        print("--embedding-model-revision requires --retriever=embedding", file=sys.stderr)
+        return 1
+    if args.reranker_model_revision is not None and args.reranker_model is None:
+        print("--reranker-model-revision requires --reranker-model", file=sys.stderr)
+        return 1
     for path in (args.catalog_csv, args.qrels_csv):
         if not path.is_file():
             print(f"File not found: {path}", file=sys.stderr)
@@ -166,7 +182,10 @@ def main(argv: list[str] | None = None) -> int:
         retriever: CatalogRetriever
         retriever_start = time.perf_counter()
         if args.retriever == "embedding":
-            retriever = SentenceTransformerCatalogRetriever(args.embedding_model).fit_frame(
+            retriever = SentenceTransformerCatalogRetriever(
+                args.embedding_model,
+                revision=args.embedding_model_revision,
+            ).fit_frame(
                 catalog_frame,
                 id_col=args.id_column,
                 text_col=args.text_column,
@@ -183,7 +202,10 @@ def main(argv: list[str] | None = None) -> int:
         reranker = None
         if args.reranker_model:
             reranker_start = time.perf_counter()
-            reranker = SentenceTransformerCrossEncoderReranker(args.reranker_model)
+            reranker = SentenceTransformerCrossEncoderReranker(
+                args.reranker_model,
+                revision=args.reranker_model_revision,
+            )
             reranker_initialization_ms = (time.perf_counter() - reranker_start) * 1000.0
         payload = benchmark_retrieval(
             retriever,
@@ -212,7 +234,15 @@ def main(argv: list[str] | None = None) -> int:
                 "embedding_model": args.embedding_model
                 if args.retriever == "embedding"
                 else None,
+                "embedding_model_revision": (
+                    getattr(retriever, "model_revision", None)
+                    if args.retriever == "embedding"
+                    else None
+                ),
                 "reranker_model": args.reranker_model,
+                "reranker_model_revision": (
+                    getattr(reranker, "model_revision", None) if reranker is not None else None
+                ),
                 "ks": args.ks,
                 "warmup_runs": args.warmup_runs,
                 "repetitions": args.repetitions,

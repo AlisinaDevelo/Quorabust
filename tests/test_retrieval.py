@@ -71,6 +71,7 @@ def test_sentence_transformer_retriever_uses_the_shared_catalog_contract():
     retriever = SentenceTransformerCatalogRetriever(
         "fake-embedding",
         model=_FakeEmbeddingModel(),
+        revision="  embedding-commit  ",
     ).fit(
         [
             CatalogQuestion("q1", "python question"),
@@ -79,14 +80,31 @@ def test_sentence_transformer_retriever_uses_the_shared_catalog_contract():
     )
 
     assert retriever.search("python help", k=1)[0].question_id == "q1"
+    assert retriever.model_revision == "embedding-commit"
 
 
 def test_cross_encoder_adapter_returns_raw_batch_scores():
-    reranker = SentenceTransformerCrossEncoderReranker("fake-cross", model=_FakeCrossEncoder())
+    reranker = SentenceTransformerCrossEncoderReranker(
+        "fake-cross",
+        model=_FakeCrossEncoder(),
+        revision="cross-commit",
+    )
 
     scores = reranker.score_batch(["query", "query"], ["python", "tickets"])
 
     assert scores == [0.9, 0.1]
+    assert reranker.model_revision == "cross-commit"
+
+
+def test_optional_retrieval_model_revisions_reject_blank_values():
+    with pytest.raises(ValueError, match="revision"):
+        SentenceTransformerCatalogRetriever(
+            "fake-embedding", model=_FakeEmbeddingModel(), revision=" "
+        )
+    with pytest.raises(ValueError, match="revision"):
+        SentenceTransformerCrossEncoderReranker(
+            "fake-cross", model=_FakeCrossEncoder(), revision=" "
+        )
 
 
 def test_reranker_reorders_candidates_and_preserves_ties_deterministically():
