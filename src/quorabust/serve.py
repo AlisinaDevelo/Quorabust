@@ -394,6 +394,7 @@ _PUBLIC_META_KEYS = {
     "embedding_model_revision",
     "cross_encoder_model",
     "cross_encoder_model_revision",
+    "cross_encoder_batch_size",
     "n_train",
     "n_eval",
     "seed",

@@ -14,7 +14,8 @@ class _FakeCrossEncoder:
         self.model_name = model_name
         self.kwargs = kwargs
 
-    def predict(self, pairs, show_progress_bar: bool = False):
+    def predict(self, pairs, batch_size: int = 32, show_progress_bar: bool = False):
+        assert batch_size == 8
         return [0.9 if idx % 2 else 0.1 for idx, _pair in enumerate(pairs)]
 
 
@@ -363,6 +364,8 @@ def test_cli_trains_with_cross_encoder_backend(tmp_path, monkeypatch):
                 "fake-cross-encoder",
                 "--cross-encoder-model-revision",
                 "abc123",
+                "--cross-encoder-batch-size",
+                "8",
                 "--metadata-out",
                 str(meta),
                 "--eval-fraction",
@@ -376,6 +379,7 @@ def test_cli_trains_with_cross_encoder_backend(tmp_path, monkeypatch):
     assert payload["feature_backend"] == "cross-encoder"
     assert payload["feature_schema"] == ["cross_score", "len_ratio", "abs_len_diff", "len_sum"]
     assert payload["cross_encoder_model_revision"] == "abc123"
+    assert payload["cross_encoder_batch_size"] == 8
 
 
 def test_cli_rejects_bad_columns(tmp_path):

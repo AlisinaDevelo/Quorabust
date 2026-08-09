@@ -26,7 +26,8 @@ unbounded text-derived memory growth.
   for pair scoring, but it is slower than TF-IDF or bi-encoder embeddings because every
   pair must be passed through the transformer jointly. Pass
   `--cross-encoder-model-revision <commit-sha>` when recording a benchmark or promotion
-  candidate; the immutable revision is persisted alongside the model name.
+  candidate; the immutable revision and `--cross-encoder-batch-size` are persisted alongside
+  the model name so latency measurements include the serving control.
 
 ### Leakage-safe hard negatives
 

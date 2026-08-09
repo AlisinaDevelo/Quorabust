@@ -19,6 +19,7 @@ class PairCrossEncoderBuilder:
         model_name: str = "cross-encoder/quora-distilroberta-base",
         *,
         revision: str | None = None,
+        batch_size: int = 32,
     ) -> None:
         if CrossEncoder is None:
             raise RuntimeError(
@@ -27,8 +28,11 @@ class PairCrossEncoderBuilder:
         normalized_revision = revision.strip() if revision is not None else None
         if revision is not None and not normalized_revision:
             raise ValueError("revision must be a non-empty string when provided")
+        if batch_size < 1:
+            raise ValueError("batch_size must be at least 1")
         self.model_name = model_name
         self.model_revision = normalized_revision
+        self.batch_size = batch_size
         model_kwargs = {"revision": normalized_revision} if normalized_revision else {}
         self._model = CrossEncoder(model_name, **model_kwargs)
         self._fitted = True
@@ -57,7 +61,11 @@ class PairCrossEncoderBuilder:
         t1 = [clean_text(x) for x in q1]
         t2 = [clean_text(x) for x in q2]
         scores = np.asarray(
-            self._model.predict(list(zip(t1, t2, strict=True)), show_progress_bar=False),
+            self._model.predict(
+                list(zip(t1, t2, strict=True)),
+                batch_size=self.batch_size,
+                show_progress_bar=False,
+            ),
             dtype=np.float64,
         ).reshape(-1)
 

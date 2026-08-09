@@ -168,6 +168,12 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     p.add_argument(
+        "--cross-encoder-batch-size",
+        type=int,
+        default=32,
+        help="Pair batch size for --feature-backend=cross-encoder",
+    )
+    p.add_argument(
         "--registry-dir",
         type=Path,
         default=None,
@@ -332,6 +338,7 @@ def main(argv: list[str] | None = None) -> int:
         feature_builder = PairCrossEncoderBuilder(
             model_name=args.cross_encoder_model,
             revision=args.cross_encoder_model_revision,
+            batch_size=args.cross_encoder_batch_size,
         )
 
     builder, clf = train_duplicate_classifier(
@@ -377,6 +384,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.feature_backend == "cross-encoder":
         assert feature_builder is not None
         meta["cross_encoder_model"] = args.cross_encoder_model
+        meta["cross_encoder_batch_size"] = args.cross_encoder_batch_size
         if args.cross_encoder_model_revision is not None:
             meta["cross_encoder_model_revision"] = feature_builder.model_revision
     if eval_csv_sha256 is not None:
