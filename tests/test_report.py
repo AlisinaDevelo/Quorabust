@@ -58,11 +58,24 @@ def _artifact(tmp_path):
 def test_render_model_card_includes_metadata_and_persisted_metrics():
     card = render_model_card(
         artifact="/tmp/model.pkl",
-        meta={"feature_backend": "tfidf", "n_train": 20, "eval_log_loss": 0.61},
+        meta={
+            "feature_backend": "tfidf",
+            "n_train": 20,
+            "eval_log_loss": 0.61,
+            "calibration_metrics": {
+                "raw": {"n": 20, "brier_score": 0.2, "expected_calibration_error": 0.1},
+                "calibrated": {
+                    "n": 20,
+                    "brier_score": 0.18,
+                    "expected_calibration_error": 0.05,
+                },
+            },
+        },
     )
     assert "# Quorabust Model Card" in card
     assert "| feature_backend | tfidf |" in card
     assert "| log_loss | 0.6100 |" in card
+    assert "## Calibration Fit Comparison" in card
 
 
 def test_report_excludes_lineage_fields_from_persisted_metrics():
@@ -87,6 +100,10 @@ def test_build_report_payload_is_machine_readable():
             "eval_accuracy": 0.75,
             "csv": "/private/train.csv",
             "training_command": "quorabust-train --csv /private/train.csv",
+            "calibration_metrics": {
+                "raw": {"n": 20, "brier_score": 0.2},
+                "calibrated": {"n": 20, "brier_score": 0.18},
+            },
         },
         holdout_metrics={
             "n": 10,
@@ -146,6 +163,7 @@ def test_build_report_payload_is_machine_readable():
     )
     assert payload["serving_contract"]["output"]["probability_source"] == "raw|calibrated"
     assert payload["threshold_sweep"][0]["f1"] == 0.8
+    assert payload["calibration_comparison"]["calibrated"]["brier_score"] == 0.18
     assert "csv" not in payload["training_metadata"]
     assert "training_command" not in payload["training_metadata"]
 

@@ -79,6 +79,7 @@ _METADATA_KEYS = [
     "calibration_method",
     "calibration_csv_sha256",
     "threshold_csv_sha256",
+    "threshold_reuses_evaluation_role",
     "calibration_git_revision",
 ]
 
@@ -278,6 +279,7 @@ def build_evaluation_manifest(
         "calibration_method",
         "calibration_csv_sha256",
         "threshold_csv_sha256",
+        "threshold_reuses_evaluation_role",
         "calibration_git_revision",
     ]
     training_lineage = {key: meta[key] for key in lineage_keys if key in meta}
@@ -654,6 +656,42 @@ def render_model_card(
                 ]
             )
 
+    calibration_comparison = meta.get("calibration_metrics")
+    if isinstance(calibration_comparison, dict):
+        comparison_rows = []
+        for label in ("raw", "calibrated"):
+            metrics = calibration_comparison.get(label)
+            if isinstance(metrics, dict):
+                comparison_rows.append(
+                    [
+                        label,
+                        metrics.get("n"),
+                        metrics.get("brier_score"),
+                        metrics.get("expected_calibration_error"),
+                        metrics.get("mean_predicted_probability"),
+                        metrics.get("mean_observed_rate"),
+                    ]
+                )
+        if comparison_rows:
+            parts.extend(
+                [
+                    "",
+                    "## Calibration Fit Comparison",
+                    "",
+                    _markdown_table(
+                        [
+                            "probability_source",
+                            "n",
+                            "brier_score",
+                            "expected_calibration_error",
+                            "mean_predicted_probability",
+                            "mean_observed_rate",
+                        ],
+                        comparison_rows,
+                    ),
+                ]
+            )
+
     if evaluation_slices:
         parts.extend(
             [
@@ -840,6 +878,9 @@ def build_report_payload(
         }
         if sweep_metrics:
             payload["threshold_sweep"] = sweep_metrics
+    calibration_comparison = meta.get("calibration_metrics")
+    if isinstance(calibration_comparison, dict):
+        payload["calibration_comparison"] = calibration_comparison
     if evaluation_slices:
         payload["evaluation_slices"] = evaluation_slices
     if evaluation_manifest is not None:
