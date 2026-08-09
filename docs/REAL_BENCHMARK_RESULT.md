@@ -27,7 +27,7 @@ external source copy, then the strict freezer was rerun under the current releas
 
 The source-cleaning manifest records only the original/output hashes, row counts, the
 drop policy, and row fingerprints; raw question text remains outside Git. The protocol,
-all role audits, and the protocol-bound TF-IDF report validator passed.
+all role audits, and the protocol-bound TF-IDF and embedding report validators passed.
 
 ## Corrected Strict v2 Pair Classification
 
