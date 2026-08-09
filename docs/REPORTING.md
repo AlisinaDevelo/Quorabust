@@ -154,6 +154,7 @@ quorabust-train \
   --out models/quorabust.pkl \
   --metadata-out models/quorabust.meta.json \
   --require-question-ids \
+  --require-question-text \
   --eval-fraction 0.1 \
   --thresholds 0.2,0.3,0.4,0.5,0.6,0.7,0.8 \
   --threshold-metric f1 \
@@ -179,8 +180,9 @@ complete question IDs retain the documented shuffled-row fallback.
 single-source workflow. With `--eval-csv`, the supplied evaluation role is never rewritten;
 its SHA-256 is recorded directly so the later report can be tied to the frozen role artifact.
 
-Use `--require-question-ids` for public benchmark runs. It fails before training when
-`qid1` or `qid2` is missing or incomplete, preventing an accidental row-level fallback.
+Use `--require-question-ids --require-question-text` for public benchmark runs. They fail
+before training when IDs or question text are missing or incomplete, preventing an accidental
+row-level fallback or an opaque missing-text sample.
 Leave it off for customer datasets that do not provide IDs, but call out the fallback in
 the evaluation manifest and model card.
 
@@ -222,8 +224,9 @@ quorabust-validate-report \
 ```
 
 `--require-question-component-split` is an opt-in benchmark release policy. It fails closed
-unless the evaluation manifest records `question_component_holdout`, `require_question_ids: true`,
-both `qid1`/`qid2` metadata columns, and those columns in the evaluated CSV. Leave it off for
+unless the evaluation manifest records `question_component_holdout`,
+`require_question_ids: true`, `require_question_text: true`, both `qid1`/`qid2` metadata
+columns, and those columns in the evaluated CSV. Leave it off for
 an explicitly documented exploratory or customer-domain report that accepts the row-level
 fallback. This policy validates protocol metadata; it does not establish model quality.
 

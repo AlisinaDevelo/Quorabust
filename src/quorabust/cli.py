@@ -69,6 +69,17 @@ def _missing_or_incomplete_question_ids(df: pd.DataFrame) -> list[str]:
     ]
 
 
+def _missing_or_incomplete_question_text(df: pd.DataFrame) -> list[str]:
+    """Return question columns that are absent or contain blank values."""
+    return [
+        column
+        for column in ("question1", "question2")
+        if column not in df.columns
+        or df[column].isna().any()
+        or df[column].astype("string").str.strip().eq("").any()
+    ]
+
+
 def _question_ids_are_disjoint(left: pd.DataFrame, right: pd.DataFrame) -> bool:
     """Check that complete question-component IDs do not cross an explicit holdout."""
     if any(_missing_or_incomplete_question_ids(frame) for frame in (left, right)):
@@ -130,6 +141,11 @@ def main(argv: list[str] | None = None) -> int:
         "--require-question-ids",
         action="store_true",
         help="Fail unless qid1 and qid2 are complete; recommended for benchmark runs",
+    )
+    p.add_argument(
+        "--require-question-text",
+        action="store_true",
+        help="Fail unless question1 and question2 are complete and non-blank",
     )
     p.add_argument("--seed", type=int, default=42)
     p.add_argument(
@@ -249,6 +265,15 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
             return 1
+    if args.require_question_text:
+        missing_or_incomplete = _missing_or_incomplete_question_text(df)
+        if missing_or_incomplete:
+            print(
+                "--require-question-text needs complete question1/question2 columns; "
+                f"missing or incomplete: {', '.join(missing_or_incomplete)}",
+                file=sys.stderr,
+            )
+            return 1
 
     eval_csv_sha256: str | None = None
     eval_split_source = "generated_from_source"
@@ -273,6 +298,16 @@ def main(argv: list[str] | None = None) -> int:
                 print(
                     "--require-question-ids needs complete qid1/qid2 columns in --eval-csv; "
                     f"missing or incomplete: {', '.join(eval_missing_ids)}",
+                    file=sys.stderr,
+                )
+                return 1
+        if args.require_question_text:
+            eval_missing_text = _missing_or_incomplete_question_text(eval_df)
+            if eval_missing_text:
+                print(
+                    "--require-question-text needs complete question1/question2 columns "
+                    "in --eval-csv; "
+                    f"missing or incomplete: {', '.join(eval_missing_text)}",
                     file=sys.stderr,
                 )
                 return 1
@@ -365,6 +400,7 @@ def main(argv: list[str] | None = None) -> int:
         else [],
         "max_rows": args.max_rows,
         "require_question_ids": args.require_question_ids,
+        "require_question_text": args.require_question_text,
         "csv": str(args.csv.resolve()),
         "csv_sha256": sha256_file(args.csv),
         "seed": args.seed,

@@ -42,7 +42,14 @@ _REQUIRED_DATASET = {
     "raw_data_policy",
     "audit",
 }
-_REQUIRED_AUDIT = {"reference", "sha256", "status", "source_sha256", "require_question_ids"}
+_REQUIRED_AUDIT = {
+    "reference",
+    "sha256",
+    "status",
+    "source_sha256",
+    "require_question_ids",
+    "require_question_text",
+}
 _REQUIRED_ROLE = {"purpose", "allowed_activities", "artifact"}
 _REQUIRED_ARTIFACT = {"reference", "sha256"}
 _REQUIRED_SPLIT = {
@@ -136,6 +143,8 @@ def _validate_dataset(dataset: Any, errors: list[str]) -> None:
         errors.append("dataset.audit.status must be pass")
     if audit.get("require_question_ids") is not True:
         errors.append("dataset.audit.require_question_ids must be true")
+    if audit.get("require_question_text") is not True:
+        errors.append("dataset.audit.require_question_text must be true")
     audit_source_digest = audit.get("source_sha256")
     audit_digest_valid = _validate_sha256(
         audit_source_digest,

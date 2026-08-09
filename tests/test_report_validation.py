@@ -80,6 +80,7 @@ def _payload():
                 "split_strategy": "question_component_holdout",
                 "question_id_columns": ["qid1", "qid2"],
                 "require_question_ids": True,
+                "require_question_text": True,
                 "seed": 42,
                 "eval_fraction": 0.1,
                 "threshold_metric": "f1",
@@ -117,6 +118,7 @@ def _protocol_payload():
                 "status": "pass",
                 "source_sha256": "c" * 64,
                 "require_question_ids": True,
+                "require_question_text": True,
             },
         },
         "roles": {
@@ -265,6 +267,7 @@ def test_validate_report_payload_rejects_row_level_fallback_when_required():
     lineage = payload["evaluation_manifest"]["training_lineage"]
     lineage["split_strategy"] = "shuffled_prefix_holdout"
     lineage["require_question_ids"] = False
+    lineage["require_question_text"] = False
     payload["evaluation_manifest"]["evaluation_dataset"]["columns"] = [
         "question1",
         "question2",
@@ -281,6 +284,7 @@ def test_validate_report_payload_rejects_row_level_fallback_when_required():
         "question_component_holdout"
     ) in errors
     assert "evaluation_manifest.training_lineage.require_question_ids must be true" in errors
+    assert "evaluation_manifest.training_lineage.require_question_text must be true" in errors
     assert (
         "evaluation_manifest.evaluation_dataset.columns is missing: qid1, qid2"
     ) in errors

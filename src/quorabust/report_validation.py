@@ -85,6 +85,10 @@ def _validate_question_component_split(manifest: dict[str, Any], errors: list[st
             errors.append(
                 "evaluation_manifest.training_lineage.require_question_ids must be true"
             )
+        if lineage.get("require_question_text") is not True:
+            errors.append(
+                "evaluation_manifest.training_lineage.require_question_text must be true"
+            )
         question_id_columns = lineage.get("question_id_columns")
         if not isinstance(question_id_columns, list) or not all(
             isinstance(column, str) for column in question_id_columns
@@ -146,6 +150,7 @@ def _validate_protocol_binding(
         return
 
     protocol_roles = protocol_payload["roles"]
+    protocol_audit = protocol_payload["dataset"]["audit"]
     protocol_split = protocol_payload["split"]
     protocol_policy = protocol_payload["decision_policy"]
     protocol_final_hash = protocol_roles["final_holdout"]["artifact"]["sha256"]
@@ -212,6 +217,12 @@ def _validate_protocol_binding(
             "evaluation_manifest.training_lineage.question_id_columns must match "
             "protocol.split.question_id_columns"
         )
+    for policy_key in ("require_question_ids", "require_question_text"):
+        if lineage.get(policy_key) != protocol_audit[policy_key]:
+            errors.append(
+                f"evaluation_manifest.training_lineage.{policy_key} must match "
+                f"protocol.dataset.audit.{policy_key}"
+            )
     if lineage.get("seed") != protocol_split["seed"]:
         errors.append("evaluation_manifest.training_lineage.seed must match protocol.split.seed")
     report_eval_fraction = lineage.get("eval_fraction")

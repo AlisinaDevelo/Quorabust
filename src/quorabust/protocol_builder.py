@@ -265,6 +265,11 @@ def _load_audit(path: Path, source_sha256: str) -> dict[str, Any]:
     question_ids = audit.get("question_ids")
     if not isinstance(question_ids, dict) or question_ids.get("present") is not True:
         raise ValueError("audit manifest must record complete question IDs")
+    policy = audit.get("policy")
+    if not isinstance(policy, dict) or policy.get("require_question_ids") is not True:
+        raise ValueError("audit manifest must require complete question IDs")
+    if policy.get("require_question_text") is not True:
+        raise ValueError("audit manifest must require non-empty question text")
     source = audit.get("source")
     audit_source_sha256 = source.get("sha256") if isinstance(source, dict) else None
     if (
@@ -395,6 +400,7 @@ def build_protocol_payload(
                 "status": audit["status"],
                 "source_sha256": source_sha256,
                 "require_question_ids": True,
+                "require_question_text": True,
             },
         },
         "roles": roles,

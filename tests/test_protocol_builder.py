@@ -27,7 +27,15 @@ def _fixture(tmp_path: Path) -> tuple[Path, dict, dict[str, Path]]:
 
     audit_path = tmp_path / "audit.json"
     audit_path.write_text(
-        json.dumps(audit_csv(source_path, require_question_ids=True), sort_keys=True) + "\n",
+        json.dumps(
+            audit_csv(
+                source_path,
+                require_question_ids=True,
+                require_question_text=True,
+            ),
+            sort_keys=True,
+        )
+        + "\n",
         encoding="utf-8",
     )
 
@@ -94,6 +102,7 @@ def test_build_protocol_payload_hashes_audited_artifacts(tmp_path):
     assert validate_protocol_payload(payload) == []
     assert payload["dataset"]["sha256"] == sha256_file(paths["source"])
     assert payload["dataset"]["audit"]["sha256"] == sha256_file(paths["audit"])
+    assert payload["dataset"]["audit"]["require_question_text"] is True
     assert payload["roles"]["train"]["artifact"]["sha256"] == sha256_file(paths["train"])
     assert payload["split"]["manifest"]["sha256"] == sha256_file(paths["split"])
     assert len(payload["provenance"]["git_revision"]) == 40

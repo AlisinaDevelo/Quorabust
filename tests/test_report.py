@@ -186,6 +186,7 @@ def test_build_evaluation_manifest_captures_reproducibility_context(tmp_path):
             "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
             "embedding_model_revision": "embedding-commit",
             "question_id_columns": ["qid1", "qid2"],
+            "require_question_text": True,
             "n_train": 100,
             "seed": 42,
             "split_strategy": "shuffled_prefix_holdout",
@@ -214,6 +215,7 @@ def test_build_evaluation_manifest_captures_reproducibility_context(tmp_path):
     assert manifest["training_lineage"]["git_revision"] == "train-commit"
     assert manifest["training_lineage"]["embedding_model_revision"] == "embedding-commit"
     assert manifest["training_lineage"]["question_id_columns"] == ["qid1", "qid2"]
+    assert manifest["training_lineage"]["require_question_text"] is True
     assert manifest["command"] == "quorabust-report --eval-csv holdout.csv"
     assert manifest["runtime"]["report_git_revision"]
     assert manifest["generated_at_utc"].endswith("Z")

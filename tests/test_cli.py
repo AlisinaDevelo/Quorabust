@@ -218,6 +218,7 @@ def test_cli_uses_question_component_holdout_when_ids_are_available(tmp_path):
                 "--metadata-out",
                 str(meta),
                 "--require-question-ids",
+                "--require-question-text",
             ]
         )
         == 0
@@ -226,6 +227,7 @@ def test_cli_uses_question_component_holdout_when_ids_are_available(tmp_path):
     payload = json.loads(meta.read_text(encoding="utf-8"))
     assert payload["split_strategy"] == "question_component_holdout"
     assert payload["require_question_ids"] is True
+    assert payload["require_question_text"] is True
     assert payload["n_eval"] > 0
 
 
@@ -263,6 +265,7 @@ def test_cli_accepts_explicit_disjoint_evaluation_csv(tmp_path):
                 "--metadata-out",
                 str(meta),
                 "--require-question-ids",
+                "--require-question-text",
             ]
         )
         == 0
@@ -324,6 +327,28 @@ def test_cli_can_require_question_ids_for_benchmark_runs(tmp_path):
         )
         == 1
     )
+
+
+def test_cli_can_require_question_text_for_benchmark_runs(tmp_path, capsys):
+    csv = tmp_path / "train.csv"
+    _write_synthetic_csv(csv)
+    frame = pd.read_csv(csv)
+    frame.loc[0, "question2"] = " "
+    frame.to_csv(csv, index=False)
+
+    assert (
+        main(
+            [
+                "--csv",
+                str(csv),
+                "--out",
+                str(tmp_path / "model.pkl"),
+                "--require-question-text",
+            ]
+        )
+        == 1
+    )
+    assert "--require-question-text" in capsys.readouterr().err
 
 
 def test_cli_rejects_bad_threshold_grid(tmp_path):

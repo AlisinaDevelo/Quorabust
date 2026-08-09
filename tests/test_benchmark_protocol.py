@@ -32,6 +32,7 @@ def _payload() -> dict:
                 "status": "pass",
                 "source_sha256": source_sha256,
                 "require_question_ids": True,
+                "require_question_text": True,
             },
         },
         "roles": {

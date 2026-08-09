@@ -91,7 +91,8 @@ For a permitted Quora release, keep the licensed source outside Git:
    freezer fails closed for missing or incomplete IDs, missing or blank question text,
    invalid labels, insufficient
    components, invalid fractions, and output collisions.
-3. Train only on the `train.csv` role and pass `tuning.csv` as `quorabust-train --eval-csv`.
+3. Train only on the `train.csv` role and pass `tuning.csv` as
+   `quorabust-train --eval-csv --require-question-ids --require-question-text`.
    The command verifies component disjointness and records the train and tuning hashes.
    Never train on the full source after roles have been frozen.
 4. Record the calibration method and threshold candidates, then point each decision to
