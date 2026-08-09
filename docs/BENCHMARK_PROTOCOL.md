@@ -90,7 +90,10 @@ For a permitted Quora release, keep the licensed source outside Git:
    freezer fails closed for missing or incomplete IDs, invalid labels, insufficient
    components, invalid fractions, and output collisions.
 3. Record the calibration method and threshold candidates, then point each decision to
-   its owning role. Never tune or calibrate against the final holdout.
+   its owning role. If the threshold metric is `expected_cost`, also record positive
+   `false_positive_cost` and `false_negative_cost` values in `decision_policy`; the
+   report validator binds the artifact's persisted cost matrix to those values. Never
+   tune or calibrate against the final holdout.
 4. Hash the dependency lock and record the exact training/report commands and commit.
 5. Validate the completed manifest before generating a comparative model card.
 
@@ -112,5 +115,6 @@ quorabust-validate-report \
 Protocol-bound validation automatically requires holdout metrics, calibration diagnostics,
 the reproducibility manifest, and qid-component evidence. It also checks that the report's
 training source and final evaluation CSV hashes, split seed and fraction, threshold metric
-and candidate grid match the protocol. The report-only validator remains available for
+and candidate grid match the protocol. For `expected_cost`, it also checks both cost
+values. The report-only validator remains available for
 exploratory or customer-domain runs with an explicitly documented fallback policy.

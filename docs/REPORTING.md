@@ -245,7 +245,10 @@ artifacts use the same holdout CSV, threshold, and metric code.
 
 When `quorabust-train` has a holdout split, it stores a selected `decision_threshold` in
 artifact metadata. The threshold is chosen from `--thresholds` by maximizing
-`--threshold-metric` (default `f1`). Serving uses that artifact threshold unless the
+`--threshold-metric` (default `f1`). The supported metrics include `expected_cost`, which
+minimizes weighted false-positive and false-negative counts per holdout row. Supply both
+`--false-positive-cost` and `--false-negative-cost`; these are relative policy units and
+are persisted with the selected threshold. Serving uses that artifact threshold unless the
 request overrides it with `?threshold=...`.
 
 ## Separate calibration and threshold selection
@@ -264,6 +267,9 @@ quorabust-calibrate \
   --out models/quorabust-calibrated.pkl \
   --metadata-out models/quorabust-calibrated.meta.json
 ```
+
+To make the action policy cost-sensitive, replace `f1` and add
+`--threshold-metric expected_cost --false-positive-cost 10 --false-negative-cost 1`.
 
 Use `--calibration-method isotonic` when the calibration sample is large enough to support
 its more flexible mapping. The command rejects reuse of the source training/evaluation CSV,

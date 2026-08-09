@@ -18,7 +18,9 @@ Training writes `csv_sha256`, `git_revision`, `quorabust_version`, `feature_sche
 `reference_feature_means` (for drift checks), holdout-selected `decision_threshold`
 when an eval split exists, and metric fields into the pickle `meta` dict. A calibrated
 artifact additionally records its calibration method, calibration and threshold-data
-hashes, base-artifact hash, calibration diagnostics, and threshold-selection policy. Treat `.pkl`
+hashes, base-artifact hash, calibration diagnostics, and threshold-selection policy. A
+cost-sensitive policy (`expected_cost`) also persists its false-positive/false-negative
+cost matrix and selected weighted-error metrics in the sidecar and registry. Treat `.pkl`
 files as **trusted** (pickle); load only from controlled storage.
 
 When source data includes complete `qid1`/`qid2` columns, the default holdout is split by

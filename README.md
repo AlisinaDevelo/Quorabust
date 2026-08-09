@@ -103,7 +103,14 @@ quorabust-train --csv data/raw/train.csv --out models/quorabust.pkl
 python -m quorabust --csv data/raw/train.csv --out models/quorabust.pkl   # equivalent
 ```
 
-Options: `--max-rows N`, `--eval-fraction 0.1` (default), `--eval-fraction 0` to train on all rows without a holdout, `--eval-out` to export the exact holdout used by training, `--require-question-ids` to fail if leakage-safe IDs are absent, `--seed`, `--feature-backend {tfidf,embedding,cross-encoder}`, `--embedding-model …`, `--cross-encoder-model …`, `--thresholds`, `--threshold-metric {accuracy,precision,recall,f1}` for holdout-based decision-threshold selection, `--registry-dir` (JSONL registry), `--metadata-out` (JSON sidecar for reviewing artifact lineage without loading the pickle).
+Options: `--max-rows N`, `--eval-fraction 0.1` (default), `--eval-fraction 0` to train on all rows without a holdout, `--eval-out` to export the exact holdout used by training, `--require-question-ids` to fail if leakage-safe IDs are absent, `--seed`, `--feature-backend {tfidf,embedding,cross-encoder}`, `--embedding-model …`, `--cross-encoder-model …`, `--thresholds`, `--threshold-metric {accuracy,precision,recall,f1,expected_cost}` for holdout-based decision-threshold selection, `--registry-dir` (JSONL registry), `--metadata-out` (JSON sidecar for reviewing artifact lineage without loading the pickle).
+
+For workflows where false positives and false negatives have different operational impact,
+use `--threshold-metric expected_cost` with both `--false-positive-cost` and
+`--false-negative-cost`. The selected threshold minimizes the normalized weighted error
+cost on the tuning holdout; the costs are relative policy units, not a claim about currency
+or production impact. The cost matrix and selected cost metrics are persisted in artifact
+metadata and the registry.
 
 To generate lexical hard negatives for training or tuning experiments, use only the
 permitted training/tuning material and keep the calibration and final holdout files out:
@@ -146,6 +153,11 @@ quorabust-calibrate \
 
 The command stores calibration and threshold-data hashes, calibration diagnostics, and the
 selected calibrated decision threshold. Keep a final untouched holdout for the model card.
+
+For a cost-sensitive action policy, add
+`--threshold-metric expected_cost --false-positive-cost 10 --false-negative-cost 1`. Keep the cost values in the protocol
+manifest as `false_positive_cost` and `false_negative_cost` so report validation can verify
+that the evaluated artifact used the declared policy.
 
 For a catalog lookup, the lexical first stage is available without the optional NLP extra:
 
