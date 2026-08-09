@@ -3,7 +3,6 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 
 from quorabust.preprocess import clean_text, tokenize
 
@@ -67,20 +66,49 @@ class PairFeatureBuilder:
             raise RuntimeError("Call fit() or fit_from_frame() first.")
         if len(q1) != len(q2):
             raise ValueError("q1 and q2 must have the same length.")
-        rows = []
-        for a, b in zip(q1, q2, strict=True):
-            ca, cb = clean_text(a), clean_text(b)
-            va = self._vec.transform([ca])
-            vb = self._vec.transform([cb])
-            cos = float(cosine_similarity(va, vb)[0, 0])
-            jac = word_jaccard(ca, cb)
-            la, lb = len(ca.split()), len(cb.split())
-            max_len = max(la, lb, 1)
-            min_len = min(la, lb)
-            len_ratio = min_len / max_len
-            abs_diff = abs(la - lb)
-            rows.append([cos, jac, len_ratio, float(abs_diff), float(la + lb)])
-        return np.asarray(rows, dtype=np.float64)
+        if not q1:
+            return np.empty((0, len(self.feature_names())), dtype=np.float64)
+
+        cleaned_q1 = [clean_text(value) for value in q1]
+        cleaned_q2 = [clean_text(value) for value in q2]
+        vectors_q1 = self._vec.transform(cleaned_q1)
+        vectors_q2 = self._vec.transform(cleaned_q2)
+        numerators = np.asarray(vectors_q1.multiply(vectors_q2).sum(axis=1)).ravel()
+        norms_q1 = np.sqrt(np.asarray(vectors_q1.multiply(vectors_q1).sum(axis=1)).ravel())
+        norms_q2 = np.sqrt(np.asarray(vectors_q2.multiply(vectors_q2).sum(axis=1)).ravel())
+        denominators = norms_q1 * norms_q2
+        cosines = np.divide(
+            numerators,
+            denominators,
+            out=np.zeros_like(numerators, dtype=np.float64),
+            where=denominators != 0,
+        )
+        jaccards = np.fromiter(
+            (word_jaccard(left, right) for left, right in zip(cleaned_q1, cleaned_q2)),
+            dtype=np.float64,
+            count=len(cleaned_q1),
+        )
+        lengths_q1 = np.fromiter(
+            (len(value.split()) for value in cleaned_q1),
+            dtype=np.int64,
+            count=len(cleaned_q1),
+        )
+        lengths_q2 = np.fromiter(
+            (len(value.split()) for value in cleaned_q2),
+            dtype=np.int64,
+            count=len(cleaned_q2),
+        )
+        max_lengths = np.maximum(np.maximum(lengths_q1, lengths_q2), 1)
+        min_lengths = np.minimum(lengths_q1, lengths_q2)
+        return np.column_stack(
+            (
+                cosines,
+                jaccards,
+                min_lengths / max_lengths,
+                np.abs(lengths_q1 - lengths_q2),
+                lengths_q1 + lengths_q2,
+            )
+        ).astype(np.float64, copy=False)
 
     def transform_frame(
         self,

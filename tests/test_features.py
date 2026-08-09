@@ -1,8 +1,10 @@
 import numpy as np
 import pandas as pd
 import pytest
+from sklearn.metrics.pairwise import cosine_similarity
 
 from quorabust.features import PairFeatureBuilder, word_jaccard
+from quorabust.preprocess import clean_text
 
 
 def test_word_jaccard_identical():
@@ -41,6 +43,27 @@ def test_fit_from_frame():
     X = b.transform_frame(df)
     assert isinstance(X, np.ndarray)
     assert X.shape[0] == 2
+
+
+def test_vectorized_transform_matches_scalar_cosine_reference():
+    pairs = [
+        ("How do I learn Python?", "What is the best way to learn Python?"),
+        ("Where is the train station?", "Explain gradient descent."),
+    ]
+    builder = PairFeatureBuilder(max_features=256).fit(
+        [question for pair in pairs for question in pair]
+    )
+    actual = builder.transform_pairs(
+        [left for left, _right in pairs],
+        [right for _left, right in pairs],
+    )
+    expected_cosines = []
+    for left, right in pairs:
+        left_vector = builder._vec.transform([clean_text(left)])
+        right_vector = builder._vec.transform([clean_text(right)])
+        expected_cosines.append(float(cosine_similarity(left_vector, right_vector)[0, 0]))
+
+    np.testing.assert_allclose(actual[:, 0], expected_cosines)
 
 
 def test_transform_before_fit_raises():
