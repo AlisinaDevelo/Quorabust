@@ -265,6 +265,7 @@ quorabust-calibrate \
   --calibration-method sigmoid \
   --thresholds 0.2,0.3,0.4,0.5,0.6,0.7,0.8 \
   --threshold-metric f1 \
+  --allow-evaluation-threshold \
   --out models/quorabust-calibrated.qmodel \
   --metadata-out models/quorabust-calibrated.meta.json
 ```
@@ -275,9 +276,12 @@ To make the action policy cost-sensitive, replace `f1` and add
 Use `--calibration-method isotonic` when the calibration sample is large enough to support
 its more flexible mapping. The command rejects reuse of the source training/evaluation CSV,
 identical calibration and threshold files, and overlapping question IDs when both inputs
-provide complete `qid1`/`qid2` columns. It records both data hashes, the base artifact
-hash, raw and calibrated reliability diagnostics, and the threshold policy. Evaluate the
-result once on a final holdout that was not used by either step.
+provide complete `qid1`/`qid2` columns. In the frozen four-role workflow, pass
+`--allow-evaluation-threshold` only when the input artifact was trained with an explicit
+`--eval-csv`; this makes the tuning role's reuse for post-calibration threshold selection
+visible and auditable. It records both data hashes, the base artifact hash, raw and calibrated
+reliability diagnostics, and the threshold policy. Evaluate the result once on a final holdout
+that was not used by either step.
 
 ## Sample model card
 
