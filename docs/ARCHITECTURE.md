@@ -12,7 +12,7 @@ flowchart LR
   subgraph offline["Offline · training"]
     raw[("raw CSV<br/>question pairs")]
     train["quorabust-train (CLI)"]
-    artifact[("model artifact .pkl<br/>builder + clf + meta")]
+    artifact[("model artifact .pkl or .qmodel<br/>builder + clf + meta")]
     registry[("model registry<br/>models.jsonl")]
     report["quorabust-report (CLI)"]
     card["model card<br/>.md / .json"]
@@ -59,10 +59,10 @@ sequenceDiagram
 
   Dev->>Train: --csv pairs.csv --out model.pkl
   Train->>Train: clean_text → features → XGBoost
-  Train->>FS: write model.pkl (+ meta sidecar)
+  Train->>FS: write model.pkl or model.qmodel (+ meta sidecar)
   Train->>FS: append models.jsonl record
   Note over API,FS: serving loads one artifact at startup
-  API->>FS: load model.pkl
+  API->>FS: load trusted .pkl or structured .qmodel
   Client->>API: POST /predict {question1[], question2[]}
   API->>API: build features, score pairs
   API-->>Client: raw/calibrated/effective probabilities + decisions

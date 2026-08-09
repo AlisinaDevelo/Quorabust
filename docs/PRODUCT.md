@@ -103,14 +103,14 @@ What is already in-repo:
 - Safe `/models` metadata endpoint.
 - `X-Request-ID` propagation and privacy-safe structured HTTP request events.
 - Stable JSON error envelopes with machine-readable codes and request correlation.
-- Optional SHA-256 artifact pinning before pickle loading, with digests in sidecars and
-  the lightweight registry.
+- Optional SHA-256 artifact pinning before pickle or safe-bundle loading, with digests in
+  sidecars and the lightweight registry.
 
 What should be added before a serious production deployment:
 
 - Real domain-specific benchmark and model card.
 - Domain-specific calibration validation and policy review on a real holdout.
-- Non-pickle artifact format for untrusted distribution.
+- Safe non-pickle coverage for the optional embedding and cross-encoder backends.
 - Authentication and rate limiting at the gateway.
 - Key rotation, quotas, and distributed rate limiting at the gateway before broad exposure.
 - A production model registry such as MLflow or an internal equivalent.

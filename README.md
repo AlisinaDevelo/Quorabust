@@ -321,7 +321,7 @@ Design notes: [docs/NOTES.md](docs/NOTES.md). Enterprise positioning:
 
 ## Enterprise / operations
 
-Governance (security policy, Dependabot, audits), containers, serving, and release expectations are summarized in [docs/ENTERPRISE.md](docs/ENTERPRISE.md) and [docs/SCALING.md](docs/SCALING.md). Saved model pickles include `meta` (CSV checksum, git revision, package version, feature means for drift, metrics); only load trusted artifacts. Use `quorabust-train --metadata-out ...` when you only need lineage and metrics.
+Governance (security policy, Dependabot, audits), containers, serving, and release expectations are summarized in [docs/ENTERPRISE.md](docs/ENTERPRISE.md) and [docs/SCALING.md](docs/SCALING.md). Saved model pickles include `meta` (CSV checksum, git revision, package version, feature means for drift, metrics); only load trusted pickles. Use the safe `.qmodel` path for the TF-IDF/XGBoost control model, including calibrated wrappers, and `quorabust-train --metadata-out ...` when you only need lineage and metrics.
 
 ## License
 

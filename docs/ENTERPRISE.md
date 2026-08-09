@@ -70,8 +70,9 @@ pin the exact artifact bytes. Quorabust verifies the digest before loading and f
 on a mismatch. This is an integrity check, not a cryptographic signature; keep the expected
 digest in trusted deployment configuration. For the current TF-IDF/XGBoost control model,
 `quorabust-export-safe` writes a non-pickle `.qmodel` bundle with explicit TF-IDF state and
-the XGBoost native JSON model. The pickle path remains the compatibility path for optional
-builders and calibrated wrappers; see [ARTIFACTS.md](ARTIFACTS.md) for the threat model and
+the XGBoost native JSON model. `quorabust-calibrate --out *.qmodel` adds a validated JSON
+calibration mapping for sigmoid or isotonic artifacts. The pickle path remains the compatibility
+path for optional builders; see [ARTIFACTS.md](ARTIFACTS.md) for the threat model and
 per-backend policy.
 
 ## Serving and SLOs

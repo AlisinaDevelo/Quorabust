@@ -91,6 +91,10 @@ Scores pairs of short natural-language questions and returns the probability tha
 
 `POST /predict` accepts `question1` and `question2` arrays of equal length and returns raw, nullable calibrated, and effective duplicate probabilities, thresholded `is_duplicate`, and explicit probability/threshold source fields. `GET /metrics` exposes Prometheus counters and latency histograms.
 
+For deployment, the TF-IDF/XGBoost control model and its supported calibration wrappers can be
+distributed as a non-pickle `.qmodel` bundle. Pickle artifacts remain trusted-local inputs; see
+[ARTIFACTS.md](ARTIFACTS.md) for the artifact boundary.
+
 ## Caveats
 
 Performance depends on the training data distribution and threshold. Re-run this card on a current holdout set before comparing artifacts.

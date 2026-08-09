@@ -4,7 +4,7 @@ Quorabust has two explicit artifact paths. The distinction is deliberate:
 
 | Format | Supported surface | Trust boundary |
 | --- | --- | --- |
-| `.qmodel` | Fitted `PairFeatureBuilder` plus `XGBClassifier` baseline | Safe structured bundle; digest still required for authenticity |
+| `.qmodel` | Fitted `PairFeatureBuilder` plus `XGBClassifier`, optionally wrapped by `CalibratedClassifier` | Safe structured bundle; digest still required for authenticity |
 | `.pkl` | All current builders, calibration wrappers, and legacy workflows | Trusted code only; loading can execute arbitrary code |
 
 ## Safe baseline export
@@ -18,12 +18,26 @@ quorabust-export-safe \
   --metadata-out models/quorabust.qmodel.meta.json
 ```
 
-The `.qmodel` file is a ZIP bundle containing exactly three members: a manifest, explicit
-TF-IDF vocabulary/IDF state, and the XGBoost native JSON model. Loading it reconstructs the
-known feature builder and XGBoost estimator; it does not invoke Python pickle deserialization.
-The export command is intentionally a trusted conversion step because its source may be a
-pickle. The output preserves threshold and lineage metadata while removing local source-path
-fields.
+An uncalibrated `.qmodel` file is a schema-1 ZIP bundle containing exactly three members: a
+manifest, explicit TF-IDF vocabulary/IDF state, and the XGBoost native JSON model. A calibrated
+`.qmodel` is a schema-2 bundle with one additional `calibrator.json` member containing validated
+JSON parameters for the sigmoid or isotonic mapping. Loading either form reconstructs the known
+feature builder and XGBoost estimator without Python pickle deserialization. The export command
+is intentionally a trusted conversion step because its source may be a pickle. The output
+preserves threshold, calibration, and lineage metadata while removing local source-path fields.
+
+To produce a safe calibrated artifact directly, pass a `.qmodel` output to the calibration CLI:
+
+```bash
+quorabust-calibrate \
+  --model models/quorabust.pkl \
+  --calibration-csv data/roles/calibration.csv \
+  --threshold-csv data/roles/threshold.csv \
+  --out models/quorabust-calibrated.qmodel
+```
+
+The calibration and threshold inputs remain independent role artifacts; the safe bundle does not
+make a quality claim and does not replace the frozen real-data evaluation protocol.
 
 The safe path is served by the existing `load_classifier` and `/models` contracts. The model
 identity includes `artifact_format`, and the existing `QUORABUST_MODEL_SHA256` pin applies to
@@ -37,8 +51,9 @@ and API readiness/model identity between the source baseline and the safe bundle
   use a signed registry or provenance system for authenticity.
 - **Registry and promotion:** inspect the sidecar, model format, source hash, code revision,
   and benchmark evidence before promotion. Never promote a `.pkl` from an untrusted registry.
-- **Startup:** `.qmodel` uses structured JSON/ZIP parsing and native XGBoost JSON loading;
-  `.pkl` remains restricted to controlled storage and pinned deployment images.
+- **Startup:** `.qmodel` uses structured JSON/ZIP parsing, native XGBoost JSON loading, and a
+  validated JSON calibration mapping; `.pkl` remains restricted to controlled storage and pinned
+  deployment images.
 - **Rollback:** retain the complete artifact digest and metadata sidecar for both formats so a
   rollback names immutable bytes rather than a mutable path.
 - **Resource exhaustion:** safe structured data is not automatically harmless. Apply file-size,
@@ -46,12 +61,13 @@ and API readiness/model identity between the source baseline and the safe bundle
 
 ## Format decision
 
-The current safe implementation targets the production control model first. `skops.io` is a
-reasonable candidate for Python object persistence because it requires explicit trust decisions,
-but the custom builder and optional transformer backends still need a compatibility matrix.
-ONNX remains a future serving target: it can remove the Python runtime, but the custom pair
-feature builder needs a converter and parity test before it can replace this path. Until then,
-the policy is per-backend and explicit rather than pretending one format supports every model.
+The current safe implementation targets the TF-IDF/XGBoost control model, including its supported
+calibration wrappers. `skops.io` is a reasonable candidate for Python object persistence because
+it requires explicit trust decisions, but the custom builder and optional transformer backends
+still need a compatibility matrix. ONNX remains a future serving target: it can remove the
+Python runtime, but the custom pair feature builder needs a converter and parity test before it
+can replace this path. Until then, the policy is per-backend and explicit rather than pretending
+one format supports every model.
 
 References: [scikit-learn model persistence](https://scikit-learn.org/stable/model_persistence.html),
 [XGBoost model IO](https://xgboost.readthedocs.io/en/stable/tutorials/saving_model.html), and
