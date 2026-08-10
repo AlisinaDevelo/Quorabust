@@ -252,6 +252,8 @@ jobs:
         run: quorabust-retrieve-profile --help
       - name: Pair classifier profile CLI
         run: quorabust-pair-profile --help
+      - name: Pair classifier profile validator CLI
+        run: quorabust-validate-pair-profile --help
       - name: Retrieval validator CLI
         run: quorabust-validate-retrieval --help
       - name: Hard-negative mining CLI
@@ -433,3 +435,13 @@ jobs:
           assert report["warm_benchmark"]["labels"]["present"] is True
           assert report["warm_benchmark"]["pair_length_strata"]
           PY
+          quorabust-validate-pair-profile \
+            --report /tmp/quorabust-pair-profile.json \
+            --max-cold-start-p95-ms 30000 \
+            --max-warm-batch-p95-ms 30000 \
+            --max-warm-per-pair-p95-ms 30000 \
+            --max-peak-rss-bytes 8589934592 \
+            --max-total-artifact-bytes 10485760 \
+            --min-quality-f1 0 \
+            --min-quality-roc-auc 0 \
+            --min-throughput-pairs-per-second 0

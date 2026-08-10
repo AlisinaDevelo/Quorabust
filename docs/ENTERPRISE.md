@@ -153,6 +153,10 @@ reports as release evidence to review alongside the model card; they do not defi
   artifact-size policies. Cold-start and artifact-size budgets require profile evidence; the
   validator does not choose deployment limits or convert synthetic smoke data into a capacity
   claim.
+- **`quorabust-validate-pair-profile`** applies caller-owned cold-start, warm batch/per-pair,
+  peak-RSS, artifact-size, throughput, and optional quality policies to pair-classifier profiles.
+  A quality threshold requires labeled metrics in the same report, so a cost-only profile cannot
+  accidentally pass as a quality-and-cost promotion decision.
 - Put TLS termination, distributed rate limiting, quotas, and key rotation at the ingress
   or gateway. The application key and batch cap are defense-in-depth controls, not a
   replacement for a multi-worker gateway policy. Ship the JSON request events to the
