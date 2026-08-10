@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, replace
 from typing import Any, Callable, Collection, Protocol, Sequence
 
@@ -302,6 +303,11 @@ class CatalogRetriever(Protocol):
 ScoreBatch = Callable[[list[str], list[str]], Sequence[float]]
 
 
+def _check_deadline(deadline: float | None) -> None:
+    if deadline is not None and time.perf_counter() > deadline:
+        raise TimeoutError("retrieval request exceeded timeout_seconds")
+
+
 def rerank_candidates(
     query: str,
     candidates: Sequence[CatalogHit],
@@ -352,12 +358,17 @@ def search_and_rerank(
     k: int = 10,
     candidate_k: int = 50,
     score_batch: ScoreBatch,
+    deadline: float | None = None,
 ) -> list[CatalogHit]:
     """Retrieve a bounded candidate set, rerank it, and return the top results."""
     if candidate_k < k:
         raise ValueError("candidate_k must be greater than or equal to k")
+    _check_deadline(deadline)
     candidates = retriever.search(query, k=candidate_k)
-    return rerank_candidates(query, candidates, score_batch)[:k]
+    _check_deadline(deadline)
+    reranked = rerank_candidates(query, candidates, score_batch)
+    _check_deadline(deadline)
+    return reranked[:k]
 
 
 def candidate_recall_at_k(

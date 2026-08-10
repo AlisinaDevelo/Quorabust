@@ -1,4 +1,5 @@
 import json
+import time
 
 import pandas as pd
 
@@ -48,6 +49,14 @@ def test_retrieval_cli_writes_json_for_multiple_queries(tmp_path):
     assert payload["retriever"] == "tfidf"
     assert [query["hits"][0]["question_id"] for query in payload["queries"]] == ["q1", "q2"]
     assert "retrieval_score" in payload["queries"][0]["hits"][0]
+    assert payload["policy"] == {
+        "max_queries": 32,
+        "max_k": 100,
+        "max_candidate_k": 100,
+        "max_query_chars": 8192,
+        "timeout_seconds": None,
+        "timeout_behavior": "cooperative_between_queries_and_stages",
+    }
 
 
 def test_retrieval_cli_prints_json_and_rejects_bad_catalog(tmp_path, capsys):
@@ -132,3 +141,113 @@ def test_retrieval_cli_can_use_optional_dense_and_reranker_stages(tmp_path, monk
     assert payload["reranker"] == "fake-cross"
     assert payload["reranker_model_revision"] == "cross-commit"
     assert payload["queries"][0]["hits"][0]["rerank_score"] == 0.9
+
+
+def test_retrieval_cli_enforces_bounded_request_policy(tmp_path, capsys):
+    catalog = tmp_path / "catalog.csv"
+    _write_catalog(catalog)
+
+    assert (
+        main(
+            [
+                "--catalog-csv",
+                str(catalog),
+                "--query",
+                "python",
+                "--query",
+                "tickets",
+                "--max-queries",
+                "1",
+            ]
+        )
+        == 1
+    )
+    assert "query count exceeds" in capsys.readouterr().err
+
+    assert (
+        main(
+            [
+                "--catalog-csv",
+                str(catalog),
+                "--query",
+                "python",
+                "--k",
+                "2",
+                "--max-k",
+                "1",
+            ]
+        )
+        == 1
+    )
+    assert "k exceeds" in capsys.readouterr().err
+
+    assert (
+        main(
+            [
+                "--catalog-csv",
+                str(catalog),
+                "--query",
+                "python",
+                "--candidate-k",
+                "2",
+                "--max-candidate-k",
+                "1",
+            ]
+        )
+        == 1
+    )
+    assert "candidate-k exceeds" in capsys.readouterr().err
+
+    assert (
+        main(
+            [
+                "--catalog-csv",
+                str(catalog),
+                "--query",
+                "python",
+                "--max-query-chars",
+                "3",
+            ]
+        )
+        == 1
+    )
+    assert "query exceeds" in capsys.readouterr().err
+
+    assert (
+        main(
+            [
+                "--catalog-csv",
+                str(catalog),
+                "--query",
+                "   ",
+            ]
+        )
+        == 1
+    )
+    assert "query must not be empty" in capsys.readouterr().err
+
+
+def test_retrieval_cli_enforces_cooperative_timeout(tmp_path, monkeypatch, capsys):
+    catalog = tmp_path / "catalog.csv"
+    _write_catalog(catalog)
+
+    def slow_search(self, _query, *, k=10):
+        time.sleep(0.02)
+        return []
+
+    monkeypatch.setattr(retrieval_cli.TfidfCatalogRetriever, "search", slow_search)
+
+    assert (
+        main(
+            [
+                "--catalog-csv",
+                str(catalog),
+                "--query",
+                "python",
+                "--timeout-seconds",
+                "0.001",
+            ]
+        )
+        == 1
+    )
+    assert "timeout" in capsys.readouterr().err

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +27,21 @@ def _positive_int(value: str) -> int:
     if parsed < 1:
         raise argparse.ArgumentTypeError("must be at least 1")
     return parsed
+
+
+def _positive_float(value: str) -> float:
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("must be a number") from exc
+    if not math.isfinite(parsed) or parsed <= 0.0:
+        raise argparse.ArgumentTypeError("must be a finite number greater than 0")
+    return parsed
+
+
+def _check_deadline(deadline: float | None) -> None:
+    if deadline is not None and time.perf_counter() > deadline:
+        raise TimeoutError("retrieval request exceeded timeout_seconds")
 
 
 def _write_payload(payload: dict[str, Any], out: Path | None) -> None:
@@ -53,6 +70,36 @@ def main(argv: list[str] | None = None) -> int:
         type=_positive_int,
         default=50,
         help="Bound the first-stage candidates passed to an optional reranker",
+    )
+    parser.add_argument(
+        "--max-queries",
+        type=_positive_int,
+        default=32,
+        help="Maximum number of queries accepted in one request",
+    )
+    parser.add_argument(
+        "--max-k",
+        type=_positive_int,
+        default=100,
+        help="Maximum number of returned hits per query",
+    )
+    parser.add_argument(
+        "--max-candidate-k",
+        type=_positive_int,
+        default=100,
+        help="Maximum first-stage candidate set per query",
+    )
+    parser.add_argument(
+        "--max-query-chars",
+        type=_positive_int,
+        default=8192,
+        help="Maximum normalized query length in characters",
+    )
+    parser.add_argument(
+        "--timeout-seconds",
+        type=_positive_float,
+        default=None,
+        help="Cooperative query execution timeout after model setup",
     )
     parser.add_argument(
         "--retriever",
@@ -94,6 +141,35 @@ def main(argv: list[str] | None = None) -> int:
     if not args.catalog_csv.is_file():
         print(f"File not found: {args.catalog_csv}", file=sys.stderr)
         return 1
+    if len(args.query) > args.max_queries:
+        print(
+            f"query count exceeds max-queries ({args.max_queries})",
+            file=sys.stderr,
+        )
+        return 1
+    if args.k > args.max_k:
+        print(f"k exceeds max-k ({args.max_k})", file=sys.stderr)
+        return 1
+    effective_candidate_k = max(args.k, args.candidate_k)
+    if effective_candidate_k > args.max_candidate_k:
+        print(
+            f"candidate-k exceeds max-candidate-k ({args.max_candidate_k})",
+            file=sys.stderr,
+        )
+        return 1
+    queries_to_run: list[str] = []
+    for query in args.query:
+        normalized_query = query.strip()
+        if not normalized_query:
+            print("query must not be empty", file=sys.stderr)
+            return 1
+        if len(normalized_query) > args.max_query_chars:
+            print(
+                f"query exceeds max-query-chars ({args.max_query_chars})",
+                file=sys.stderr,
+            )
+            return 1
+        queries_to_run.append(normalized_query)
     try:
         frame = pd.read_csv(args.catalog_csv)
         retriever: CatalogRetriever
@@ -120,28 +196,36 @@ def main(argv: list[str] | None = None) -> int:
             if args.reranker_model
             else None
         )
-        queries = [
-            {
-                "query": query,
-                "k": args.k,
-                "hits": [
-                    hit.as_dict()
-                    for hit in (
-                        search_and_rerank(
-                            retriever,
-                            query,
-                            k=args.k,
-                            candidate_k=max(args.k, args.candidate_k),
-                            score_batch=reranker.score_batch,
-                        )
-                        if reranker is not None
-                        else retriever.search(query, k=args.k)
-                    )
-                ],
-            }
-            for query in args.query
-        ]
-    except (OSError, KeyError, RuntimeError, ValueError) as exc:
+        deadline = (
+            time.perf_counter() + args.timeout_seconds
+            if args.timeout_seconds is not None
+            else None
+        )
+        queries = []
+        for query in queries_to_run:
+            _check_deadline(deadline)
+            hits = (
+                search_and_rerank(
+                    retriever,
+                    query,
+                    k=args.k,
+                    candidate_k=effective_candidate_k,
+                    score_batch=reranker.score_batch,
+                    deadline=deadline,
+                )
+                if reranker is not None
+                else retriever.search(query, k=args.k)
+            )
+            _check_deadline(deadline)
+            queries.append(
+                {
+                    "query": query,
+                    "k": args.k,
+                    "candidate_k": effective_candidate_k,
+                    "hits": [hit.as_dict() for hit in hits],
+                }
+            )
+    except (OSError, KeyError, RuntimeError, TimeoutError, ValueError) as exc:
         print(f"Unable to retrieve from catalog: {exc}", file=sys.stderr)
         return 1
 
@@ -159,6 +243,14 @@ def main(argv: list[str] | None = None) -> int:
             "reranker_model_revision": (
                 getattr(reranker, "model_revision", None) if reranker is not None else None
             ),
+            "policy": {
+                "max_queries": args.max_queries,
+                "max_k": args.max_k,
+                "max_candidate_k": args.max_candidate_k,
+                "max_query_chars": args.max_query_chars,
+                "timeout_seconds": args.timeout_seconds,
+                "timeout_behavior": "cooperative_between_queries_and_stages",
+            },
             "queries": queries,
         },
         args.out,
