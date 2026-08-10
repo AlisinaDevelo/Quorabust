@@ -215,8 +215,9 @@ smoke fixtures, not real quality evidence; use a permitted frozen dataset before
 model claims.
 
 For process-level rollout sizing, `quorabust-retrieve-profile` repeats the benchmark in fresh
-subprocesses and records process-to-report startup time, warm metrics, input sizes, and optional
-local artifact hashes. It is an operational profile, not model-quality evidence.
+subprocesses and records process-to-report startup time, warm metrics, input sizes, optional local
+artifact hashes, and optional model cache manifests from repeated `--model-cache` flags. It is an
+operational profile, not model-quality evidence.
 
 For pair-classifier rollout sizing, profile a saved artifact against a labeled or unlabeled pair
 CSV:
@@ -236,7 +237,10 @@ quorabust-pair-profile \
 The path-light report binds the artifact, evaluation input, optional dependency lock, model
 metadata, repository revision, batch policy, and runtime environment. It separates fresh-process
 cold-start p50/p95/p99 from serial warm batch and per-pair latency, throughput, peak RSS, artifact
-size, and short/medium/long pair-length strata. When `is_duplicate` is present, it also records
+size, and short/medium/long pair-length strata. Retrieval profiles can also record one or more
+model files or cache directories with repeatable `--model-cache`; each manifest contains a
+deterministic hash, total bytes, kind, and file count without publishing the local path. When
+`is_duplicate` is present, it also records
 label counts and optional quality metrics using the artifact threshold, an explicit `--threshold`,
 or `0.5`. Use this beside `quorabust-report`, not as a replacement for a permitted holdout model
 card; smoke measurements do not establish a production SLO or a universal model-quality claim.
@@ -251,10 +255,11 @@ Use `quorabust-validate-retrieval` in release jobs to validate report provenance
 counts, latency summaries, and query-length strata, then apply caller-owned policies such as
 `--min-final-recall-at-k 10=0.95`, `--max-end-to-end-p95-ms 100`,
 `--max-cold-start-p95-ms`, `--max-peak-rss-bytes`, and
-`--max-total-artifact-bytes`. Cold-start and artifact-size policies require a profile, and the
-artifact-size policy requires at least one profiled `--artifact`. The gate compares supplied
-evidence; it does not turn the smoke fixture into a public quality claim or define universal
-quality, latency, memory, or packaging targets.
+`--max-total-artifact-bytes`, or `--max-total-model-cache-bytes`. Cold-start, artifact-size, and
+model-cache-size policies require a profile; artifact-size requires at least one profiled
+`--artifact`, and model-cache-size requires at least one profiled `--model-cache`. The gate
+compares supplied evidence; it does not turn the smoke fixture into a public quality claim or
+define universal quality, latency, memory, or packaging targets.
 
 ### Generate a model card
 

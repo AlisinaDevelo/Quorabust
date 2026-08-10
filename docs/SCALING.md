@@ -161,7 +161,8 @@ quorabust-validate-retrieval \
   --report reports/retrieval-profile.json \
   --max-cold-start-p95-ms 5000 \
   --max-peak-rss-bytes 2147483648 \
-  --max-total-artifact-bytes 1073741824
+  --max-total-artifact-bytes 1073741824 \
+  --max-total-model-cache-bytes 2147483648
 ```
 
 The validator checks source hashes and byte counts, runtime provenance, repetition and latency
@@ -169,8 +170,9 @@ sample invariants, and the query-length strata contract. The policy values belon
 deployment and must be chosen from representative measurements; the command does not claim
 that any displayed recall, latency, memory, or size threshold is universally correct. Cold-start
 and artifact-size policies require a fresh-process profile; artifact-size enforcement also
-requires at least one repeated `--artifact` input when generating that profile. RSS policy works
-with either report and fails closed where peak RSS is unavailable. The profile is accepted
+requires at least one repeated `--artifact` input when generating that profile. Model-cache-size
+enforcement requires at least one repeated `--model-cache` input. RSS policy works with either
+report and fails closed where peak RSS is unavailable. The profile is accepted
 through its embedded `warm_benchmark` report and still retains its timing-only evidence boundary.
 
 ### Fresh-process profile
@@ -186,15 +188,18 @@ quorabust-retrieve-profile \
   --warmup-runs 1 \
   --repetitions 3 \
   --timeout-seconds 120 \
+  --model-cache ~/.cache/huggingface/hub \
   --out reports/retrieval-profile.json
 ```
 
 Each cold-start measurement runs the benchmark in a fresh subprocess and records
 process-to-report wall time. The report also carries warm benchmark metrics, input source
-hashes and byte sizes, optional local artifact hashes/sizes from repeated `--artifact` flags,
-and a path-light command. This is timing and packaging evidence only; it makes no quality
-claim and does not upload or commit model weights. The child timeout is a bounded process
-supervisor timeout, while the nested benchmark timeout remains a cooperative stage deadline.
+hashes and byte sizes, optional local artifact hashes/sizes from repeated `--artifact` flags, and
+optional model file/cache manifests from repeated `--model-cache` flags. A cache manifest records
+its deterministic tree hash, total bytes, kind, and file count while keeping the local path out of
+the report. This is timing and packaging evidence only; it makes no quality claim and does not
+upload or commit model weights. The child timeout is a bounded process supervisor timeout, while
+the nested benchmark timeout remains a cooperative stage deadline.
 
 ## Online serving, SLOs, monitoring
 

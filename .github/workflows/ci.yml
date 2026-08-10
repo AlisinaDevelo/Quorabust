@@ -404,6 +404,9 @@ jobs:
             --max-end-to-end-p95-ms 1000
       - name: Retrieval process profile smoke
         run: |
+          mkdir -p /tmp/quorabust-model-cache/nested
+          printf 'smoke-cache-a' > /tmp/quorabust-model-cache/model.bin
+          printf 'smoke-cache-b' > /tmp/quorabust-model-cache/nested/weights.bin
           quorabust-retrieve-profile \
             --catalog-csv examples/retrieval_catalog.csv \
             --qrels-csv examples/retrieval_qrels.csv \
@@ -414,6 +417,7 @@ jobs:
             --cold-start-repetitions 2 \
             --timeout-seconds 10 \
             --artifact /tmp/quorabust-smoke.qmodel \
+            --model-cache /tmp/quorabust-model-cache \
             --out /tmp/quorabust-retrieval-profile.json
           python - <<'PY'
           import json
@@ -426,6 +430,9 @@ jobs:
           assert report["cold_start"]["measurement_count"] == 2
           assert report["sources"]["catalog"]["bytes"] > 0
           assert report["artifacts"][0]["bytes"] > 0
+          assert report["model_caches"][0]["kind"] == "directory"
+          assert report["model_caches"][0]["file_count"] == 2
+          assert report["model_caches"][0]["bytes"] == 26
           assert report["warm_benchmark"]["query_count"] == 4
           assert set(report["warm_benchmark"]["query_length_strata"]) == {"short", "medium"}
           PY
@@ -434,7 +441,8 @@ jobs:
             --max-end-to-end-p95-ms 1000 \
             --max-cold-start-p95-ms 20000 \
             --max-peak-rss-bytes 8589934592 \
-            --max-total-artifact-bytes 10485760
+            --max-total-artifact-bytes 10485760 \
+            --max-total-model-cache-bytes 10485760
       - name: Pair classifier profile smoke
         run: |
           quorabust-pair-profile \
