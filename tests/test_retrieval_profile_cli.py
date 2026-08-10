@@ -32,6 +32,10 @@ def _write_inputs(tmp_path):
 
 def test_profile_cli_reports_fresh_processes_sizes_and_path_light_output(tmp_path):
     catalog, qrels, artifact = _write_inputs(tmp_path)
+    model_cache = tmp_path / "model-cache"
+    (model_cache / "nested").mkdir(parents=True)
+    (model_cache / "model.bin").write_bytes(b"cache-a")
+    (model_cache / "nested" / "weights.bin").write_bytes(b"cache-b")
     output = tmp_path / "profile.json"
 
     assert (
@@ -55,6 +59,8 @@ def test_profile_cli_reports_fresh_processes_sizes_and_path_light_output(tmp_pat
                 "10",
                 "--artifact",
                 str(artifact),
+                "--model-cache",
+                str(model_cache),
                 "--out",
                 str(output),
             ]
@@ -77,6 +83,9 @@ def test_profile_cli_reports_fresh_processes_sizes_and_path_light_output(tmp_pat
     assert payload["sources"]["catalog"]["bytes"] == catalog.stat().st_size
     assert payload["artifacts"][0]["bytes"] == artifact.stat().st_size
     assert payload["artifacts"][0]["name"] == artifact.name
+    assert payload["model_caches"][0]["kind"] == "directory"
+    assert payload["model_caches"][0]["file_count"] == 2
+    assert payload["model_caches"][0]["bytes"] == 14
     assert str(tmp_path) not in output.read_text(encoding="utf-8")
 
 
@@ -92,6 +101,25 @@ def test_profile_cli_rejects_missing_artifact(tmp_path, capsys):
                 str(qrels),
                 "--artifact",
                 str(tmp_path / "missing.bin"),
+            ]
+        )
+        == 1
+    )
+    assert "File not found" in capsys.readouterr().err
+
+
+def test_profile_cli_rejects_missing_model_cache(tmp_path, capsys):
+    catalog, qrels, _ = _write_inputs(tmp_path)
+
+    assert (
+        main(
+            [
+                "--catalog-csv",
+                str(catalog),
+                "--qrels-csv",
+                str(qrels),
+                "--model-cache",
+                str(tmp_path / "missing-cache"),
             ]
         )
         == 1

@@ -13,7 +13,11 @@ from pathlib import Path
 from typing import Any
 
 from quorabust.lineage import git_revision
-from quorabust.retrieval_benchmark import source_manifest, summarize_latencies_ms
+from quorabust.retrieval_benchmark import (
+    model_cache_manifest,
+    source_manifest,
+    summarize_latencies_ms,
+)
 
 
 def _positive_int(value: str) -> int:
@@ -68,7 +72,13 @@ def _write_payload(payload: dict[str, Any], out: Path | None) -> None:
 
 def _path_light_command(argv: list[str] | None) -> str:
     arguments = sys.argv[1:] if argv is None else argv
-    path_flags = {"--catalog-csv", "--qrels-csv", "--artifact", "--out"}
+    path_flags = {
+        "--artifact",
+        "--catalog-csv",
+        "--model-cache",
+        "--out",
+        "--qrels-csv",
+    }
     rendered: list[str] = []
     redact_next = False
     for raw_value in arguments:
@@ -204,6 +214,13 @@ def main(argv: list[str] | None = None) -> int:
         default=[],
         help="Optional local artifact file to hash and size; repeatable",
     )
+    parser.add_argument(
+        "--model-cache",
+        type=Path,
+        action="append",
+        default=[],
+        help="Optional model file or cache directory to hash and size; repeatable",
+    )
     parser.add_argument("--out", type=Path, default=None)
     args = parser.parse_args(argv)
 
@@ -215,6 +232,10 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     for path in [args.catalog_csv, args.qrels_csv, *args.artifact]:
         if not path.is_file():
+            print(f"File not found: {path}", file=sys.stderr)
+            return 1
+    for path in args.model_cache:
+        if not path.exists():
             print(f"File not found: {path}", file=sys.stderr)
             return 1
 
@@ -236,6 +257,12 @@ def main(argv: list[str] | None = None) -> int:
         print("Unable to profile retrieval: no child measurements", file=sys.stderr)
         return 1
 
+    try:
+        model_caches = [model_cache_manifest(str(path)) for path in args.model_cache]
+    except (OSError, ValueError) as exc:
+        print(f"Unable to profile retrieval: {exc}", file=sys.stderr)
+        return 1
+
     payload: dict[str, Any] = {
         "schema_version": 1,
         "benchmark": "quorabust-retrieve-profile",
@@ -245,6 +272,7 @@ def main(argv: list[str] | None = None) -> int:
             "qrels": source_manifest(str(args.qrels_csv)),
         },
         "artifacts": [source_manifest(str(path)) for path in args.artifact],
+        "model_caches": model_caches,
         "configuration": {
             "retriever": args.retriever,
             "embedding_model": args.embedding_model
@@ -263,6 +291,7 @@ def main(argv: list[str] | None = None) -> int:
             "repetitions": args.repetitions,
             "cold_start_repetitions": args.cold_start_repetitions,
             "timeout_seconds": args.timeout_seconds,
+            "model_cache_count": len(args.model_cache),
         },
         "cold_start": {
             "measurement_count": len(elapsed_samples),

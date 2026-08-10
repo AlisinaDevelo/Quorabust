@@ -63,6 +63,15 @@ def _profile_report(payload: dict) -> dict:
                 "bytes": 25,
             }
         ],
+        "model_caches": [
+            {
+                "name": "model-cache",
+                "sha256": "d" * 64,
+                "bytes": 30,
+                "kind": "directory",
+                "file_count": 2,
+            }
+        ],
         "configuration": payload["configuration"],
         "cold_start": {
             "measurement_count": 2,
@@ -97,6 +106,7 @@ def test_validate_retrieval_payload_accepts_benchmark_and_profile(tmp_path):
         max_cold_start_p95_ms=2.0,
         max_peak_rss_bytes=4096,
         max_total_artifact_bytes=25,
+        max_total_model_cache_bytes=30,
     ) == []
 
 
@@ -110,11 +120,13 @@ def test_validate_retrieval_payload_enforces_profile_resource_budgets(tmp_path):
         max_cold_start_p95_ms=1.0,
         max_peak_rss_bytes=4095,
         max_total_artifact_bytes=24,
+        max_total_model_cache_bytes=29,
     )
 
     assert any("cold_start.process_to_report_ms.p95" in error for error in errors)
     assert any("runtime.peak_rss_bytes" in error for error in errors)
     assert any("total artifact bytes" in error for error in errors)
+    assert any("total model cache bytes" in error for error in errors)
 
 
 def test_validate_retrieval_payload_fails_closed_without_profile_evidence(tmp_path):
@@ -145,6 +157,18 @@ def test_validate_retrieval_payload_requires_profile_provenance(tmp_path):
 
     assert "runtime.profile_git_revision must be a non-empty string" in errors
     assert "artifacts.0.sha256 must be a 64-character hex digest" in errors
+
+
+def test_validate_retrieval_payload_rejects_malformed_model_cache_manifest(tmp_path):
+    _, payload = _benchmark_report(tmp_path)
+    profile = _profile_report(payload)
+    profile["model_caches"][0]["kind"] = "archive"
+    del profile["model_caches"][0]["file_count"]
+
+    errors = validate_retrieval_payload(profile)
+
+    assert "model_caches.0.kind must be file or directory" in errors
+    assert "missing model_caches.0 field: file_count" in errors
 
 
 def test_validate_retrieval_payload_requires_core_fields():

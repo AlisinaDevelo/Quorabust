@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import hashlib
 import math
 import platform
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Collection, Mapping, Sequence
 
 import numpy as np
@@ -437,11 +439,55 @@ def benchmark_retrieval(
 
 def source_manifest(path: str) -> dict[str, object]:
     """Return path-light source metadata suitable for a benchmark artifact."""
-    from pathlib import Path
-
     source = Path(path)
     return {
         "name": source.name,
         "sha256": sha256_file(source),
         "bytes": int(source.stat().st_size),
+    }
+
+
+def model_cache_manifest(path: str) -> dict[str, object]:
+    """Return a deterministic path-light manifest for a model file or cache directory."""
+    source = Path(path)
+    if source.is_symlink():
+        raise ValueError(f"model cache must not be a symlink: {source}")
+    if source.is_file():
+        return {
+            **source_manifest(path),
+            "kind": "file",
+            "file_count": 1,
+        }
+    if not source.is_dir():
+        raise ValueError(f"model cache must be a file or directory: {source}")
+
+    digest = hashlib.sha256()
+    total_bytes = 0
+    file_count = 0
+    entries = sorted(
+        source.rglob("*"),
+        key=lambda candidate: candidate.relative_to(source).as_posix(),
+    )
+    for candidate in entries:
+        if candidate.is_symlink():
+            relative = candidate.relative_to(source).as_posix()
+            raise ValueError(f"model cache must not contain symlinks: {relative}")
+        if not candidate.is_file():
+            continue
+        relative = candidate.relative_to(source).as_posix()
+        size = int(candidate.stat().st_size)
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(str(size).encode("ascii"))
+        digest.update(b"\0")
+        digest.update(bytes.fromhex(sha256_file(candidate)))
+        total_bytes += size
+        file_count += 1
+
+    return {
+        "name": source.name or "model-cache",
+        "sha256": digest.hexdigest(),
+        "bytes": total_bytes,
+        "kind": "directory",
+        "file_count": file_count,
     }

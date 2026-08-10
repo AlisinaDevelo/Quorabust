@@ -79,6 +79,22 @@ def _validate_artifact_manifests(artifacts: Any, errors: list[str]) -> None:
         _validate_file_manifest(manifest, f"artifacts.{index}", errors)
 
 
+def _validate_model_cache_manifests(model_caches: Any, errors: list[str]) -> None:
+    if not isinstance(model_caches, list):
+        errors.append("model_caches must be an array")
+        return
+    for index, manifest in enumerate(model_caches):
+        field = f"model_caches.{index}"
+        _validate_file_manifest(manifest, field, errors)
+        for key in _missing_keys(manifest, {"kind", "file_count"}):
+            errors.append(f"missing {field} field: {key}")
+        if not isinstance(manifest, dict):
+            continue
+        if manifest.get("kind") not in {"file", "directory"}:
+            errors.append(f"{field}.kind must be file or directory")
+        _non_negative_integer(manifest.get("file_count"), f"{field}.file_count", errors)
+
+
 def _validate_latency_summary(
     value: Any,
     field: str,
@@ -355,6 +371,8 @@ def _validate_outer_payload(payload: Any, errors: list[str]) -> dict[str, Any] |
         if "artifacts" not in payload:
             errors.append("missing top-level field: artifacts")
         _validate_artifact_manifests(payload.get("artifacts"), errors)
+        if "model_caches" in payload:
+            _validate_model_cache_manifests(payload.get("model_caches"), errors)
         profile_runtime = payload.get("runtime")
         for key in {"python_version", "system", "machine", "profile_git_revision"}:
             if (
@@ -400,6 +418,7 @@ def validate_retrieval_payload(
     max_cold_start_p95_ms: float | None = None,
     max_peak_rss_bytes: int | None = None,
     max_total_artifact_bytes: int | None = None,
+    max_total_model_cache_bytes: int | None = None,
 ) -> list[str]:
     """Return structural and caller-supplied policy errors for a retrieval report."""
     errors: list[str] = []
@@ -491,6 +510,27 @@ def validate_retrieval_payload(
                             f"total artifact bytes={total_bytes} exceeds policy maximum "
                             f"{max_total_artifact_bytes}"
                         )
+    if max_total_model_cache_bytes is not None:
+        if not is_profile:
+            errors.append("model-cache-size policy requires a retrieval profile report")
+        else:
+            model_caches = payload.get("model_caches")
+            if not isinstance(model_caches, list) or not model_caches:
+                errors.append("model-cache-size policy requires at least one model cache")
+            else:
+                model_cache_sizes: list[int] = []
+                for model_cache in model_caches:
+                    size = model_cache.get("bytes") if isinstance(model_cache, dict) else None
+                    if not isinstance(size, int) or isinstance(size, bool) or size < 0:
+                        break
+                    model_cache_sizes.append(size)
+                if len(model_cache_sizes) == len(model_caches):
+                    total_bytes = sum(model_cache_sizes)
+                    if total_bytes > max_total_model_cache_bytes:
+                        errors.append(
+                            f"total model cache bytes={total_bytes} exceeds policy maximum "
+                            f"{max_total_model_cache_bytes}"
+                        )
     return errors
 
 
@@ -565,6 +605,12 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Require total declared profile artifact size to stay at or below VALUE bytes",
     )
+    parser.add_argument(
+        "--max-total-model-cache-bytes",
+        type=_non_negative_int,
+        default=None,
+        help="Require total declared model cache size to stay at or below VALUE bytes",
+    )
     args = parser.parse_args(argv)
 
     if not args.report.is_file():
@@ -583,6 +629,7 @@ def main(argv: list[str] | None = None) -> int:
         max_cold_start_p95_ms=args.max_cold_start_p95_ms,
         max_peak_rss_bytes=args.max_peak_rss_bytes,
         max_total_artifact_bytes=args.max_total_artifact_bytes,
+        max_total_model_cache_bytes=args.max_total_model_cache_bytes,
     )
     if errors:
         for error in errors:
