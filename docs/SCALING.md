@@ -97,6 +97,14 @@ uncalibrated reranker score as `P(duplicate)`. See
 [#15](https://github.com/AlisinaDevelo/Quorabust/issues/15) for the retrieve-and-rerank
 product work.
 
+The retrieval CLI has a bounded request contract: it rejects requests over 32 queries, `k` over
+100, candidate sets over 100, or normalized query text over 8,192 characters unless a stricter
+policy is supplied with `--max-queries`, `--max-k`, `--max-candidate-k`, and
+`--max-query-chars`. `--timeout-seconds` checks a cooperative deadline between queries and
+retrieval/reranking stages; configure a server or process supervisor as the hard timeout because
+native model calls cannot be interrupted by this check. The emitted JSON `policy` object is the
+runtime contract that should be captured with deployment evidence.
+
 ### Retrieval evaluation and cost proxy
 
 Use `quorabust-retrieve-benchmark` with a qrels CSV containing `query`, `question_id`, and

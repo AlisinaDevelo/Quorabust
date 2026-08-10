@@ -187,6 +187,14 @@ extra, `--retriever embedding` adds dense retrieval and `--reranker-model` appli
 cross-encoder only to the bounded candidate set. Those reranker scores are ranking signals,
 not calibrated duplicate probabilities.
 
+The CLI applies an explicit request policy before loading the catalog: at most 32 queries,
+100 returned hits, 100 first-stage candidates, and 8,192 normalized query characters by
+default. Tighten those limits for a deployment with `--max-queries`, `--max-k`,
+`--max-candidate-k`, and `--max-query-chars`; the JSON response records the active policy.
+`--timeout-seconds` adds a cooperative deadline checked between queries and retrieval stages.
+It does not preempt a native model call already in progress, so production deployments should
+also configure a process or server-level hard timeout.
+
 Benchmark a catalog against a qrels-style CSV (`query,question_id,relevance`) with the same
 control or optional NLP stages:
 

@@ -246,6 +246,34 @@ jobs:
         run: quorabust-calibrate --help
       - name: Retrieval CLI
         run: quorabust-retrieve --help
+      - name: Retrieval request policy smoke
+        run: |
+          quorabust-retrieve \
+            --catalog-csv examples/retrieval_catalog.csv \
+            --query "Python" \
+            --k 1 \
+            --candidate-k 1 \
+            --max-queries 1 \
+            --max-k 1 \
+            --max-candidate-k 1 \
+            --max-query-chars 64 \
+            --timeout-seconds 10 \
+            --out /tmp/quorabust-retrieval-policy.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          report = json.loads(Path("/tmp/quorabust-retrieval-policy.json").read_text())
+          assert report["policy"] == {
+              "max_queries": 1,
+              "max_k": 1,
+              "max_candidate_k": 1,
+              "max_query_chars": 64,
+              "timeout_seconds": 10.0,
+              "timeout_behavior": "cooperative_between_queries_and_stages",
+          }
+          assert report["queries"][0]["candidate_k"] == 1
+          PY
       - name: Retrieval benchmark CLI
         run: quorabust-retrieve-benchmark --help
       - name: Retrieval profile CLI
