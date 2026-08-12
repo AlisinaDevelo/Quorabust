@@ -150,11 +150,12 @@ reports as release evidence to review alongside the model card; they do not defi
   ECE as point estimates unless a permitted resampling protocol is supplied.
 - **`quorabust-validate-retrieval`** applies the same fail-closed discipline to
   retrieval/profile evidence and caller-supplied first-stage/final recall, warm/cold p95,
-  peak-RSS, and declared artifact-size policies. It also supports deployment-owned catalog-size
-  and first-stage candidate-k ceilings. A first-stage recall floor keeps candidate generation
-  accountable when a reranker is present. Cold-start and artifact-size budgets require profile
-  evidence; the validator does not choose deployment limits or convert synthetic smoke data into
-  a capacity claim.
+  peak-RSS, declared artifact-size, and bounded reranker-work policies. It also supports
+  deployment-owned catalog-size and first-stage candidate-k ceilings. A first-stage recall floor
+  keeps candidate generation accountable when a reranker is present, while the reranker-work
+  policy normalizes measured pair work by measured query count. This is a cost proxy, not a cloud
+  billing estimate. Cold-start and artifact-size budgets require profile evidence; the validator
+  does not choose deployment limits or convert synthetic smoke data into a capacity claim.
 - **`quorabust-validate-pair-profile`** applies caller-owned cold-start, warm batch/per-pair,
   peak-RSS, artifact-size, throughput, and optional quality policies to pair-classifier profiles.
   Labeled profiles include ROC-AUC and PR-AUC when both classes are present. A quality threshold

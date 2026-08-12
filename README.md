@@ -260,8 +260,10 @@ counts, latency summaries, and query-length strata, then apply caller-owned poli
 `--max-end-to-end-p95-ms 100`,
 `--max-cold-start-p95-ms`, `--max-peak-rss-bytes`, and
 `--max-total-artifact-bytes`, `--max-total-model-cache-bytes`, `--max-catalog-size`, and
-`--max-candidate-k`. The first-stage recall floor prevents a reranker from masking insufficient
-candidate generation. Cold-start, artifact-size, and model-cache-size policies require a profile;
+`--max-candidate-k`, plus `--max-reranker-pairs-per-query` for a bounded work budget. The
+first-stage recall floor prevents a reranker from masking insufficient candidate generation.
+The reranker policy normalizes measured pair work by measured query count; it is a cost proxy,
+not a cloud billing estimate. Cold-start, artifact-size, and model-cache-size policies require a profile;
 artifact-size requires at least one profiled `--artifact`, and model-cache-size requires at least
 one profiled `--model-cache`. Catalog and candidate ceilings are deployment-owned capacity
 policies. The gate compares supplied evidence; it does not turn the smoke fixture into a public

@@ -156,7 +156,8 @@ quorabust-validate-retrieval \
   --report reports/retrieval-benchmark.json \
   --min-first-stage-recall-at-k 50=0.90 \
   --min-final-recall-at-k 10=0.95 \
-  --max-end-to-end-p95-ms 100
+  --max-end-to-end-p95-ms 100 \
+  --max-reranker-pairs-per-query 50
 
 quorabust-validate-retrieval \
   --report reports/retrieval-profile.json \
@@ -172,7 +173,9 @@ The validator checks source hashes and byte counts, runtime provenance, repetiti
 sample invariants, and the query-length strata contract. It can also enforce deployment-owned
 first-stage recall floors, catalog-size, and candidate-k ceilings. The first-stage recall policy
 keeps candidate generation accountable when a reranker is enabled; a final-stage threshold alone
-is not enough to demonstrate that the candidate set contains the relevant result. The policy values belong to the target
+is not enough to demonstrate that the candidate set contains the relevant result. It can also
+enforce a reranker work budget normalized by measured query count; this is a bounded work proxy,
+not a cloud billing estimate. The policy values belong to the target
 deployment and must be chosen from representative measurements; the command does not claim
 that any displayed recall, latency, memory, or size threshold is universally correct. Cold-start
 and artifact-size policies require a fresh-process profile; artifact-size enforcement also
