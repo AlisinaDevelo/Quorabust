@@ -150,7 +150,8 @@ reports as release evidence to review alongside the model card; they do not defi
   ECE as point estimates unless a permitted resampling protocol is supplied.
 - **`quorabust-validate-retrieval`** applies the same fail-closed discipline to
   retrieval/profile evidence and caller-supplied recall, warm/cold p95, peak-RSS, and declared
-  artifact-size policies. Cold-start and artifact-size budgets require profile evidence; the
+  artifact-size policies. It also supports deployment-owned catalog-size and first-stage
+  candidate-k ceilings. Cold-start and artifact-size budgets require profile evidence; the
   validator does not choose deployment limits or convert synthetic smoke data into a capacity
   claim.
 - **`quorabust-validate-pair-profile`** applies caller-owned cold-start, warm batch/per-pair,

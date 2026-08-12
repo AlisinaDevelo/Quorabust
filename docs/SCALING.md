@@ -162,11 +162,14 @@ quorabust-validate-retrieval \
   --max-cold-start-p95-ms 5000 \
   --max-peak-rss-bytes 2147483648 \
   --max-total-artifact-bytes 1073741824 \
-  --max-total-model-cache-bytes 2147483648
+  --max-total-model-cache-bytes 2147483648 \
+  --max-catalog-size 1000000 \
+  --max-candidate-k 100
 ```
 
 The validator checks source hashes and byte counts, runtime provenance, repetition and latency
-sample invariants, and the query-length strata contract. The policy values belong to the target
+sample invariants, and the query-length strata contract. It can also enforce deployment-owned
+catalog-size and first-stage candidate ceilings. The policy values belong to the target
 deployment and must be chosen from representative measurements; the command does not claim
 that any displayed recall, latency, memory, or size threshold is universally correct. Cold-start
 and artifact-size policies require a fresh-process profile; artifact-size enforcement also
