@@ -469,6 +469,7 @@ jobs:
           assert report["dependency_lock"]["sha256"]
           assert report["warm_benchmark"]["pair_count"] == 32
           assert report["warm_benchmark"]["labels"]["present"] is True
+          assert 0 <= report["warm_benchmark"]["quality"]["pr_auc"] <= 1
           assert report["warm_benchmark"]["pair_length_strata"]
           PY
           quorabust-validate-pair-profile \
@@ -480,4 +481,5 @@ jobs:
             --max-total-artifact-bytes 10485760 \
             --min-quality-f1 0 \
             --min-quality-roc-auc 0 \
+            --min-quality-pr-auc 0 \
             --min-throughput-pairs-per-second 0

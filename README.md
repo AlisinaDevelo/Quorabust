@@ -242,14 +242,17 @@ model files or cache directories with repeatable `--model-cache`; each manifest 
 deterministic hash, total bytes, kind, and file count without publishing the local path. When
 `is_duplicate` is present, it also records
 label counts and optional quality metrics using the artifact threshold, an explicit `--threshold`,
-or `0.5`. Use this beside `quorabust-report`, not as a replacement for a permitted holdout model
-card; smoke measurements do not establish a production SLO or a universal model-quality claim.
+or `0.5`. Labeled profiles include ROC-AUC and PR-AUC when both classes are present. Use this
+beside `quorabust-report`, not as a replacement for a permitted holdout model card; smoke
+measurements do not establish a production SLO or a universal model-quality claim.
 
 Use `quorabust-validate-pair-profile` in a release job to apply caller-owned limits such as
 `--max-cold-start-p95-ms`, `--max-warm-batch-p95-ms`, `--max-warm-per-pair-p95-ms`,
 `--max-peak-rss-bytes`, `--max-total-artifact-bytes`, and optional `--min-quality-f1` or
-`--min-quality-roc-auc`. The validator fails closed on missing provenance, inconsistent batch or
-stratum counts, absent labeled quality evidence, or a breached policy; it does not invent SLOs.
+`--min-quality-roc-auc` or `--min-quality-pr-auc`. The validator fails closed on missing
+provenance, inconsistent batch or stratum counts, absent labeled quality evidence, or a breached
+policy; it does not invent SLOs. Older profiles without PR-AUC remain structurally readable, but
+a requested PR-AUC minimum requires that metric in the report.
 
 Use `quorabust-validate-retrieval` in release jobs to validate report provenance, measurement
 counts, latency summaries, and query-length strata, then apply caller-owned policies such as

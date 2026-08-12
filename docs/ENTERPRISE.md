@@ -155,8 +155,10 @@ reports as release evidence to review alongside the model card; they do not defi
   claim.
 - **`quorabust-validate-pair-profile`** applies caller-owned cold-start, warm batch/per-pair,
   peak-RSS, artifact-size, throughput, and optional quality policies to pair-classifier profiles.
-  A quality threshold requires labeled metrics in the same report, so a cost-only profile cannot
-  accidentally pass as a quality-and-cost promotion decision.
+  Labeled profiles include ROC-AUC and PR-AUC when both classes are present. A quality threshold
+  requires labeled metrics in the same report, so a cost-only profile cannot accidentally pass as
+  a quality-and-cost promotion decision; requesting `--min-quality-pr-auc` fails closed when the
+  report lacks PR-AUC.
 - Put TLS termination, distributed rate limiting, quotas, and key rotation at the ingress
   or gateway. The application key and batch cap are defense-in-depth controls, not a
   replacement for a multi-worker gateway policy. Ship the JSON request events to the
