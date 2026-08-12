@@ -410,9 +410,35 @@ def _validate_outer_payload(payload: Any, errors: list[str]) -> dict[str, Any] |
     return payload
 
 
+def _validate_recall_policy(
+    core: Mapping[str, Any],
+    *,
+    stage: str,
+    minimums: Mapping[int, float] | None,
+    errors: list[str],
+) -> None:
+    if not minimums:
+        return
+    stage_payload = core.get(stage)
+    recall = stage_payload.get("recall_at_k") if isinstance(stage_payload, dict) else None
+    field = f"{stage}.recall_at_k"
+    for cutoff, minimum in sorted(minimums.items()):
+        raw_value = recall.get(str(cutoff)) if isinstance(recall, dict) else None
+        if raw_value is None:
+            errors.append(f"{field} is missing cutoff {cutoff}")
+        elif not isinstance(raw_value, int | float) or isinstance(raw_value, bool):
+            errors.append(f"{field}.{cutoff} must be numeric")
+        elif float(raw_value) < minimum:
+            errors.append(
+                f"{field}.{cutoff}={float(raw_value):g} is below policy "
+                f"minimum {minimum:g}"
+            )
+
+
 def validate_retrieval_payload(
     payload: Any,
     *,
+    min_first_stage_recall_at_k: Mapping[int, float] | None = None,
     min_final_recall_at_k: Mapping[int, float] | None = None,
     max_end_to_end_p95_ms: float | None = None,
     max_cold_start_p95_ms: float | None = None,
@@ -447,20 +473,18 @@ def validate_retrieval_payload(
                 f"candidate_k={observed} exceeds policy maximum {max_candidate_k}"
             )
 
-    final = core.get("final") if isinstance(core, dict) else None
-    if min_final_recall_at_k:
-        final_recall = final.get("recall_at_k") if isinstance(final, dict) else None
-        for cutoff, minimum in sorted(min_final_recall_at_k.items()):
-            raw_value = final_recall.get(str(cutoff)) if isinstance(final_recall, dict) else None
-            if raw_value is None:
-                errors.append(f"final.recall_at_k is missing cutoff {cutoff}")
-            elif not isinstance(raw_value, int | float) or isinstance(raw_value, bool):
-                errors.append(f"final.recall_at_k.{cutoff} must be numeric")
-            elif float(raw_value) < minimum:
-                errors.append(
-                    f"final.recall_at_k.{cutoff}={float(raw_value):g} is below policy "
-                    f"minimum {minimum:g}"
-                )
+    _validate_recall_policy(
+        core,
+        stage="first_stage",
+        minimums=min_first_stage_recall_at_k,
+        errors=errors,
+    )
+    _validate_recall_policy(
+        core,
+        stage="final",
+        minimums=min_final_recall_at_k,
+        errors=errors,
+    )
 
     if max_end_to_end_p95_ms is not None:
         latency = core.get("latency_ms") if isinstance(core, dict) else None
@@ -601,6 +625,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--report", type=Path, required=True, help="Benchmark or profile JSON")
     parser.add_argument(
+        "--min-first-stage-recall-at-k",
+        type=_recall_policy,
+        action="append",
+        default=[],
+        metavar="K=VALUE",
+        help="Require first-stage recall at K to be at least VALUE; repeatable",
+    )
+    parser.add_argument(
         "--min-final-recall-at-k",
         type=_recall_policy,
         action="append",
@@ -663,6 +695,7 @@ def main(argv: list[str] | None = None) -> int:
 
     errors = validate_retrieval_payload(
         payload,
+        min_first_stage_recall_at_k=dict(args.min_first_stage_recall_at_k),
         min_final_recall_at_k=dict(args.min_final_recall_at_k),
         max_end_to_end_p95_ms=args.max_end_to_end_p95_ms,
         max_cold_start_p95_ms=args.max_cold_start_p95_ms,

@@ -114,6 +114,25 @@ def test_validate_retrieval_payload_accepts_benchmark_and_profile(tmp_path):
     ) == []
 
 
+def test_validate_retrieval_payload_enforces_first_stage_recall_policy(tmp_path):
+    _, payload = _benchmark_report(tmp_path)
+    payload["first_stage"]["recall_at_k"]["1"] = 0.25
+    del payload["first_stage"]["recall_at_k"]["2"]
+
+    assert validate_retrieval_payload(
+        payload,
+        min_first_stage_recall_at_k={1: 0.25},
+    ) == []
+
+    errors = validate_retrieval_payload(
+        payload,
+        min_first_stage_recall_at_k={1: 0.5, 2: 0.5},
+    )
+
+    assert any("first_stage.recall_at_k.1=0.25" in error for error in errors)
+    assert "first_stage.recall_at_k is missing cutoff 2" in errors
+
+
 def test_validate_retrieval_payload_enforces_profile_resource_budgets(tmp_path):
     _, payload = _benchmark_report(tmp_path)
     profile = _profile_report(payload)
@@ -257,3 +276,22 @@ def test_validate_retrieval_cli_passes_and_fails_policy(tmp_path, capsys):
         )
         == 0
     )
+
+
+def test_validate_retrieval_cli_enforces_first_stage_recall_policy(tmp_path, capsys):
+    report, payload = _benchmark_report(tmp_path)
+    payload["first_stage"]["recall_at_k"]["1"] = 0.25
+    report.write_text(json.dumps(payload), encoding="utf-8")
+
+    assert (
+        main(
+            [
+                "--report",
+                str(report),
+                "--min-first-stage-recall-at-k",
+                "1=0.5",
+            ]
+        )
+        == 1
+    )
+    assert "first_stage.recall_at_k.1=0.25" in capsys.readouterr().err
