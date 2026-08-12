@@ -419,7 +419,7 @@ jobs:
             --warmup-runs 0 \
             --repetitions 1 \
             --cold-start-repetitions 2 \
-            --timeout-seconds 10 \
+            --timeout-seconds 30 \
             --artifact /tmp/quorabust-smoke.qmodel \
             --model-cache /tmp/quorabust-model-cache \
             --out /tmp/quorabust-retrieval-profile.json

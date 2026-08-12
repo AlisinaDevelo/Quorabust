@@ -56,7 +56,7 @@ def test_profile_cli_reports_fresh_processes_sizes_and_path_light_output(tmp_pat
                 "--cold-start-repetitions",
                 "2",
                 "--timeout-seconds",
-                "10",
+                "30",
                 "--artifact",
                 str(artifact),
                 "--model-cache",

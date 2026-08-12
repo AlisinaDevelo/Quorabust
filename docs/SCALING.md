@@ -207,8 +207,9 @@ hashes and byte sizes, optional local artifact hashes/sizes from repeated `--art
 optional model file/cache manifests from repeated `--model-cache` flags. A cache manifest records
 its deterministic tree hash, total bytes, kind, and file count while keeping the local path out of
 the report. This is timing and packaging evidence only; it makes no quality claim and does not
-upload or commit model weights. The child timeout is a bounded process supervisor timeout, while
-the nested benchmark timeout remains a cooperative stage deadline.
+upload or commit model weights. The child timeout is a bounded process supervisor timeout that
+includes interpreter import and model/catalog startup; leave startup headroom in this value. The
+nested benchmark timeout remains a cooperative stage deadline.
 
 ## Online serving, SLOs, monitoring
 
