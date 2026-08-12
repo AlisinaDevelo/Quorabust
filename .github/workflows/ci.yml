@@ -400,6 +400,7 @@ jobs:
           PY
           quorabust-validate-retrieval \
             --report /tmp/quorabust-retrieval-benchmark.json \
+            --min-first-stage-recall-at-k 1=1.0 \
             --min-final-recall-at-k 1=1.0 \
             --max-end-to-end-p95-ms 1000 \
             --max-catalog-size 3 \

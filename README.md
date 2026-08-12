@@ -256,10 +256,12 @@ a requested PR-AUC minimum requires that metric in the report.
 
 Use `quorabust-validate-retrieval` in release jobs to validate report provenance, measurement
 counts, latency summaries, and query-length strata, then apply caller-owned policies such as
-`--min-final-recall-at-k 10=0.95`, `--max-end-to-end-p95-ms 100`,
+`--min-first-stage-recall-at-k 50=0.90`, `--min-final-recall-at-k 10=0.95`,
+`--max-end-to-end-p95-ms 100`,
 `--max-cold-start-p95-ms`, `--max-peak-rss-bytes`, and
 `--max-total-artifact-bytes`, `--max-total-model-cache-bytes`, `--max-catalog-size`, and
-`--max-candidate-k`. Cold-start, artifact-size, and model-cache-size policies require a profile;
+`--max-candidate-k`. The first-stage recall floor prevents a reranker from masking insufficient
+candidate generation. Cold-start, artifact-size, and model-cache-size policies require a profile;
 artifact-size requires at least one profiled `--artifact`, and model-cache-size requires at least
 one profiled `--model-cache`. Catalog and candidate ceilings are deployment-owned capacity
 policies. The gate compares supplied evidence; it does not turn the smoke fixture into a public
