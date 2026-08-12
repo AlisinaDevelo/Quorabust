@@ -435,6 +435,34 @@ def _validate_recall_policy(
             )
 
 
+def _validate_reranker_work_policy(
+    core: Mapping[str, Any],
+    *,
+    maximum: float | None,
+    errors: list[str],
+) -> None:
+    if maximum is None:
+        return
+    measured_query_count = core.get("measured_query_count")
+    work = core.get("work")
+    reranker_pairs = work.get("reranker_pairs") if isinstance(work, dict) else None
+    if (
+        not isinstance(measured_query_count, int)
+        or isinstance(measured_query_count, bool)
+        or measured_query_count < 1
+        or not isinstance(reranker_pairs, int)
+        or isinstance(reranker_pairs, bool)
+        or reranker_pairs < 0
+    ):
+        return
+    observed = reranker_pairs / measured_query_count
+    if observed > maximum:
+        errors.append(
+            "work.reranker_pairs_per_measured_query="
+            f"{observed:g} exceeds policy maximum {maximum:g}"
+        )
+
+
 def validate_retrieval_payload(
     payload: Any,
     *,
@@ -447,6 +475,7 @@ def validate_retrieval_payload(
     max_total_model_cache_bytes: int | None = None,
     max_catalog_size: int | None = None,
     max_candidate_k: int | None = None,
+    max_reranker_pairs_per_query: float | None = None,
 ) -> list[str]:
     """Return structural and caller-supplied policy errors for a retrieval report."""
     errors: list[str] = []
@@ -485,6 +514,7 @@ def validate_retrieval_payload(
         minimums=min_final_recall_at_k,
         errors=errors,
     )
+    _validate_reranker_work_policy(core, maximum=max_reranker_pairs_per_query, errors=errors)
 
     if max_end_to_end_p95_ms is not None:
         latency = core.get("latency_ms") if isinstance(core, dict) else None
@@ -682,6 +712,12 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Require the first-stage candidate bound to stay at or below VALUE",
     )
+    parser.add_argument(
+        "--max-reranker-pairs-per-query",
+        type=_non_negative_float,
+        default=None,
+        help="Require reranker work per measured query to stay at or below VALUE",
+    )
     args = parser.parse_args(argv)
 
     if not args.report.is_file():
@@ -704,6 +740,7 @@ def main(argv: list[str] | None = None) -> int:
         max_total_model_cache_bytes=args.max_total_model_cache_bytes,
         max_catalog_size=args.max_catalog_size,
         max_candidate_k=args.max_candidate_k,
+        max_reranker_pairs_per_query=args.max_reranker_pairs_per_query,
     )
     if errors:
         for error in errors:

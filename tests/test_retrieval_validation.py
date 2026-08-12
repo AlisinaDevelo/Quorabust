@@ -133,6 +133,24 @@ def test_validate_retrieval_payload_enforces_first_stage_recall_policy(tmp_path)
     assert "first_stage.recall_at_k is missing cutoff 2" in errors
 
 
+def test_validate_retrieval_payload_enforces_reranker_work_policy(tmp_path):
+    _, payload = _benchmark_report(tmp_path)
+    measured_query_count = payload["measured_query_count"]
+    payload["work"]["reranker_pairs"] = measured_query_count * 3
+
+    assert validate_retrieval_payload(
+        payload,
+        max_reranker_pairs_per_query=3.0,
+    ) == []
+
+    errors = validate_retrieval_payload(
+        payload,
+        max_reranker_pairs_per_query=2.0,
+    )
+
+    assert any("reranker_pairs_per_measured_query=3" in error for error in errors)
+
+
 def test_validate_retrieval_payload_enforces_profile_resource_budgets(tmp_path):
     _, payload = _benchmark_report(tmp_path)
     profile = _profile_report(payload)
@@ -295,3 +313,22 @@ def test_validate_retrieval_cli_enforces_first_stage_recall_policy(tmp_path, cap
         == 1
     )
     assert "first_stage.recall_at_k.1=0.25" in capsys.readouterr().err
+
+
+def test_validate_retrieval_cli_enforces_reranker_work_policy(tmp_path, capsys):
+    report, payload = _benchmark_report(tmp_path)
+    payload["work"]["reranker_pairs"] = payload["measured_query_count"] * 3
+    report.write_text(json.dumps(payload), encoding="utf-8")
+
+    assert (
+        main(
+            [
+                "--report",
+                str(report),
+                "--max-reranker-pairs-per-query",
+                "2",
+            ]
+        )
+        == 1
+    )
+    assert "reranker_pairs_per_measured_query=3" in capsys.readouterr().err
