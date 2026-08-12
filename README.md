@@ -18,6 +18,8 @@ pickle boundary, parity checks, and promotion threat model.
 via Docker Compose.
 **API snapshots:** [docs/demo-assets](docs/demo-assets) — generated request/response and
 OpenAPI excerpts for quick inspection without running the service.
+**Evidence index:** [docs/EVIDENCE_INDEX.md](docs/EVIDENCE_INDEX.md) — the shortest route
+through supported claims, measured tradeoffs, release controls, and open gates.
 **Hosted demo checklist:** [docs/HOSTED_DEMO.md](docs/HOSTED_DEMO.md) — safe public demo
 requirements and portfolio capture notes.
 **Real benchmark evidence:** [docs/REAL_BENCHMARK_RESULT.md](docs/REAL_BENCHMARK_RESULT.md) —
