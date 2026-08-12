@@ -100,6 +100,8 @@ def test_validate_retrieval_payload_accepts_benchmark_and_profile(tmp_path):
         payload,
         min_final_recall_at_k={1: 1.0},
         max_end_to_end_p95_ms=1000.0,
+        max_catalog_size=3,
+        max_candidate_k=2,
     ) == []
     assert validate_retrieval_payload(
         profile,
@@ -107,6 +109,8 @@ def test_validate_retrieval_payload_accepts_benchmark_and_profile(tmp_path):
         max_peak_rss_bytes=4096,
         max_total_artifact_bytes=25,
         max_total_model_cache_bytes=30,
+        max_catalog_size=3,
+        max_candidate_k=2,
     ) == []
 
 
@@ -121,12 +125,16 @@ def test_validate_retrieval_payload_enforces_profile_resource_budgets(tmp_path):
         max_peak_rss_bytes=4095,
         max_total_artifact_bytes=24,
         max_total_model_cache_bytes=29,
+        max_catalog_size=2,
+        max_candidate_k=1,
     )
 
     assert any("cold_start.process_to_report_ms.p95" in error for error in errors)
     assert any("runtime.peak_rss_bytes" in error for error in errors)
     assert any("total artifact bytes" in error for error in errors)
     assert any("total model cache bytes" in error for error in errors)
+    assert any("catalog_size=3" in error for error in errors)
+    assert any("candidate_k=2" in error for error in errors)
 
 
 def test_validate_retrieval_payload_fails_closed_without_profile_evidence(tmp_path):
@@ -213,6 +221,10 @@ def test_validate_retrieval_cli_passes_and_fails_policy(tmp_path, capsys):
                 "1=1.0",
                 "--max-end-to-end-p95-ms",
                 "1000",
+                "--max-catalog-size",
+                "3",
+                "--max-candidate-k",
+                "2",
             ]
         )
         == 0
@@ -237,6 +249,10 @@ def test_validate_retrieval_cli_passes_and_fails_policy(tmp_path, capsys):
                 "4096",
                 "--max-total-artifact-bytes",
                 "25",
+                "--max-catalog-size",
+                "3",
+                "--max-candidate-k",
+                "2",
             ]
         )
         == 0

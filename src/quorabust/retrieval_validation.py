@@ -419,6 +419,8 @@ def validate_retrieval_payload(
     max_peak_rss_bytes: int | None = None,
     max_total_artifact_bytes: int | None = None,
     max_total_model_cache_bytes: int | None = None,
+    max_catalog_size: int | None = None,
+    max_candidate_k: int | None = None,
 ) -> list[str]:
     """Return structural and caller-supplied policy errors for a retrieval report."""
     errors: list[str] = []
@@ -426,6 +428,24 @@ def validate_retrieval_payload(
     if core is None:
         return errors
     _validate_core_payload(core, errors)
+
+    if max_catalog_size is not None:
+        observed = core.get("catalog_size")
+        if not isinstance(observed, int) or isinstance(observed, bool):
+            errors.append("catalog_size must be an integer for the catalog-size policy")
+        elif observed > max_catalog_size:
+            errors.append(
+                f"catalog_size={observed} exceeds policy maximum {max_catalog_size}"
+            )
+
+    if max_candidate_k is not None:
+        observed = core.get("candidate_k")
+        if not isinstance(observed, int) or isinstance(observed, bool):
+            errors.append("candidate_k must be an integer for the candidate-k policy")
+        elif observed > max_candidate_k:
+            errors.append(
+                f"candidate_k={observed} exceeds policy maximum {max_candidate_k}"
+            )
 
     final = core.get("final") if isinstance(core, dict) else None
     if min_final_recall_at_k:
@@ -568,6 +588,13 @@ def _non_negative_int(value: str) -> int:
     return parsed
 
 
+def _positive_int(value: str) -> int:
+    parsed = _non_negative_int(value)
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("must be at least 1")
+    return parsed
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Validate retrieval benchmark evidence and optional release policies.",
@@ -611,6 +638,18 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Require total declared model cache size to stay at or below VALUE bytes",
     )
+    parser.add_argument(
+        "--max-catalog-size",
+        type=_positive_int,
+        default=None,
+        help="Require the profiled catalog size to stay at or below VALUE rows",
+    )
+    parser.add_argument(
+        "--max-candidate-k",
+        type=_positive_int,
+        default=None,
+        help="Require the first-stage candidate bound to stay at or below VALUE",
+    )
     args = parser.parse_args(argv)
 
     if not args.report.is_file():
@@ -630,6 +669,8 @@ def main(argv: list[str] | None = None) -> int:
         max_peak_rss_bytes=args.max_peak_rss_bytes,
         max_total_artifact_bytes=args.max_total_artifact_bytes,
         max_total_model_cache_bytes=args.max_total_model_cache_bytes,
+        max_catalog_size=args.max_catalog_size,
+        max_candidate_k=args.max_candidate_k,
     )
     if errors:
         for error in errors:
