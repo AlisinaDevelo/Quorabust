@@ -107,6 +107,7 @@ def test_pair_profile_cli_reports_cost_provenance_and_length_strata(tmp_path):
     assert warm["work"]["throughput_pairs_per_second"] > 0.0
     assert set(warm["pair_length_strata"]) == {"short", "medium"}
     assert warm["labels"]["counts"] == {"0": 2, "1": 2}
+    assert 0.0 <= warm["quality"]["pr_auc"] <= 1.0
     assert str(tmp_path) not in output.read_text(encoding="utf-8")
 
 

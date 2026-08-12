@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import (
     accuracy_score,
+    average_precision_score,
     f1_score,
     log_loss,
     precision_score,
@@ -106,6 +107,7 @@ def _quality_metrics(
     }
     if len(unique_labels) > 1:
         metrics["roc_auc"] = float(roc_auc_score(labels, probabilities))
+        metrics["pr_auc"] = float(average_precision_score(labels, probabilities))
     return metrics
 
 

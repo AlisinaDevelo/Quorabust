@@ -237,6 +237,10 @@ def _validate_quality(warm: dict[str, Any], pair_count: int | None, errors: list
             _number(quality.get("roc_auc"), "quality.roc_auc", errors)
             if isinstance(quality.get("roc_auc"), int | float) and float(quality["roc_auc"]) > 1.0:
                 errors.append("quality.roc_auc must be at most 1")
+        if "pr_auc" in quality:
+            _number(quality.get("pr_auc"), "quality.pr_auc", errors)
+            if isinstance(quality.get("pr_auc"), int | float) and float(quality["pr_auc"]) > 1.0:
+                errors.append("quality.pr_auc must be at most 1")
     elif counts is not None or warm.get("quality") is not None:
         errors.append("quality and label counts must be null when labels are absent")
 
@@ -416,6 +420,7 @@ def validate_pair_profile_payload(
     max_total_artifact_bytes: int | None = None,
     min_quality_f1: float | None = None,
     min_quality_roc_auc: float | None = None,
+    min_quality_pr_auc: float | None = None,
     min_throughput_pairs_per_second: float | None = None,
 ) -> list[str]:
     """Return structural and caller-owned policy errors for a pair profile."""
@@ -507,6 +512,7 @@ def validate_pair_profile_payload(
     for field, minimum in (
         ("f1", min_quality_f1),
         ("roc_auc", min_quality_roc_auc),
+        ("pr_auc", min_quality_pr_auc),
     ):
         if minimum is None:
             continue
@@ -569,6 +575,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-total-artifact-bytes", type=_non_negative_int, default=None)
     parser.add_argument("--min-quality-f1", type=_fraction, default=None)
     parser.add_argument("--min-quality-roc-auc", type=_fraction, default=None)
+    parser.add_argument("--min-quality-pr-auc", type=_fraction, default=None)
     parser.add_argument(
         "--min-throughput-pairs-per-second",
         type=_non_negative_float,
@@ -594,6 +601,7 @@ def main(argv: list[str] | None = None) -> int:
         max_total_artifact_bytes=args.max_total_artifact_bytes,
         min_quality_f1=args.min_quality_f1,
         min_quality_roc_auc=args.min_quality_roc_auc,
+        min_quality_pr_auc=args.min_quality_pr_auc,
         min_throughput_pairs_per_second=args.min_throughput_pairs_per_second,
     )
     if errors:

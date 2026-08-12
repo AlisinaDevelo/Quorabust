@@ -75,6 +75,7 @@ def _payload() -> dict:
                 "f1": 0.8,
                 "log_loss": 0.3,
                 "roc_auc": 0.9,
+                "pr_auc": 0.9,
             },
             "work": {"throughput_pairs_per_second": 50.0, "concurrency": 1, "execution": "serial"},
             "measurement_policy": {
@@ -122,6 +123,7 @@ def test_validate_pair_profile_accepts_quality_and_cost_policies():
             max_total_artifact_bytes=25,
             min_quality_f1=0.8,
             min_quality_roc_auc=0.9,
+            min_quality_pr_auc=0.9,
             min_throughput_pairs_per_second=50.0,
         )
         == []
@@ -136,6 +138,7 @@ def test_validate_pair_profile_reports_policy_failures():
         max_peak_rss_bytes=4095,
         max_total_artifact_bytes=24,
         min_quality_f1=0.9,
+        min_quality_pr_auc=0.95,
         min_throughput_pairs_per_second=60.0,
     )
 
@@ -144,6 +147,7 @@ def test_validate_pair_profile_reports_policy_failures():
     assert any("warm_benchmark.runtime.peak_rss_bytes" in error for error in errors)
     assert any("total artifact bytes" in error for error in errors)
     assert any("quality.f1" in error for error in errors)
+    assert any("quality.pr_auc" in error for error in errors)
     assert any("throughput_pairs_per_second" in error for error in errors)
 
 
@@ -158,6 +162,9 @@ def test_validate_pair_profile_cli_fails_quality_policy_without_labels(tmp_path,
     assert main(["--report", str(report)]) == 0
     assert "validated" in capsys.readouterr().out
     assert main(["--report", str(report), "--min-quality-f1", "0.5"]) == 1
+    assert "quality policy requires labeled" in capsys.readouterr().err
+
+    assert main(["--report", str(report), "--min-quality-pr-auc", "0.5"]) == 1
     assert "quality policy requires labeled" in capsys.readouterr().err
 
     broken = copy.deepcopy(payload)
