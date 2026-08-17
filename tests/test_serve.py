@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 from starlette.testclient import TestClient
 
+from quorabust import __version__
 from quorabust.calibration import calibrate_classifier
 from quorabust.lineage import sha256_file
 from quorabust.model import train_duplicate_classifier
@@ -248,6 +249,8 @@ def test_openapi_includes_predict_examples(tmp_path):
     app = create_app(model_path_a=str(p))
     with TestClient(app) as client:
         spec = client.get("/openapi.json").json()
+    assert spec["info"]["title"] == f"Quorabust {__version__}"
+    assert spec["info"]["version"] == __version__
     post = spec["paths"]["/predict"]["post"]
     assert post.get("summary")
     assert "scoring" in post.get("tags", [])

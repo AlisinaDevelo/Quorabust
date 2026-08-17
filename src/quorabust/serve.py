@@ -559,8 +559,10 @@ def create_app(
                 state["b"] = load_variant(pb, expected_sha256_b, "b")
         yield
 
+    service_version = _dist_version()
     app = FastAPI(
-        title=f"Quorabust {_dist_version()}",
+        title=f"Quorabust {service_version}",
+        version=service_version,
         lifespan=lifespan,
         openapi_tags=[
             {"name": "scoring", "description": "Duplicate probability for question pairs."},
