@@ -273,12 +273,73 @@ def _validate_protocol_binding(
         )
 
 
+def _validate_slice_provenance_policy(
+    payload: dict[str, Any],
+    manifest: dict[str, Any],
+    errors: list[str],
+) -> None:
+    slices = payload.get("evaluation_slices")
+    if not isinstance(slices, dict) or not slices:
+        errors.append(
+            "evaluation_slices must be a non-empty object when slice provenance is required"
+        )
+        return
+
+    if "slice_provenance" not in manifest:
+        errors.append("missing evaluation_manifest.slice_provenance for evaluation_slices")
+        return
+    provenance = manifest["slice_provenance"]
+    if not isinstance(provenance, dict):
+        return
+    provenance_manifest = provenance.get("manifest")
+    if not isinstance(provenance_manifest, dict):
+        return
+    columns = provenance_manifest.get("columns")
+    if not isinstance(columns, dict) or not all(
+        isinstance(column, str) for column in columns
+    ):
+        return
+    expected_columns = sorted(columns)
+
+    evaluation_policy = manifest.get("evaluation_policy")
+    requested_columns = (
+        evaluation_policy.get("slice_columns")
+        if isinstance(evaluation_policy, dict)
+        else None
+    )
+    if not isinstance(requested_columns, list) or not all(
+        isinstance(column, str) for column in requested_columns
+    ):
+        errors.append(
+            "evaluation_manifest.evaluation_policy.slice_columns must match "
+            "evaluation_manifest.slice_provenance.manifest.columns"
+        )
+    elif sorted(requested_columns) != expected_columns:
+        errors.append(
+            "evaluation_manifest.evaluation_policy.slice_columns must match "
+            "evaluation_manifest.slice_provenance.manifest.columns"
+        )
+
+    output_columns = list(slices)
+    if not all(isinstance(column, str) for column in output_columns):
+        errors.append(
+            "evaluation_slices columns must match "
+            "evaluation_manifest.slice_provenance.manifest.columns"
+        )
+    elif sorted(output_columns) != expected_columns:
+        errors.append(
+            "evaluation_slices columns must match "
+            "evaluation_manifest.slice_provenance.manifest.columns"
+        )
+
+
 def validate_report_payload(
     payload: Any,
     *,
     require_holdout: bool = False,
     require_calibration: bool = False,
     require_manifest: bool = False,
+    require_slice_provenance: bool = False,
     require_question_component_split: bool = False,
     protocol_payload: Any | None = None,
 ) -> list[str]:
@@ -293,6 +354,8 @@ def validate_report_payload(
         require_calibration = True
         require_manifest = True
         require_question_component_split = True
+    if require_slice_provenance and payload.get("evaluation_slices") is not None:
+        require_manifest = True
     for key in _missing_keys(payload, _REQUIRED_TOP_LEVEL):
         errors.append(f"missing top-level field: {key}")
 
@@ -345,6 +408,8 @@ def validate_report_payload(
                     "evaluation_manifest." + error
                     for error in validate_slice_provenance_payload(manifest["slice_provenance"])
                 )
+            if require_slice_provenance:
+                _validate_slice_provenance_policy(payload, manifest, errors)
             if require_question_component_split:
                 _validate_question_component_split(manifest, errors)
     if protocol_bound:
@@ -372,6 +437,11 @@ def main(argv: list[str] | None = None) -> int:
         "--require-manifest",
         action="store_true",
         help="Fail unless holdout reproducibility metadata is present",
+    )
+    parser.add_argument(
+        "--require-slice-provenance",
+        action="store_true",
+        help="Fail unless evaluation slices have bound manifest provenance",
     )
     parser.add_argument(
         "--require-question-component-split",
@@ -411,6 +481,7 @@ def main(argv: list[str] | None = None) -> int:
         require_holdout=args.require_holdout or protocol_payload is not None,
         require_calibration=args.require_calibration or protocol_payload is not None,
         require_manifest=args.require_manifest or protocol_payload is not None,
+        require_slice_provenance=args.require_slice_provenance,
         require_question_component_split=(
             args.require_question_component_split or protocol_payload is not None
         ),

@@ -226,6 +226,67 @@ def test_validate_report_payload_rejects_incomplete_slice_provenance():
     )
 
 
+def _slice_payload():
+    payload = _payload()
+    payload["evaluation_slices"] = {
+        "language": [{"value": "en", "n": 10}],
+    }
+    payload["evaluation_manifest"]["evaluation_policy"]["slice_columns"] = ["language"]
+    payload["evaluation_manifest"]["slice_provenance"] = {
+        "manifest": {
+            "schema_version": 1,
+            "source": {
+                "reference": "synthetic://evaluation.csv",
+                "sha256": "a" * 64,
+                "rows": 10,
+            },
+            "columns": {"language": {"labeling_method": "synthetic owner labels"}},
+        },
+        "observed_row_counts": {"language": {"rows": 10, "labels": {"en": 10}}},
+    }
+    return payload
+
+
+def test_validate_report_payload_requires_slice_provenance_for_release_slices():
+    payload = _payload()
+    payload["evaluation_slices"] = {"language": [{"value": "en", "n": 10}]}
+
+    errors = validate_report_payload(payload, require_slice_provenance=True)
+
+    assert errors == ["missing evaluation_manifest.slice_provenance for evaluation_slices"]
+
+
+def test_validate_report_payload_accepts_bound_slice_provenance():
+    assert validate_report_payload(
+        _slice_payload(),
+        require_slice_provenance=True,
+    ) == []
+
+
+def test_validate_report_payload_rejects_slice_column_binding_mismatch():
+    payload = _slice_payload()
+    payload["evaluation_manifest"]["evaluation_policy"]["slice_columns"] = ["domain"]
+
+    errors = validate_report_payload(payload, require_slice_provenance=True)
+
+    assert (
+        "evaluation_manifest.evaluation_policy.slice_columns must match "
+        "evaluation_manifest.slice_provenance.manifest.columns"
+    ) in errors
+
+
+def test_validate_report_payload_rejects_emitted_slice_column_mismatch():
+    payload = _slice_payload()
+    payload["evaluation_slices"] = {"domain": [{"value": "quora", "n": 10}]}
+
+    errors = validate_report_payload(payload, require_slice_provenance=True)
+
+    assert (
+        "evaluation_slices columns must match "
+        "evaluation_manifest.slice_provenance.manifest.columns"
+    ) in errors
+
+
 def test_validate_report_cli_passes(tmp_path):
     report = tmp_path / "report.json"
     report.write_text(json.dumps(_payload()), encoding="utf-8")
@@ -250,6 +311,15 @@ def test_validate_report_cli_fails_for_missing_holdout(tmp_path):
     report = tmp_path / "report.json"
     report.write_text(json.dumps(payload), encoding="utf-8")
     assert main(["--report", str(report), "--require-holdout"]) == 1
+
+
+def test_validate_report_cli_fails_for_unbound_slices(tmp_path):
+    payload = _payload()
+    payload["evaluation_slices"] = {"language": [{"value": "en", "n": 10}]}
+    report = tmp_path / "report.json"
+    report.write_text(json.dumps(payload), encoding="utf-8")
+
+    assert main(["--report", str(report), "--require-slice-provenance"]) == 1
 
 
 def test_validate_report_payload_reports_missing_manifest():

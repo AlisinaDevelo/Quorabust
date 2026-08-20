@@ -230,6 +230,12 @@ columns, and those columns in the evaluated CSV. Leave it off for
 an explicitly documented exploratory or customer-domain report that accepts the row-level
 fallback. This policy validates protocol metadata; it does not establish model quality.
 
+For a report that emits `evaluation_slices`, add `--require-slice-provenance` to fail closed
+unless the report contains a slice manifest bound to the exact evaluated CSV, with an explicit
+labeling method for every requested column. The validator also checks that the requested and
+emitted slice columns match the sidecar. Leave this policy off for exploratory slice reports;
+it does not establish domain or multilingual quality.
+
 Use repeated `--compare-model label=path` arguments when you need to compare trained
 backends against the same holdout split:
 
