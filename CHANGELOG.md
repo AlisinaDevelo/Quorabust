@@ -39,6 +39,7 @@
   JSONL registry records now carry the post-save artifact digest.
 
 ### Fixed
+- Report release validation can require provenance for emitted evaluation slices.
 - OpenAPI serving metadata now uses the installed package version for both the API title
   and version, keeping release snapshots and runtime identity aligned.
 - Docker image now installs serving dependencies via `.[serve]`.
