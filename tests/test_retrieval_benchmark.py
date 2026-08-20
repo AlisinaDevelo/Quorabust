@@ -9,6 +9,7 @@ from quorabust.retrieval_benchmark import (
     benchmark_retrieval,
     evaluate_rankings,
     load_retrieval_qrels,
+    model_cache_manifest,
     query_length_bucket,
     summarize_latencies_ms,
 )
@@ -63,6 +64,59 @@ def test_qrels_loader_groups_queries_and_rejects_unknown_ids(tmp_path):
 
     with pytest.raises(ValueError, match="unknown catalog"):
         load_retrieval_qrels(qrels, catalog_ids={"q1", "q2"})
+
+
+def test_model_cache_manifest_is_path_light_and_order_independent(tmp_path):
+    cache_a = tmp_path / "cache-a"
+    cache_b = tmp_path / "cache-b"
+    (cache_a / "nested").mkdir(parents=True)
+    (cache_a / "root.bin").write_bytes(b"root")
+    (cache_a / "nested" / "model.bin").write_bytes(b"nested")
+    (cache_b / "nested").mkdir(parents=True)
+    (cache_b / "nested" / "model.bin").write_bytes(b"nested")
+    (cache_b / "root.bin").write_bytes(b"root")
+
+    manifest_a = model_cache_manifest(str(cache_a))
+    manifest_b = model_cache_manifest(str(cache_b))
+
+    assert manifest_a["kind"] == "directory"
+    assert manifest_a["file_count"] == 2
+    assert manifest_a["bytes"] == len(b"root") + len(b"nested")
+    assert manifest_a["sha256"] == manifest_b["sha256"]
+    assert str(tmp_path) not in json.dumps(manifest_a)
+
+
+def test_model_cache_manifest_changes_with_content_and_rejects_symlinks(tmp_path):
+    cache = tmp_path / "cache"
+    cache.mkdir()
+    weights = cache / "weights.bin"
+    weights.write_bytes(b"before")
+    before = model_cache_manifest(str(cache))
+
+    weights.write_bytes(b"after!")
+    after = model_cache_manifest(str(cache))
+    assert before["sha256"] != after["sha256"]
+
+    linked = cache / "linked.bin"
+    linked.symlink_to(tmp_path / "outside.bin")
+    with pytest.raises(ValueError, match="must not contain symlinks"):
+        model_cache_manifest(str(cache))
+
+
+def test_model_cache_manifest_supports_a_single_file_and_rejects_symlink_root(tmp_path):
+    artifact = tmp_path / "model.bin"
+    artifact.write_bytes(b"model")
+    manifest = model_cache_manifest(str(artifact))
+
+    assert manifest["kind"] == "file"
+    assert manifest["file_count"] == 1
+    assert manifest["bytes"] == len(b"model")
+    assert manifest["name"] == artifact.name
+
+    link = tmp_path / "model-link.bin"
+    link.symlink_to(artifact)
+    with pytest.raises(ValueError, match="must not be a symlink"):
+        model_cache_manifest(str(link))
 
 
 @pytest.mark.parametrize(
