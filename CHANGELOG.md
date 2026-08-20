@@ -39,6 +39,8 @@
   JSONL registry records now carry the post-save artifact digest.
 
 ### Fixed
+- OpenAPI serving metadata now uses the installed package version for both the API title
+  and version, keeping release snapshots and runtime identity aligned.
 - Docker image now installs serving dependencies via `.[serve]`.
 - Capped NumPy below 2.5 so Mypy can parse dependency stubs with the configured
   Python target.
